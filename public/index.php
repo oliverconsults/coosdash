@@ -239,28 +239,40 @@ renderHeader('Dashboard');
         </div>
         <div class="meta">#<?php echo (int)$node['id']; ?> • created_by=<?php echo h($node['created_by']); ?></div>
 
-        <div class="row" style="margin-top:10px">
-          <form method="post" style="display:flex;gap:8px;flex-wrap:wrap">
-            <input type="hidden" name="action" value="set_main">
+        <?php
+          $ms = (string)($node['main_status'] ?? '');
+          $ws = (string)($node['worker_status'] ?? '');
+        ?>
+
+        <div class="row" style="margin-top:10px; align-items:center">
+          <div class="meta">Optionen:</div>
+
+          <?php if ($ms === 'new' && $ws === 'approve'): ?>
+            <form method="post" action="/actions.php" style="margin:0">
+              <input type="hidden" name="action" value="accept">
+              <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
+              <button class="btn btn-gold" type="submit">accept</button>
+            </form>
+          <?php endif; ?>
+
+          <?php if ($ms === 'active' && $ws === 'approve'): ?>
+            <form method="post" action="/actions.php" style="margin:0">
+              <input type="hidden" name="action" value="approve_to_todo_recursive">
+              <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
+              <button class="btn btn-gold" type="submit">release</button>
+            </form>
+          <?php endif; ?>
+
+          <form method="post" action="/actions.php" style="margin:0">
+            <input type="hidden" name="action" value="set_later">
             <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
-            <button class="btn" name="main_status" value="active">active</button>
-            <button class="btn" name="main_status" value="later">later</button>
-            <button class="btn" name="main_status" value="canceled">canceled</button>
-            <button class="btn" name="main_status" value="new">new</button>
+            <button class="btn" type="submit">later</button>
           </form>
 
-          <form method="post" style="display:flex;gap:8px;flex-wrap:wrap">
-            <input type="hidden" name="action" value="set_worker">
+          <form method="post" action="/actions.php" style="margin:0">
+            <input type="hidden" name="action" value="set_cancel">
             <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
-            <button class="btn btn-gold" name="worker_status" value="todo">todo</button>
-            <button class="btn" name="worker_status" value="approve">approve</button>
-            <button class="btn" name="worker_status" value="done">done</button>
-          </form>
-
-          <form method="post" action="/actions.php" style="display:flex;gap:8px;flex-wrap:wrap">
-            <input type="hidden" name="action" value="approve_to_todo_recursive">
-            <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
-            <button class="btn" type="submit">Freigeben (rekursiv)</button>
+            <button class="btn" type="submit">cancel</button>
           </form>
         </div>
       </div>

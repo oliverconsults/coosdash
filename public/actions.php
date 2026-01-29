@@ -32,14 +32,58 @@ function propagateTodo(PDO $pdo, int $nodeId): int {
   return $count;
 }
 
+function propagateDone(PDO $pdo, int $nodeId): int {
+  $count = 0;
+  $st = $pdo->prepare('SELECT id FROM nodes WHERE parent_id=?');
+  $st->execute([$nodeId]);
+  $children = $st->fetchAll();
+  foreach ($children as $c) {
+    $cid = (int)$c['id'];
+    $pdo->prepare('UPDATE nodes SET worker_status="done" WHERE id=?')->execute([$cid]);
+    $count++;
+    $count += propagateDone($pdo, $cid);
+  }
+  return $count;
+}
+
 if ($action === 'approve_to_todo_recursive') {
-  // set this node
+  // Only meaningful for active|approve.
   $pdo->prepare('UPDATE nodes SET worker_status="todo" WHERE id=? AND main_status="active"')->execute([$nodeId]);
   $pdo->prepare('INSERT INTO node_notes (node_id, author, note) VALUES (?, "oliver", ?)')
-      ->execute([$nodeId, 'Freigabe: worker_status approve→todo (rekursiv)']);
+      ->execute([$nodeId, 'Freigabe: approve→todo (rekursiv)']);
 
   $n = propagateTodo($pdo, $nodeId);
   flash_set('Freigegeben. Rekursiv aktiviert: ' . $n . ' Unterpunkte.', 'info');
+  header('Location: /?id=' . $nodeId);
+  exit;
+}
+
+if ($action === 'accept') {
+  // new -> active|todo
+  $pdo->prepare('UPDATE nodes SET main_status="active", worker_status="todo" WHERE id=?')->execute([$nodeId]);
+  $pdo->prepare('INSERT INTO node_notes (node_id, author, note) VALUES (?, "oliver", ?)')
+      ->execute([$nodeId, 'Akzeptiert: new→active und approve→todo']);
+  flash_set('Akzeptiert.', 'info');
+  header('Location: /?id=' . $nodeId);
+  exit;
+}
+
+if ($action === 'set_later') {
+  $pdo->prepare('UPDATE nodes SET main_status="later", worker_status="done" WHERE id=?')->execute([$nodeId]);
+  $n = propagateDone($pdo, $nodeId);
+  $pdo->prepare('INSERT INTO node_notes (node_id, author, note) VALUES (?, "oliver", ?)')
+      ->execute([$nodeId, 'Status: later (worker done). Descendants done: ' . $n]);
+  flash_set('Auf later gesetzt (done).', 'info');
+  header('Location: /?id=' . $nodeId);
+  exit;
+}
+
+if ($action === 'set_cancel') {
+  $pdo->prepare('UPDATE nodes SET main_status="canceled", worker_status="done" WHERE id=?')->execute([$nodeId]);
+  $n = propagateDone($pdo, $nodeId);
+  $pdo->prepare('INSERT INTO node_notes (node_id, author, note) VALUES (?, "oliver", ?)')
+      ->execute([$nodeId, 'Status: canceled (worker done). Descendants done: ' . $n]);
+  flash_set('Canceled (done).', 'info');
   header('Location: /?id=' . $nodeId);
   exit;
 }
