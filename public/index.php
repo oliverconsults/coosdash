@@ -130,23 +130,12 @@ function renderTree(array $byParent, array $open, int $currentId, int $parentId=
     $numParts = array_merge($prefix, [$i]);
     $num = implode('.', $numParts) . '.';
 
-    // counts among direct children
-    $approveCount = 0;
-    $activeCount = 0;
-    if (!empty($byParent[$id])) {
-      foreach ($byParent[$id] as $c) {
-        if (($c['main_status'] ?? '') === 'active') $activeCount++;
-        if (($c['main_status'] ?? '') === 'active' && ($c['worker_status'] ?? '') === 'approve') $approveCount++;
-      }
-    }
+    // show total number of direct children in parentheses
+    $directCount = !empty($byParent[$id]) ? count($byParent[$id]) : 0;
+    $countTxt = $hasKids ? ' (' . $directCount . ')' : '';
 
-    // no parentheses counts anymore (move info to the right tag)
-    $countTxt = '';
-
+    // right tag stays as main_status | worker_status
     $statusText = ($n['main_status'] ?? '') . ' | ' . ($n['worker_status'] ?? '');
-    if ($hasKids && ($approveCount > 0 || $activeCount > 0)) {
-      $statusText = 'approve: ' . $approveCount . ' | active: ' . $activeCount;
-    }
 
     $shade = max(0, min(4, $depth));
     $col = ['#d4af37','#f2d98a','#f6e7b9','#fbf3dc','#e8eefc'][$shade];
