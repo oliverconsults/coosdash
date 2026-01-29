@@ -163,7 +163,8 @@ if ($nodeId) {
   $st->execute([$nodeId]);
   $node = $st->fetch();
 
-  $st = $pdo->prepare('SELECT id,title,type,status,priority FROM nodes WHERE parent_id=? ORDER BY COALESCE(priority,999), id');
+  // children list removed from UI; keep query minimal for potential future use
+  $st = $pdo->prepare('SELECT id,title,main_status,worker_status FROM nodes WHERE parent_id=? ORDER BY id');
   $st->execute([$nodeId]);
   $children = $st->fetchAll();
 
