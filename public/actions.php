@@ -103,20 +103,20 @@ if ($action === 'set_active') {
   if ($laterRootId && isUnderRoot($pdo, $nodeId, $laterRootId)) $moveToProjects = true;
 
   if ($moveToProjects && $projId) {
-    $pdo->prepare('UPDATE nodes SET parent_id=?, worker_status="todo" WHERE id=?')->execute([$projId, $nodeId]);
+    $pdo->prepare('UPDATE nodes SET parent_id=?, worker_status="todo_james" WHERE id=?')->execute([$projId, $nodeId]);
     $ts = date('d.m.Y H:i');
-    $line = "\n\n[oliver] {$ts} Statusänderung: todo (aktiviert; nach Projekte verschoben)";
+    $line = "\n\n[oliver] {$ts} Statusänderung: todo_james (aktiviert; nach Projekte verschoben)";
     $pdo->prepare('UPDATE nodes SET description=CONCAT(COALESCE(description,\'\'), ?) WHERE id=?')->execute([$line, $nodeId]);
-    flash_set('Aktiviert: nach Projekte verschoben (todo).', 'info');
+    flash_set('Aktiviert: nach Projekte verschoben (James).', 'info');
     header('Location: /?id=' . $nodeId);
     exit;
   }
 
-  $pdo->prepare('UPDATE nodes SET worker_status="todo" WHERE id=?')->execute([$nodeId]);
+  $pdo->prepare('UPDATE nodes SET worker_status="todo_james" WHERE id=?')->execute([$nodeId]);
   $ts = date('d.m.Y H:i');
-  $line = "\n\n[oliver] {$ts} Statusänderung: todo (aktiviert)";
+  $line = "\n\n[oliver] {$ts} Statusänderung: todo_james (aktiviert)";
   $pdo->prepare('UPDATE nodes SET description=CONCAT(COALESCE(description,\'\'), ?) WHERE id=?')->execute([$line, $nodeId]);
-  flash_set('Aktiviert (todo).', 'info');
+  flash_set('Aktiviert (James).', 'info');
   header('Location: /?id=' . $nodeId);
   exit;
 }

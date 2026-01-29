@@ -51,7 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $newDesc = rtrim($formNote);
       $newDesc .= "\n\n[oliver] {$ts} Statusänderung: todo";
 
-      $st = $pdo->prepare('UPDATE nodes SET description=?, worker_status="todo" WHERE id=?');
+      $st = $pdo->prepare('UPDATE nodes SET description=?, worker_status="todo_oliver" WHERE id=?');
       $st->execute([$newDesc, $nid]);
 
       flash_set('Gespeichert.', 'info');
@@ -79,7 +79,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $desc = rtrim($formChildBody) . "\n\n[oliver] {$ts} Statusänderung: todo";
 
       $st = $pdo->prepare('INSERT INTO nodes (parent_id, title, description, priority, created_by, worker_status) VALUES (?, ?, ?, ?, ?, ?)');
-      $st->execute([$parentId, $title, $desc, null, 'oliver', 'todo']);
+      $st->execute([$parentId, $title, $desc, null, 'oliver', 'todo_oliver']);
       $newId = (int)$pdo->lastInsertId();
 
       // also append a short line into parent description
@@ -95,7 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   if ($action === 'set_worker') {
     $nid = (int)($_POST['node_id'] ?? 0);
     $worker = (string)($_POST['worker_status'] ?? '');
-    $allowed = ['todo','done'];
+    $allowed = ['todo_james','todo_oliver','done'];
     if ($nid && in_array($worker, $allowed, true)) {
       $st = $pdo->prepare('UPDATE nodes SET worker_status=? WHERE id=?');
       $st->execute([$worker, $nid]);
@@ -204,7 +204,8 @@ function subtreeCounts(array $byParent, array $byId, int $id, array &$memo): arr
   // include self only if it's a leaf AND not a container root
   if (!$hasKids && !$isContainerRoot) {
     $st = (string)($byId[$id]['worker_status'] ?? '');
-    if ($st === 'todo') $todo++;
+    if ($st === 'todo_james') $todo++;
+    if ($st === 'todo_oliver') $todo++;
     if ($st === 'done') $done++;
   }
 
@@ -239,9 +240,24 @@ function renderTree(array $byParent, array $byId, array $sectionByIdAll, array $
     $countTxt = $hasKids ? ' (' . $directCount . ')' : '';
 
     // right tag: subtree totals (descendants). If leaf: counts reflect own status.
-    [$todo, $done] = subtreeCounts($byParent, $byId, $id, $countsMemo);
+    // subtree totals by assignee
+    $todoJames = 0; $todoOliver = 0; $done = 0;
+    $stack = [$id];
+    while ($stack) {
+      $curId = array_pop($stack);
+      $kids = $byParent[$curId] ?? [];
+      if ($kids) {
+        foreach ($kids as $cc) $stack[] = (int)$cc['id'];
+      } else {
+        $st = (string)($byId[$curId]['worker_status'] ?? '');
+        if ($st === 'todo_james') $todoJames++;
+        if ($st === 'todo_oliver') $todoOliver++;
+        if ($st === 'done') $done++;
+      }
+    }
     $parts = [];
-    if ($todo > 0) $parts[] = 'ToDo: ' . $todo;
+    if ($todoJames > 0) $parts[] = 'James: ' . $todoJames;
+    if ($todoOliver > 0) $parts[] = 'Oliver: ' . $todoOliver;
     if ($done > 0) $parts[] = 'Done: ' . $done;
     $statusText = $parts ? implode(' | ', $parts) : '';
 
@@ -357,7 +373,7 @@ renderHeader('Dashboard');
           <h2 style="margin:0;"><?php echo h($crumb); ?></h2>
           <?php
             $work = (string)($node['worker_status'] ?? '');
-            $workMap = ['todo'=>'todo','done'=>'erledigt'];
+            $workMap = ['todo_james'=>'ToDo (James)','todo_oliver'=>'ToDo (Oliver)','done'=>'erledigt'];
             $statusLabel = ($workMap[$work] ?? $work);
           ?>
           <span class="tag gold"><?php echo h($statusLabel); ?></span>
@@ -367,6 +383,7 @@ renderHeader('Dashboard');
         <?php
           $ws = (string)($node['worker_status'] ?? '');
           $sec = (string)($sectionByIdAll[(int)$node['id']] ?? '');
+          $isInProjekte = ($sec === 'Projekte');
         ?>
 
         <?php
@@ -387,11 +404,40 @@ renderHeader('Dashboard');
           <?php endif; ?>
 
           <?php if ($sec === 'Projekte'): ?>
-            <form method="post" style="margin:0">
-              <input type="hidden" name="action" value="set_worker">
-              <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
-              <button class="btn btn-gold" name="worker_status" value="<?php echo $ws === 'done' ? 'todo' : 'done'; ?>" type="submit"><?php echo $ws === 'done' ? 'wieder öffnen' : 'erledigt'; ?></button>
-            </form>
+            <?php if ($ws === 'done'): ?>
+              <form method="post" style="margin:0">
+                <input type="hidden" name="action" value="set_worker">
+                <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
+                <button class="btn btn-gold" name="worker_status" value="todo_james" type="submit">an James</button>
+              </form>
+              <form method="post" style="margin:0">
+                <input type="hidden" name="action" value="set_worker">
+                <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
+                <button class="btn btn-gold" name="worker_status" value="todo_oliver" type="submit">an Oliver</button>
+              </form>
+            <?php elseif ($ws === 'todo_oliver'): ?>
+              <form method="post" style="margin:0">
+                <input type="hidden" name="action" value="set_worker">
+                <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
+                <button class="btn btn-gold" name="worker_status" value="todo_james" type="submit">an James</button>
+              </form>
+              <form method="post" style="margin:0">
+                <input type="hidden" name="action" value="set_worker">
+                <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
+                <button class="btn" name="worker_status" value="done" type="submit">erledigt</button>
+              </form>
+            <?php else: /* todo_james */ ?>
+              <form method="post" style="margin:0">
+                <input type="hidden" name="action" value="set_worker">
+                <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
+                <button class="btn btn-gold" name="worker_status" value="todo_oliver" type="submit">an Oliver</button>
+              </form>
+              <form method="post" style="margin:0">
+                <input type="hidden" name="action" value="set_worker">
+                <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
+                <button class="btn" name="worker_status" value="done" type="submit">erledigt</button>
+              </form>
+            <?php endif; ?>
 
             <form method="post" action="/actions.php" style="margin:0">
               <input type="hidden" name="action" value="set_later">
