@@ -95,8 +95,16 @@ function renderHeader(string $title='COOS'): void {
       .grid{display:grid;grid-template-columns:360px 1fr;gap:16px}
       .card{background:rgba(15,22,35,.92);border:1px solid var(--border);border-radius:16px;padding:14px}
       .card h2{margin:0 0 10px 0;font-size:15px;letter-spacing:.02em}
-      .list a{display:block;padding:10px;border-radius:12px;border:1px solid rgba(212,175,55,.12);margin:8px 0;background:rgba(5,7,11,.35)}
-      .list a.active{border-color:rgba(212,175,55,.6);background:rgba(212,175,55,.06)}
+      .tree{font-size:12px}
+      .tree details{margin:6px 0}
+      .tree summary{list-style:none}
+      .tree summary::-webkit-details-marker{display:none}
+      .tree-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:12px;border:1px solid rgba(212,175,55,.12);background:rgba(5,7,11,.35)}
+      .tree-item.active{border-color:rgba(212,175,55,.6);background:rgba(212,175,55,.06)}
+      .tree-item a{color:var(--text)}
+      .tree-item a:hover{color:var(--gold)}
+      .tree-branch{padding-left:6px;border-left:1px dashed rgba(212,175,55,.18)}
+      .tree-leaf{padding-left:6px}
       .tag{display:inline-block;font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid rgba(212,175,55,.22);color:var(--muted)}
       .tag.gold{color:var(--gold);border-color:rgba(212,175,55,.55)}
       .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}

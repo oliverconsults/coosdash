@@ -55,10 +55,57 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   }
 }
 
-// fetch roots
-$roots = $pdo->query("SELECT id,title,type,status,priority FROM nodes WHERE parent_id IS NULL ORDER BY COALESCE(priority,999), id")->fetchAll();
+// Load full tree for nav
+$allNodes = $pdo->query("SELECT id, parent_id, title, type, status, priority FROM nodes ORDER BY COALESCE(priority,999), id")->fetchAll();
+$byParent = [];
+$byId = [];
+foreach ($allNodes as $n) {
+  $pid = $n['parent_id'] === null ? 0 : (int)$n['parent_id'];
+  $byParent[$pid][] = $n;
+  $byId[(int)$n['id']] = $n;
+}
 
+// pick default selection: first root
+$roots = $byParent[0] ?? [];
 if (!$nodeId && $roots) $nodeId = (int)$roots[0]['id'];
+
+// compute open-path (ancestors of current)
+$open = [];
+$cur = $nodeId;
+while ($cur && isset($byId[$cur]) && $byId[$cur]['parent_id'] !== null) {
+  $pid = (int)$byId[$cur]['parent_id'];
+  $open[$pid] = true;
+  $cur = $pid;
+}
+
+function renderTree(array $byParent, array $open, int $currentId, int $parentId=0, int $depth=0): void {
+  if (empty($byParent[$parentId])) return;
+  foreach ($byParent[$parentId] as $n) {
+    $id = (int)$n['id'];
+    $title = $n['title'];
+    $hasKids = !empty($byParent[$id]);
+    $isActive = ($id === (int)$currentId);
+
+    $indent = $depth * 14;
+
+    if ($hasKids) {
+      $isOpen = $open[$id] ?? $isActive;
+      echo '<details class="tree-branch" ' . ($isOpen ? 'open' : '') . ' style="margin-left:' . $indent . 'px">';
+      echo '<summary class="tree-item ' . ($isActive ? 'active' : '') . '">';
+      echo '<a href="/?id=' . $id . '">' . h($title) . '</a>';
+      echo '<span class="tag" style="margin-left:auto">' . h($n['status']) . '</span>';
+      echo '</summary>';
+      renderTree($byParent, $open, $currentId, $id, $depth+1);
+      echo '</details>';
+    } else {
+      echo '<div class="tree-leaf" style="margin-left:' . $indent . 'px">';
+      echo '<div class="tree-item ' . ($isActive ? 'active' : '') . '">';
+      echo '<a href="/?id=' . $id . '">' . h($title) . '</a>';
+      echo '<span class="tag" style="margin-left:auto">' . h($n['status']) . '</span>';
+      echo '</div></div>';
+    }
+  }
+}
 
 $node = null;
 $children = [];
@@ -84,16 +131,8 @@ renderHeader('Dashboard');
 <div class="grid">
   <div class="card">
     <h2>Projects</h2>
-    <div class="list">
-      <?php foreach ($roots as $r): ?>
-        <a class="<?php echo ((int)$r['id'] === (int)$nodeId) ? 'active' : ''; ?>" href="/?id=<?php echo (int)$r['id']; ?>">
-          <div class="row" style="justify-content:space-between">
-            <strong><?php echo h($r['title']); ?></strong>
-            <span class="tag gold"><?php echo h($r['status']); ?></span>
-          </div>
-          <div class="meta"><?php echo h($r['type']); ?><?php echo $r['priority'] ? ' • P'.$r['priority'] : ''; ?></div>
-        </a>
-      <?php endforeach; ?>
+    <div class="tree">
+      <?php renderTree($byParent, $open, (int)$nodeId, 0, 0); ?>
     </div>
   </div>
 
