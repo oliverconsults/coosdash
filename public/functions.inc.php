@@ -108,8 +108,8 @@ function renderHeader(string $title='COOS'): void {
       .tree-item.ms-canceled a{color:rgba(255,120,120,.95);text-decoration:line-through;opacity:.9}
       .tree-item.ms-canceled a span{color:rgba(255,120,120,.95) !important}
       .tree-item.ms-later a{font-style:italic;opacity:.92}
-      .tree-branch{padding-left:4px;border-left:1px dashed rgba(212,175,55,.18)}
-      .tree-leaf{padding-left:4px}
+      .tree-branch{padding-left:0;border-left:1px dashed rgba(212,175,55,.18)}
+      .tree-leaf{padding-left:0}
       .tag{display:inline-block;font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid rgba(212,175,55,.22);color:var(--muted)}
       .tag.gold{color:var(--gold);border-color:rgba(212,175,55,.55)}
       .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
