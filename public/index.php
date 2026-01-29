@@ -89,7 +89,8 @@ function renderTree(array $byParent, array $open, int $currentId, int $parentId=
     $indent = $depth * 14;
 
     if ($hasKids) {
-      $isOpen = $open[$id] ?? $isActive;
+      $forceOpenAll = (!empty($_GET['open']) && $_GET['open'] === 'all');
+      $isOpen = $forceOpenAll || ($open[$id] ?? $isActive);
       echo '<details class="tree-branch" ' . ($isOpen ? 'open' : '') . ' style="margin-left:' . $indent . 'px">';
       echo '<summary class="tree-item ' . ($isActive ? 'active' : '') . '">';
       echo '<a href="/?id=' . $id . '">' . h($title) . '</a>';
@@ -131,6 +132,10 @@ renderHeader('Dashboard');
 <div class="grid">
   <div class="card">
     <h2>Projects</h2>
+    <div class="row" style="justify-content:space-between; margin-bottom:10px;">
+      <div></div>
+      <a class="btn" style="padding:6px 10px; font-size:12px" href="/?open=all<?php echo $nodeId ? '&id='.(int)$nodeId : ''; ?>">Alles aufklappen</a>
+    </div>
     <div class="tree">
       <?php renderTree($byParent, $open, (int)$nodeId, 0, 0); ?>
     </div>
