@@ -34,8 +34,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $nid = (int)($_POST['node_id'] ?? 0);
     $formNote = (string)($_POST['description'] ?? '');
 
+    // block editing of container roots
+    $st = $pdo->prepare('SELECT parent_id, title FROM nodes WHERE id=?');
+    $st->execute([$nid]);
+    $row = $st->fetch();
+    $isContainerRoot = $row && ($row['parent_id'] === null) && in_array((string)$row['title'], ['Ideen','Projekte','Später','Gelöscht'], true);
+
     if (!$nid) {
       flash_set('Projekt fehlt.', 'err');
+    } elseif ($isContainerRoot) {
+      flash_set('Oberprojekte haben kein Notizfeld. Bitte nur Subtasks anlegen.', 'err');
     } elseif (trim($formNote) === '') {
       flash_set('Text fehlt.', 'err');
     } else {
@@ -402,19 +410,21 @@ renderHeader('Dashboard');
       </div>
 
       <div class="card" style="margin-top:16px">
-        <form method="post" style="margin:0">
-          <input type="hidden" name="action" value="save_task">
-          <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
+        <?php if (!$isContainerRoot): ?>
+          <form method="post" style="margin:0">
+            <input type="hidden" name="action" value="save_task">
+            <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
 
-          <label>Aufgabe / Notiz:</label>
-          <textarea name="description" required><?php echo h((string)($node['description'] ?? '')); ?></textarea>
+            <label>Aufgabe / Notiz:</label>
+            <textarea name="description" required><?php echo h((string)($node['description'] ?? '')); ?></textarea>
 
-          <div style="margin-top:10px">
-            <button class="btn btn-gold" type="submit">Speichern</button>
-          </div>
-        </form>
+            <div style="margin-top:10px">
+              <button class="btn btn-gold" type="submit">Speichern</button>
+            </div>
+          </form>
 
-        <div style="height:14px"></div>
+          <div style="height:14px"></div>
+        <?php endif; ?>
 
         <form method="post" style="margin:0">
           <input type="hidden" name="action" value="add_subtask">
