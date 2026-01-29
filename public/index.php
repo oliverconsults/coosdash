@@ -303,11 +303,12 @@ renderHeader('Dashboard');
           <textarea name="note" placeholder="[oliver] <?php echo h(date('d.m.Y H:i')); ?> - ..." required></textarea>
 
           <div class="row" style="align-items:center; gap:10px; margin-top:10px; flex-wrap:wrap">
-            <label style="display:flex;align-items:center;gap:8px;margin:0;">
-              <input type="checkbox" name="as_child" value="1" onchange="document.getElementById('childNameWrap').style.display = this.checked ? 'flex' : 'none';"> als Subprojekt anlegen
+            <label style="display:flex;align-items:center;gap:8px;margin:0; white-space:nowrap;">
+              als Subprojekt anlegen:
+              <input type="checkbox" name="as_child" value="1">
             </label>
 
-            <div id="childNameWrap" style="display:none;align-items:center;gap:10px;flex:1;min-width:240px">
+            <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:320px">
               <span class="meta" style="white-space:nowrap">Name:</span>
               <input name="child_title" placeholder="max. 3–4 Wörter" style="flex:1">
             </div>
