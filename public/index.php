@@ -1,63 +1,201 @@
 <?php
-session_start();
+require_once __DIR__ . '/functions.inc.php';
+requireLogin();
 
-// Minimal Idea-to-Cash dashboard (v0)
-// Storage: JSON file in /var/www/coos/shared/data/ideas.json
+$pdo = db();
 
-$sharedPath = '/var/www/coos/shared/data/ideas.json';
-$ideas = [];
-if (is_file($sharedPath)) {
-  $raw = file_get_contents($sharedPath);
-  $ideas = json_decode($raw, true) ?: [];
+// current selection
+$nodeId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+
+// handle actions
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+  $action = $_POST['action'] ?? '';
+
+  if ($action === 'add_note') {
+    $nid = (int)($_POST['node_id'] ?? 0);
+    $note = trim((string)($_POST['note'] ?? ''));
+    if ($nid && $note !== '') {
+      $st = $pdo->prepare('INSERT INTO node_notes (node_id, author, note) VALUES (?, ?, ?)');
+      $st->execute([$nid, 'oliver', $note]);
+      flash_set('Note added.', 'info');
+      header('Location: /?id=' . $nid);
+      exit;
+    }
+    flash_set('Missing note.', 'err');
+  }
+
+  if ($action === 'add_child') {
+    $parentId = (int)($_POST['parent_id'] ?? 0);
+    $title = trim((string)($_POST['title'] ?? ''));
+    $type = (string)($_POST['type'] ?? 'idea');
+    $priority = $_POST['priority'] !== '' ? (int)$_POST['priority'] : null;
+    if ($parentId && $title !== '') {
+      $st = $pdo->prepare('INSERT INTO nodes (parent_id, type, status, title, description, priority, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)');
+      $st->execute([$parentId, $type, 'new', $title, null, $priority, 'oliver']);
+      $newId = (int)$pdo->lastInsertId();
+      flash_set('Child node created.', 'info');
+      header('Location: /?id=' . $newId);
+      exit;
+    }
+    flash_set('Missing title.', 'err');
+  }
+
+  if ($action === 'set_status') {
+    $nid = (int)($_POST['node_id'] ?? 0);
+    $status = (string)($_POST['status'] ?? '');
+    $allowed = ['new','accepted','deferred','rejected','active','done'];
+    if ($nid && in_array($status, $allowed, true)) {
+      $st = $pdo->prepare('UPDATE nodes SET status=? WHERE id=?');
+      $st->execute([$status, $nid]);
+      flash_set('Status updated.', 'info');
+      header('Location: /?id=' . $nid);
+      exit;
+    }
+    flash_set('Invalid status.', 'err');
+  }
 }
 
-?><!doctype html>
-<html lang="de">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>COOS — Idea-to-Cash Dashboard</title>
-  <style>
-    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial; margin:24px; max-width:1100px}
-    h1{margin:0 0 12px 0}
-    .muted{color:#666}
-    .card{border:1px solid #ddd;border-radius:12px;padding:14px;margin:12px 0;background:#fafafa}
-    table{width:100%;border-collapse:collapse}
-    th,td{padding:8px;border-bottom:1px solid #eee;text-align:left;vertical-align:top}
-    code{background:#f1f1f1;padding:2px 6px;border-radius:6px}
-  </style>
-</head>
-<body>
-  <h1>Idea-to-Cash Dashboard</h1>
-  <div class="muted">v0 • Storage: <code><?php echo htmlspecialchars($sharedPath); ?></code></div>
+// fetch roots
+$roots = $pdo->query("SELECT id,title,type,status,priority FROM nodes WHERE parent_id IS NULL ORDER BY COALESCE(priority,999), id")->fetchAll();
 
+if (!$nodeId && $roots) $nodeId = (int)$roots[0]['id'];
+
+$node = null;
+$children = [];
+$notes = [];
+
+if ($nodeId) {
+  $st = $pdo->prepare('SELECT * FROM nodes WHERE id=?');
+  $st->execute([$nodeId]);
+  $node = $st->fetch();
+
+  $st = $pdo->prepare('SELECT id,title,type,status,priority FROM nodes WHERE parent_id=? ORDER BY COALESCE(priority,999), id');
+  $st->execute([$nodeId]);
+  $children = $st->fetchAll();
+
+  $st = $pdo->prepare('SELECT author, created_at, note FROM node_notes WHERE node_id=? ORDER BY id DESC LIMIT 50');
+  $st->execute([$nodeId]);
+  $notes = $st->fetchAll();
+}
+
+renderHeader('Dashboard');
+?>
+
+<div class="grid">
   <div class="card">
-    <strong>Heute Nacht</strong><br>
-    James schreibt hier künftig 3–5 neue Konzepte/Experimente rein.
+    <h2>Projects</h2>
+    <div class="list">
+      <?php foreach ($roots as $r): ?>
+        <a class="<?php echo ((int)$r['id'] === (int)$nodeId) ? 'active' : ''; ?>" href="/?id=<?php echo (int)$r['id']; ?>">
+          <div class="row" style="justify-content:space-between">
+            <strong><?php echo h($r['title']); ?></strong>
+            <span class="tag gold"><?php echo h($r['status']); ?></span>
+          </div>
+          <div class="meta"><?php echo h($r['type']); ?><?php echo $r['priority'] ? ' • P'.$r['priority'] : ''; ?></div>
+        </a>
+      <?php endforeach; ?>
+    </div>
   </div>
 
-  <div class="card">
-    <strong>Backlog</strong>
-    <?php if (!$ideas): ?>
-      <p class="muted">Noch keine Einträge. (Heute: nur Grundgerüst.)</p>
-    <?php else: ?>
-      <table>
-        <thead>
-          <tr><th>Titel</th><th>Impact</th><th>Effort</th><th>Next step</th><th>Created</th></tr>
-        </thead>
-        <tbody>
-        <?php foreach ($ideas as $it): ?>
-          <tr>
-            <td><strong><?php echo htmlspecialchars($it['title'] ?? ''); ?></strong><br><span class="muted"><?php echo nl2br(htmlspecialchars($it['problem'] ?? '')); ?></span></td>
-            <td><?php echo htmlspecialchars($it['impact'] ?? ''); ?></td>
-            <td><?php echo htmlspecialchars($it['effort'] ?? ''); ?></td>
-            <td><?php echo htmlspecialchars($it['next_action'] ?? ''); ?></td>
-            <td class="muted"><?php echo htmlspecialchars($it['created_at'] ?? ''); ?></td>
-          </tr>
+  <div>
+    <?php if ($node): ?>
+      <div class="card">
+        <div class="row" style="justify-content:space-between">
+          <h2 style="margin:0;"><?php echo h($node['title']); ?></h2>
+          <span class="tag gold"><?php echo h($node['status']); ?></span>
+        </div>
+        <div class="meta">#<?php echo (int)$node['id']; ?> • <?php echo h($node['type']); ?> • created_by=<?php echo h($node['created_by']); ?></div>
+
+        <div class="row" style="margin-top:10px">
+          <form method="post" style="display:flex;gap:8px;flex-wrap:wrap">
+            <input type="hidden" name="action" value="set_status">
+            <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
+            <button class="btn" name="status" value="accepted">annehmen</button>
+            <button class="btn" name="status" value="deferred">zurückstellen</button>
+            <button class="btn" name="status" value="rejected">ablehnen</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:16px">
+        <h2>Subnodes</h2>
+        <?php if (!$children): ?>
+          <div class="muted">Keine Unterideen.</div>
+        <?php else: ?>
+          <table>
+            <thead>
+              <tr><th>Title</th><th>Type</th><th>Status</th><th>Priority</th></tr>
+            </thead>
+            <tbody>
+              <?php foreach ($children as $c): ?>
+                <tr>
+                  <td><a href="/?id=<?php echo (int)$c['id']; ?>"><?php echo h($c['title']); ?></a></td>
+                  <td class="meta"><?php echo h($c['type']); ?></td>
+                  <td><span class="tag"><?php echo h($c['status']); ?></span></td>
+                  <td class="meta"><?php echo $c['priority'] ? 'P'.(int)$c['priority'] : '-'; ?></td>
+                </tr>
+              <?php endforeach; ?>
+            </tbody>
+          </table>
+        <?php endif; ?>
+
+        <details style="margin-top:12px">
+          <summary class="btn">+ Unteridee hinzufügen</summary>
+          <form method="post" style="margin-top:10px">
+            <input type="hidden" name="action" value="add_child">
+            <input type="hidden" name="parent_id" value="<?php echo (int)$node['id']; ?>">
+
+            <label>Titel</label>
+            <input name="title" required>
+
+            <div class="row">
+              <div style="flex:1; min-width:180px">
+                <label>Type</label>
+                <select name="type">
+                  <option value="idea">idea</option>
+                  <option value="project">project</option>
+                  <option value="task">task</option>
+                  <option value="research">research</option>
+                </select>
+              </div>
+              <div style="flex:1; min-width:140px">
+                <label>Priority</label>
+                <input name="priority" type="number" min="1" max="5" placeholder="1-5">
+              </div>
+            </div>
+
+            <div style="margin-top:12px">
+              <button class="btn btn-gold" type="submit">Create</button>
+            </div>
+          </form>
+        </details>
+      </div>
+
+      <div class="card" style="margin-top:16px">
+        <h2>Notizzettel</h2>
+
+        <form method="post">
+          <input type="hidden" name="action" value="add_note">
+          <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
+          <label>Neue Notiz</label>
+          <textarea name="note" placeholder="[oliver] <?php echo h(date('d.m.Y H:i')); ?> - ..." required></textarea>
+          <div style="margin-top:10px">
+            <button class="btn btn-gold" type="submit">Add note</button>
+          </div>
+        </form>
+
+        <?php foreach ($notes as $n): ?>
+          <div class="note">
+            <div class="head">[<?php echo h($n['author']); ?>] <?php echo h($n['created_at']); ?></div>
+            <div><?php echo nl2br(h($n['note'])); ?></div>
+          </div>
         <?php endforeach; ?>
-        </tbody>
-      </table>
+      </div>
+
+    <?php else: ?>
+      <div class="card"><h2>No node selected</h2></div>
     <?php endif; ?>
   </div>
-</body>
-</html>
+</div>
+
+<?php renderFooter(); ?>
