@@ -342,8 +342,11 @@ function renderTree(array $byParent, array $byId, array $sectionByIdAll, array $
     if ($hasKids) {
       $forceOpenAll = (!empty($_GET['open']) && $_GET['open'] === 'all') || !empty($_GET['q']);
       $isOpen = $forceOpenAll || ($open[$id] ?? $isActive);
-      echo '<details class="tree-branch" ' . ($isOpen ? 'open' : '') . ' style="margin-left:' . $indent . 'px">';
-      echo '<summary class="tree-item ' . ($isActive ? 'active' : '') . $msClass . '">';
+
+      // Important: apply indentation to the clickable row, not the <details> wrapper.
+      // Otherwise browser default <details> layout can add extra indentation when fully expanded (search).
+      echo '<details class="tree-branch" ' . ($isOpen ? 'open' : '') . '>';
+      echo '<summary class="tree-item ' . ($isActive ? 'active' : '') . $msClass . '" style="margin-left:' . $indent . 'px">';
       echo '<a href="/?id=' . $id . '" style="display:flex;align-items:center;gap:0;">'
         . '<span style="color:' . $col . ';">' . h($num) . '</span>'
         . '&nbsp;'
@@ -354,8 +357,8 @@ function renderTree(array $byParent, array $byId, array $sectionByIdAll, array $
       renderTree($byParent, $byId, $sectionByIdAll, $open, $currentId, $id, $depth+1, $numParts, $countsMemo);
       echo '</details>';
     } else {
-      echo '<div class="tree-leaf" style="margin-left:' . $indent . 'px">';
-      echo '<div class="tree-item ' . ($isActive ? 'active' : '') . $msClass . '">';
+      echo '<div class="tree-leaf">';
+      echo '<div class="tree-item ' . ($isActive ? 'active' : '') . $msClass . '" style="margin-left:' . $indent . 'px">';
       echo '<a href="/?id=' . $id . '" style="display:flex;align-items:center;gap:0;">'
         . '<span style="color:' . $col . ';">' . h($num) . '</span>'
         . '&nbsp;'
