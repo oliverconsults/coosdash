@@ -106,6 +106,7 @@ function renderHeader(string $title='COOS'): void {
       .tree-item a{color:var(--text)}
       .tree-item a:hover{color:var(--gold)}
       .tree-item.ms-canceled a{color:rgba(255,120,120,.95);text-decoration:line-through;opacity:.9}
+      .tree-item.ms-canceled a span{color:rgba(255,120,120,.95) !important}
       .tree-item.ms-later a{font-style:italic;opacity:.92}
       .tree-branch{padding-left:4px;border-left:1px dashed rgba(212,175,55,.18)}
       .tree-leaf{padding-left:4px}
