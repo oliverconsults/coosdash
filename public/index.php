@@ -29,12 +29,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $title = trim((string)($_POST['title'] ?? ''));
     $note = trim((string)($_POST['note'] ?? ''));
 
-    // always create an active subproject that is ready to work on
-    $type = 'task';
-
     if ($parentId && $title !== '' && $note !== '') {
-      $st = $pdo->prepare('INSERT INTO nodes (parent_id, type, status, title, description, priority, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)');
-      $st->execute([$parentId, $type, 'active', $title, null, null, 'oliver']);
+      // Always create an active subproject that is ready to work on
+      $st = $pdo->prepare('INSERT INTO nodes (parent_id, title, description, priority, created_by, main_status, worker_status) VALUES (?, ?, ?, ?, ?, ?, ?)');
+      $st->execute([$parentId, $title, null, null, 'oliver', 'active', 'todo']);
       $newId = (int)$pdo->lastInsertId();
 
       // first note is required
