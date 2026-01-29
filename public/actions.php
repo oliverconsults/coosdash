@@ -46,6 +46,21 @@ function propagateDone(PDO $pdo, int $nodeId): int {
   return $count;
 }
 
+function isUnderRoot(PDO $pdo, int $nodeId, int $rootId): bool {
+  $cur = $nodeId;
+  for ($i=0; $i<50; $i++) {
+    $st = $pdo->prepare('SELECT parent_id FROM nodes WHERE id=?');
+    $st->execute([$cur]);
+    $row = $st->fetch();
+    if (!$row) return false;
+    if ($row['parent_id'] === null) return false;
+    $pid = (int)$row['parent_id'];
+    if ($pid === $rootId) return true;
+    $cur = $pid;
+  }
+  return false;
+}
+
 if ($action === 'approve_to_todo_recursive') {
   // Only meaningful for active|approve.
   $pdo->prepare('UPDATE nodes SET worker_status="todo" WHERE id=? AND main_status="active"')->execute([$nodeId]);
@@ -69,12 +84,18 @@ if ($action === 'accept') {
 }
 
 if ($action === 'set_later') {
-  $pdo->prepare('UPDATE nodes SET main_status="later", worker_status="done" WHERE id=?')->execute([$nodeId]);
+  // Move to "Später" root
+  $st = $pdo->prepare('SELECT id FROM nodes WHERE parent_id IS NULL AND title="Später" LIMIT 1');
+  $st->execute();
+  $sp = $st->fetch();
+  $spId = $sp ? (int)$sp['id'] : 0;
+
+  $pdo->prepare('UPDATE nodes SET parent_id=?, main_status="later", worker_status="done" WHERE id=?')->execute([$spId ?: null, $nodeId]);
   $n = propagateDone($pdo, $nodeId);
   $pdo->prepare('INSERT INTO node_notes (node_id, author, note) VALUES (?, "oliver", ?)')
-      ->execute([$nodeId, 'Status: later (worker done). Descendants done: ' . $n]);
-  flash_set('Auf later gesetzt (done).', 'info');
-  header('Location: /?id=' . $nodeId);
+      ->execute([$nodeId, 'Status: later (worker done) + moved to Später. Descendants done: ' . $n]);
+  flash_set('Auf later gesetzt (done) & verschoben.', 'info');
+  header('Location: /?id=' . ($spId ?: $nodeId));
   exit;
 }
 
@@ -89,11 +110,39 @@ if ($action === 'set_cancel') {
 }
 
 if ($action === 'set_active') {
-  // Reactivate: active + todo
+  // Reactivate: active + todo. If coming from Ideen/Später, move under Projekte.
+  $st = $pdo->prepare('SELECT id FROM nodes WHERE parent_id IS NULL AND title="Projekte" LIMIT 1');
+  $st->execute();
+  $pr = $st->fetch();
+  $projId = $pr ? (int)$pr['id'] : 0;
+
+  $st = $pdo->prepare('SELECT id FROM nodes WHERE parent_id IS NULL AND title="Ideen" LIMIT 1');
+  $st->execute();
+  $idRow = $st->fetch();
+  $ideasId = $idRow ? (int)$idRow['id'] : 0;
+
+  $st = $pdo->prepare('SELECT id FROM nodes WHERE parent_id IS NULL AND title="Später" LIMIT 1');
+  $st->execute();
+  $spRow = $st->fetch();
+  $laterRootId = $spRow ? (int)$spRow['id'] : 0;
+
+  $moveToProjects = false;
+  if ($ideasId && isUnderRoot($pdo, $nodeId, $ideasId)) $moveToProjects = true;
+  if ($laterRootId && isUnderRoot($pdo, $nodeId, $laterRootId)) $moveToProjects = true;
+
+  if ($moveToProjects && $projId) {
+    $pdo->prepare('UPDATE nodes SET parent_id=?, main_status="active", worker_status="todo" WHERE id=?')->execute([$projId, $nodeId]);
+    $pdo->prepare('INSERT INTO node_notes (node_id, author, note) VALUES (?, "oliver", ?)')
+        ->execute([$nodeId, 'Activate: moved to Projekte; main_status=active, worker_status=todo']);
+    flash_set('Activate: verschoben nach Projekte (todo).', 'info');
+    header('Location: /?id=' . $nodeId);
+    exit;
+  }
+
   $pdo->prepare('UPDATE nodes SET main_status="active", worker_status="todo" WHERE id=?')->execute([$nodeId]);
   $pdo->prepare('INSERT INTO node_notes (node_id, author, note) VALUES (?, "oliver", ?)')
-      ->execute([$nodeId, 'Reaktiviert: main_status=active, worker_status=todo']);
-  flash_set('Auf active gesetzt (todo).', 'info');
+      ->execute([$nodeId, 'Activate: main_status=active, worker_status=todo']);
+  flash_set('Activate (todo).', 'info');
   header('Location: /?id=' . $nodeId);
   exit;
 }
