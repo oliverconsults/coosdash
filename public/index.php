@@ -265,17 +265,29 @@ renderHeader('Dashboard');
             </form>
           <?php endif; ?>
 
-          <form method="post" action="/actions.php" style="margin:0">
-            <input type="hidden" name="action" value="set_later">
-            <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
-            <button class="btn" type="submit">later</button>
-          </form>
+          <?php if ($ms === 'later' || $ms === 'canceled'): ?>
+            <form method="post" action="/actions.php" style="margin:0">
+              <input type="hidden" name="action" value="set_active">
+              <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
+              <button class="btn btn-gold" type="submit">active</button>
+            </form>
+          <?php endif; ?>
 
-          <form method="post" action="/actions.php" style="margin:0">
-            <input type="hidden" name="action" value="set_cancel">
-            <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
-            <button class="btn" type="submit">cancel</button>
-          </form>
+          <?php if ($ms !== 'later'): ?>
+            <form method="post" action="/actions.php" style="margin:0">
+              <input type="hidden" name="action" value="set_later">
+              <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
+              <button class="btn" type="submit">later</button>
+            </form>
+          <?php endif; ?>
+
+          <?php if ($ms !== 'canceled'): ?>
+            <form method="post" action="/actions.php" style="margin:0">
+              <input type="hidden" name="action" value="set_cancel">
+              <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
+              <button class="btn" type="submit">cancel</button>
+            </form>
+          <?php endif; ?>
         </div>
       </div>
 

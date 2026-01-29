@@ -88,6 +88,16 @@ if ($action === 'set_cancel') {
   exit;
 }
 
+if ($action === 'set_active') {
+  // Reactivate: active + todo
+  $pdo->prepare('UPDATE nodes SET main_status="active", worker_status="todo" WHERE id=?')->execute([$nodeId]);
+  $pdo->prepare('INSERT INTO node_notes (node_id, author, note) VALUES (?, "oliver", ?)')
+      ->execute([$nodeId, 'Reaktiviert: main_status=active, worker_status=todo']);
+  flash_set('Auf active gesetzt (todo).', 'info');
+  header('Location: /?id=' . $nodeId);
+  exit;
+}
+
 flash_set('Unknown action.', 'err');
 header('Location: /?id=' . $nodeId);
 exit;
