@@ -130,8 +130,14 @@ function renderTree(array $byParent, array $open, int $currentId, int $parentId=
     $numParts = array_merge($prefix, [$i]);
     $num = implode('.', $numParts) . '.';
 
-    $directCount = !empty($byParent[$id]) ? count($byParent[$id]) : 0;
-    $countTxt = $hasKids ? ' (' . $directCount . ')' : '';
+    // show only "to approve" count among direct children (active|approve)
+    $approveCount = 0;
+    if (!empty($byParent[$id])) {
+      foreach ($byParent[$id] as $c) {
+        if (($c['main_status'] ?? '') === 'active' && ($c['worker_status'] ?? '') === 'approve') $approveCount++;
+      }
+    }
+    $countTxt = ($hasKids && $approveCount > 0) ? ' (' . $approveCount . ')' : '';
 
     $statusText = ($n['main_status'] ?? '') . ' | ' . ($n['worker_status'] ?? '');
 
