@@ -293,7 +293,7 @@ function renderTree(array $byParent, array $byId, array $sectionByIdAll, array $
     $hasKids = !empty($byParent[$id]);
     $isActive = ($id === (int)$currentId);
 
-    $indent = $depth * 14;
+    $indent = $depth * 5;
     $numParts = array_merge($prefix, [$i]);
     $num = implode('.', $numParts) . '.';
 
