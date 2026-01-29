@@ -233,10 +233,8 @@ renderHeader('Dashboard');
           $crumb = implode(' > ', $crumbParts);
         ?>
 
-        <div class="meta" style="margin-bottom:6px; color: var(--muted);"><?php echo h($crumb); ?></div>
-
-        <div class="row" style="justify-content:space-between">
-          <h2 style="margin:0;"><?php echo h($node['title']); ?></h2>
+        <div class="row" style="justify-content:space-between; align-items:center">
+          <h2 style="margin:0;"><?php echo h($crumb); ?></h2>
           <span class="tag gold"><?php echo h(($node['main_status'] ?? '') . ' | ' . ($node['worker_status'] ?? '')); ?></span>
         </div>
         <div class="meta">#<?php echo (int)$node['id']; ?> • created_by=<?php echo h($node['created_by']); ?></div>
