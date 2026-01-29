@@ -295,13 +295,11 @@ renderHeader('Dashboard');
       </div>
 
       <div class="card" style="margin-top:16px">
-        <h2 style="margin:0 0 10px 0;">Notizzettel</h2>
-
         <form method="post" style="margin:0">
           <input type="hidden" name="action" value="add_note_or_child">
           <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
 
-          <label>Neue Notiz:</label>
+          <label>Neue Notiz anlegen:</label>
           <textarea name="note" placeholder="[oliver] <?php echo h(date('d.m.Y H:i')); ?> - ..." required></textarea>
 
           <div class="row" style="align-items:center; gap:10px; margin-top:10px; flex-wrap:wrap">
