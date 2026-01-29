@@ -192,57 +192,37 @@ renderHeader('Dashboard');
       </div>
 
       <div class="card" style="margin-top:16px">
-        <h2>Subnodes</h2>
-        <?php if (!$children): ?>
-          <div class="muted">Keine Unterideen.</div>
-        <?php else: ?>
-          <table>
-            <thead>
-              <tr><th>Title</th><th>Type</th><th>Status</th><th>Priority</th></tr>
-            </thead>
-            <tbody>
-              <?php foreach ($children as $c): ?>
-                <tr>
-                  <td><a href="/?id=<?php echo (int)$c['id']; ?>"><?php echo h($c['title']); ?></a></td>
-                  <td class="meta"><?php echo h($c['type']); ?></td>
-                  <td><span class="tag"><?php echo h($c['status']); ?></span></td>
-                  <td class="meta"><?php echo $c['priority'] ? 'P'.(int)$c['priority'] : '-'; ?></td>
-                </tr>
-              <?php endforeach; ?>
-            </tbody>
-          </table>
-        <?php endif; ?>
+        <div class="row" style="justify-content:space-between; align-items:center;">
+          <h2 style="margin:0;">Neues Subprojekt anlegen:</h2>
+        </div>
 
-        <details style="margin-top:12px">
-          <summary class="btn">+ Unteridee hinzufügen</summary>
-          <form method="post" style="margin-top:10px">
-            <input type="hidden" name="action" value="add_child">
-            <input type="hidden" name="parent_id" value="<?php echo (int)$node['id']; ?>">
+        <form method="post" style="margin-top:10px">
+          <input type="hidden" name="action" value="add_child">
+          <input type="hidden" name="parent_id" value="<?php echo (int)$node['id']; ?>">
 
-            <label>Titel</label>
-            <input name="title" required>
+          <label>Titel (kurz)</label>
+          <input name="title" required placeholder="max. 3–4 Wörter">
 
-            <div class="row">
-              <div style="flex:1; min-width:180px">
-                <label>Type</label>
-                <select name="type">
-                  <option value="idea">idea</option>
-                  <option value="project">project</option>
-                  <option value="task">task</option>
-                  <option value="research">research</option>
-                </select>
-              </div>
-              <div style="flex:1; min-width:140px">
-                <label>Priority</label>
-                <input name="priority" type="number" min="1" max="5" placeholder="1-5">
-              </div>
+          <div class="row">
+            <div style="flex:1; min-width:180px">
+              <label>Type</label>
+              <select name="type">
+                <option value="task">task</option>
+                <option value="idea">idea</option>
+                <option value="project">project</option>
+                <option value="research">research</option>
+              </select>
             </div>
-
-            <div style="margin-top:12px">
-              <button class="btn btn-gold" type="submit">Create</button>
+            <div style="flex:1; min-width:140px">
+              <label>Priority</label>
+              <input name="priority" type="number" min="1" max="5" placeholder="1-5">
             </div>
-          </form>
-        </details>
+          </div>
+
+          <div style="margin-top:12px">
+            <button class="btn btn-gold" type="submit">Create</button>
+          </div>
+        </form>
       </div>
 
       <div class="card" style="margin-top:16px">
