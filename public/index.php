@@ -7,15 +7,26 @@ $pdo = db();
 // current selection
 $nodeId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 
+// form state (to preserve user input on validation errors)
+$formNote = '';
+$formAsChild = false;
+$formChildTitle = '';
+
 // handle actions
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $action = $_POST['action'] ?? '';
 
   if ($action === 'add_note_or_child') {
     $nid = (int)($_POST['node_id'] ?? 0);
-    $note = trim((string)($_POST['note'] ?? ''));
-    $asChild = !empty($_POST['as_child']);
-    $title = trim((string)($_POST['child_title'] ?? ''));
+
+    // keep raw input for re-render (don't lose user's text)
+    $formNote = (string)($_POST['note'] ?? '');
+    $formAsChild = !empty($_POST['as_child']);
+    $formChildTitle = (string)($_POST['child_title'] ?? '');
+
+    $note = trim($formNote);
+    $asChild = $formAsChild;
+    $title = trim($formChildTitle);
 
     if (!$nid) {
       flash_set('Missing node.', 'err');
@@ -295,22 +306,22 @@ renderHeader('Dashboard');
       </div>
 
       <div class="card" style="margin-top:16px">
-        <form method="post" style="margin:0">
+        <form method="post" style="margin:0" onsubmit="if (this.as_child && this.as_child.checked) { return confirm('Subprojekt anlegen?'); } return true;">
           <input type="hidden" name="action" value="add_note_or_child">
           <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
 
           <label>Neue Notiz anlegen:</label>
-          <textarea name="note" placeholder="[oliver] <?php echo h(date('d.m.Y H:i')); ?> - ..." required></textarea>
+          <textarea name="note" placeholder="[oliver] <?php echo h(date('d.m.Y H:i')); ?> - ..." required><?php echo h($formNote); ?></textarea>
 
           <div class="row" style="align-items:center; gap:10px; margin-top:10px; flex-wrap:wrap">
             <label style="display:flex;align-items:center;gap:8px;margin:0; white-space:nowrap;">
               als Subprojekt anlegen:
-              <input type="checkbox" name="as_child" value="1">
+              <input type="checkbox" name="as_child" value="1" <?php echo $formAsChild ? 'checked' : ''; ?>>
             </label>
 
             <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:320px">
               <span class="meta" style="white-space:nowrap">Name:</span>
-              <input name="child_title" placeholder="max. 3–4 Wörter" style="flex:1">
+              <input name="child_title" placeholder="max. 3–4 Wörter" style="flex:1" value="<?php echo h($formChildTitle); ?>">
             </div>
 
             <button class="btn btn-gold" type="submit">Absenden</button>
