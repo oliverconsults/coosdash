@@ -512,6 +512,12 @@ renderHeader('Dashboard');
               <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
               <button class="btn" type="submit">löschen</button>
             </form>
+          <?php elseif ($sec === 'Später'): ?>
+            <form method="post" action="/actions.php" style="margin:0" onsubmit="return confirm('Wirklich nach „Gelöscht" verschieben? (inkl. Subtasks)');">
+              <input type="hidden" name="action" value="remove_recursive">
+              <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
+              <button class="btn" type="submit">löschen</button>
+            </form>
           <?php endif; ?>
         </div>
         <?php endif; ?>
