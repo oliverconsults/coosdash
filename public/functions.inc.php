@@ -114,7 +114,8 @@ function renderHeader(string $title='COOS'): void {
       .tag.gold{color:var(--gold);border-color:rgba(212,175,55,.55)}
       .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
       textarea,input,select{width:100%;padding:10px 12px;border-radius:12px;border:1px solid rgba(212,175,55,.22);background:rgba(5,7,11,.55);color:var(--text)}
-      textarea{min-height:330px;resize:vertical}
+      textarea{min-height:110px;resize:vertical}
+      textarea.task-note{min-height:330px}
       label{display:block;margin:10px 0 6px 0;color:var(--muted);font-size:12px}
       table{width:100%;border-collapse:collapse}
       td,th{padding:10px;border-bottom:1px solid rgba(212,175,55,.12);vertical-align:top}

@@ -544,7 +544,7 @@ renderHeader('Dashboard');
             <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
 
             <label>Aufgabe / Notiz:</label>
-            <textarea name="description" required><?php echo h((string)($node['description'] ?? '')); ?></textarea>
+            <textarea class="task-note" name="description" required><?php echo h((string)($node['description'] ?? '')); ?></textarea>
 
             <div style="margin-top:10px">
               <button class="btn btn-gold" type="submit">Speichern</button>
