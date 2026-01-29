@@ -147,24 +147,24 @@ if ($action === 'set_active') {
   exit;
 }
 
-function deleteSubtree(PDO $pdo, int $nodeId): int {
-  $count = 0;
+function countSubtree(PDO $pdo, int $nodeId): int {
+  $count = 1;
   $st = $pdo->prepare('SELECT id FROM nodes WHERE parent_id=?');
   $st->execute([$nodeId]);
-  $kids = $st->fetchAll();
-  foreach ($kids as $k) {
-    $count += deleteSubtree($pdo, (int)$k['id']);
+  foreach ($st->fetchAll() as $k) {
+    $count += countSubtree($pdo, (int)$k['id']);
   }
+  return $count;
+}
 
-  // delete notes first, then node
-  $pdo->prepare('DELETE FROM node_notes WHERE node_id=?')->execute([$nodeId]);
-  $pdo->prepare('DELETE FROM nodes WHERE id=?')->execute([$nodeId]);
-  return $count + 1;
+function moveSubtreeRoot(PDO $pdo, int $nodeId, int $newParentId): void {
+  // move only the root; children stay attached
+  $pdo->prepare('UPDATE nodes SET parent_id=? WHERE id=?')->execute([$newParentId, $nodeId]);
 }
 
 if ($action === 'remove_recursive') {
-  // Safety: only allow hard-delete if node is canceled
-  $st = $pdo->prepare('SELECT id, parent_id, main_status, title FROM nodes WHERE id=?');
+  // Soft-delete: move under root "Gelöscht" (keep notes + subtree)
+  $st = $pdo->prepare('SELECT id, main_status, title FROM nodes WHERE id=?');
   $st->execute([$nodeId]);
   $n = $st->fetch();
   if (!$n) {
@@ -178,11 +178,23 @@ if ($action === 'remove_recursive') {
     exit;
   }
 
-  $parentId = $n['parent_id'] === null ? 0 : (int)$n['parent_id'];
+  $st = $pdo->prepare('SELECT id FROM nodes WHERE parent_id IS NULL AND title="Gelöscht" LIMIT 1');
+  $st->execute();
+  $del = $st->fetch();
+  $deletedRootId = $del ? (int)$del['id'] : 0;
+  if (!$deletedRootId) {
+    flash_set('Missing root: Gelöscht', 'err');
+    header('Location: /?id=' . $nodeId);
+    exit;
+  }
 
   $pdo->beginTransaction();
   try {
-    $deleted = deleteSubtree($pdo, $nodeId);
+    $moved = countSubtree($pdo, $nodeId);
+    moveSubtreeRoot($pdo, $nodeId, $deletedRootId);
+    $pdo->prepare('UPDATE nodes SET worker_status="done" WHERE id=?')->execute([$nodeId]);
+    $pdo->prepare('INSERT INTO node_notes (node_id, author, note) VALUES (?, "oliver", ?)')
+        ->execute([$nodeId, 'Removed: moved to Gelöscht (subtree kept).']);
     $pdo->commit();
   } catch (Throwable $e) {
     $pdo->rollBack();
@@ -191,8 +203,8 @@ if ($action === 'remove_recursive') {
     exit;
   }
 
-  flash_set('Removed permanently (' . $deleted . ' items).', 'info');
-  header('Location: /?id=' . $parentId);
+  flash_set('Removed (' . $moved . ' items) → Gelöscht.', 'info');
+  header('Location: /?id=' . $deletedRootId);
   exit;
 }
 

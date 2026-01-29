@@ -89,12 +89,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // Load full tree for nav
 $allNodes = $pdo->query("SELECT id, parent_id, title, main_status, worker_status, priority FROM nodes ORDER BY COALESCE(priority,999), id")->fetchAll();
-$byParent = [];
-$byId = [];
+$byParentAll = [];
+$byIdAll = [];
 foreach ($allNodes as $n) {
   $pid = $n['parent_id'] === null ? 0 : (int)$n['parent_id'];
-  $byParent[$pid][] = $n;
-  $byId[(int)$n['id']] = $n;
+  $byParentAll[$pid][] = $n;
+  $byIdAll[(int)$n['id']] = $n;
+}
+
+// optional search: filter tree to only paths that match notes/titles
+$q = trim((string)($_GET['q'] ?? ''));
+$byParent = $byParentAll;
+$byId = $byIdAll;
+if ($q !== '') {
+  $needle = '%' . $q . '%';
+  $st = $pdo->prepare('SELECT DISTINCT node_id FROM node_notes WHERE note LIKE ?');
+  $st->execute([$needle]);
+  $matchIds = array_map(fn($r) => (int)$r['node_id'], $st->fetchAll());
+
+  $st = $pdo->prepare('SELECT id FROM nodes WHERE title LIKE ?');
+  $st->execute([$needle]);
+  foreach ($st->fetchAll() as $r) $matchIds[] = (int)$r['id'];
+
+  $matchIds = array_values(array_unique($matchIds));
+
+  $show = [];
+  foreach ($matchIds as $mid) {
+    $cur = $mid;
+    for ($i=0; $i<50; $i++) {
+      if (!isset($byIdAll[$cur])) break;
+      $show[$cur] = true;
+      $p = $byIdAll[$cur]['parent_id'];
+      if ($p === null) break;
+      $cur = (int)$p;
+    }
+  }
+
+  $byParent = [];
+  $byId = [];
+  foreach ($show as $id => $_) {
+    $n = $byIdAll[$id] ?? null;
+    if (!$n) continue;
+    $pid = $n['parent_id'] === null ? 0 : (int)$n['parent_id'];
+    $byParent[$pid][] = $n;
+    $byId[$id] = $n;
+  }
 }
 
 // pick default selection: first root
@@ -212,12 +251,21 @@ renderHeader('Dashboard');
       <h2 style="margin:0;">Projects / Ideas (<?php echo count($roots); ?>)</h2>
       <form method="get" style="margin:0;">
         <?php if ($nodeId): ?><input type="hidden" name="id" value="<?php echo (int)$nodeId; ?>"><?php endif; ?>
+        <?php if (!empty($_GET['q'])): ?><input type="hidden" name="q" value="<?php echo h((string)$_GET['q']); ?>"><?php endif; ?>
         <select name="open" onchange="this.form.submit()" style="width:auto; padding:6px 10px; font-size:12px;">
           <option value="">close all</option>
           <option value="all" <?php echo (!empty($_GET['open']) && $_GET['open']==='all') ? 'selected' : ''; ?>>open all</option>
         </select>
       </form>
     </div>
+
+    <form method="get" style="margin:8px 0 0 0; display:flex; gap:10px;">
+      <input type="text" name="q" placeholder="Search notes..." value="<?php echo h((string)($_GET['q'] ?? '')); ?>" style="flex:1">
+      <?php if ($nodeId): ?><input type="hidden" name="id" value="<?php echo (int)$nodeId; ?>"><?php endif; ?>
+      <?php if (!empty($_GET['open'])): ?><input type="hidden" name="open" value="<?php echo h((string)$_GET['open']); ?>"><?php endif; ?>
+      <button class="btn" type="submit">Search</button>
+      <?php if (!empty($_GET['q'])): ?><a class="btn" href="/?<?php echo ($nodeId ? 'id='.(int)$nodeId.'&' : '') . (!empty($_GET['open']) ? 'open='.urlencode((string)$_GET['open']).'&' : ''); ?>">Clear</a><?php endif; ?>
+    </form>
 
     <div style="height:10px"></div>
 
