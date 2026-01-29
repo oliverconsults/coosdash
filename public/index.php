@@ -11,39 +11,40 @@ $nodeId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $action = $_POST['action'] ?? '';
 
-  if ($action === 'add_note') {
+  if ($action === 'add_note_or_child') {
     $nid = (int)($_POST['node_id'] ?? 0);
     $note = trim((string)($_POST['note'] ?? ''));
-    if ($nid && $note !== '') {
+    $asChild = !empty($_POST['as_child']);
+    $title = trim((string)($_POST['child_title'] ?? ''));
+
+    if (!$nid) {
+      flash_set('Missing node.', 'err');
+    } elseif ($note === '') {
+      flash_set('Missing note.', 'err');
+    } elseif ($asChild && $title === '') {
+      flash_set('Missing subproject name.', 'err');
+    } else {
+      if ($asChild) {
+        // create a subproject under current node
+        $st = $pdo->prepare('INSERT INTO nodes (parent_id, title, description, priority, created_by, main_status, worker_status) VALUES (?, ?, ?, ?, ?, ?, ?)');
+        $st->execute([$nid, $title, null, null, 'oliver', 'active', 'todo']);
+        $newId = (int)$pdo->lastInsertId();
+
+        $st = $pdo->prepare('INSERT INTO node_notes (node_id, author, note) VALUES (?, ?, ?)');
+        $st->execute([$newId, 'oliver', $note]);
+
+        flash_set('Subprojekt created.', 'info');
+        header('Location: /?id=' . $newId);
+        exit;
+      }
+
+      // just add note to current node
       $st = $pdo->prepare('INSERT INTO node_notes (node_id, author, note) VALUES (?, ?, ?)');
       $st->execute([$nid, 'oliver', $note]);
       flash_set('Note added.', 'info');
       header('Location: /?id=' . $nid);
       exit;
     }
-    flash_set('Missing note.', 'err');
-  }
-
-  if ($action === 'add_child') {
-    $parentId = (int)($_POST['parent_id'] ?? 0);
-    $title = trim((string)($_POST['title'] ?? ''));
-    $note = trim((string)($_POST['note'] ?? ''));
-
-    if ($parentId && $title !== '' && $note !== '') {
-      // Always create an active subproject that is ready to work on
-      $st = $pdo->prepare('INSERT INTO nodes (parent_id, title, description, priority, created_by, main_status, worker_status) VALUES (?, ?, ?, ?, ?, ?, ?)');
-      $st->execute([$parentId, $title, null, null, 'oliver', 'active', 'todo']);
-      $newId = (int)$pdo->lastInsertId();
-
-      // first note is required
-      $st = $pdo->prepare('INSERT INTO node_notes (node_id, author, note) VALUES (?, ?, ?)');
-      $st->execute([$newId, 'oliver', $note]);
-
-      flash_set('Subprojekt created.', 'info');
-      header('Location: /?id=' . $newId);
-      exit;
-    }
-    flash_set('Missing title or note.', 'err');
   }
 
   if ($action === 'set_worker') {
@@ -294,36 +295,26 @@ renderHeader('Dashboard');
       </div>
 
       <div class="card" style="margin-top:16px">
-        <div class="row" style="justify-content:space-between; align-items:center;">
-          <h2 style="margin:0;">Neues Subprojekt anlegen:</h2>
-        </div>
+        <h2 style="margin:0 0 10px 0;">Notizzettel</h2>
 
-        <form method="post" style="margin-top:10px">
-          <input type="hidden" name="action" value="add_child">
-          <input type="hidden" name="parent_id" value="<?php echo (int)$node['id']; ?>">
-
-          <label>Neuer Subprojekt-Titel (kurz)</label>
-          <input name="title" required placeholder="max. 3–4 Wörter">
-
-          <label>Erste Notiz (Pflicht)</label>
-          <textarea name="note" required placeholder="[oliver] <?php echo h(date('d.m.Y H:i')); ?> - ..."></textarea>
-
-          <div style="margin-top:12px">
-            <button class="btn btn-gold" type="submit">Create</button>
-          </div>
-        </form>
-      </div>
-
-      <div class="card" style="margin-top:16px">
-        <h2>Notizzettel</h2>
-
-        <form method="post">
-          <input type="hidden" name="action" value="add_note">
+        <form method="post" style="margin:0">
+          <input type="hidden" name="action" value="add_note_or_child">
           <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
-          <label>Neue Notiz</label>
+
+          <label>Neue Notiz:</label>
           <textarea name="note" placeholder="[oliver] <?php echo h(date('d.m.Y H:i')); ?> - ..." required></textarea>
-          <div style="margin-top:10px">
-            <button class="btn btn-gold" type="submit">Add note</button>
+
+          <div class="row" style="align-items:center; gap:10px; margin-top:10px; flex-wrap:wrap">
+            <label style="display:flex;align-items:center;gap:8px;margin:0;">
+              <input type="checkbox" name="as_child" value="1" onchange="document.getElementById('childNameWrap').style.display = this.checked ? 'flex' : 'none';"> als Subprojekt anlegen
+            </label>
+
+            <div id="childNameWrap" style="display:none;align-items:center;gap:10px;flex:1;min-width:240px">
+              <span class="meta" style="white-space:nowrap">Name:</span>
+              <input name="child_title" placeholder="max. 3–4 Wörter" style="flex:1">
+            </div>
+
+            <button class="btn btn-gold" type="submit">Absenden</button>
           </div>
         </form>
 
