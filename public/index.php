@@ -170,7 +170,27 @@ function buildNumMap(array $byParent, int $parentId=0, array $prefix=[]): array 
   return $out;
 }
 
-function renderTree(array $byParent, array $open, int $currentId, int $parentId=0, int $depth=0, array $prefix=[]): void {
+function subtreeCounts(array $byParent, array $byId, int $id, array &$memo): array {
+  if (isset($memo[$id])) return $memo[$id];
+  $todo = 0; $done = 0;
+  // include self if it's a leaf
+  $hasKids = !empty($byParent[$id]);
+  if (!$hasKids) {
+    $st = (string)($byId[$id]['worker_status'] ?? '');
+    if ($st === 'todo') $todo++;
+    if ($st === 'done') $done++;
+  }
+  if (!empty($byParent[$id])) {
+    foreach ($byParent[$id] as $c) {
+      $cid = (int)$c['id'];
+      [$ct, $cd] = subtreeCounts($byParent, $byId, $cid, $memo);
+      $todo += $ct; $done += $cd;
+    }
+  }
+  return $memo[$id] = [$todo, $done];
+}
+
+function renderTree(array $byParent, array $byId, array $sectionByIdAll, array $open, int $currentId, int $parentId=0, int $depth=0, array $prefix=[], array &$countsMemo=[]): void {
   if (empty($byParent[$parentId])) return;
 
   $i = 0;
@@ -189,25 +209,12 @@ function renderTree(array $byParent, array $open, int $currentId, int $parentId=
     $directCount = !empty($byParent[$id]) ? count($byParent[$id]) : 0;
     $countTxt = $hasKids ? ' (' . $directCount . ')' : '';
 
-    // right tag: show statuses in German (DB values stay English)
-    // right tag: show direct-children counts if node has kids; otherwise show own status
-    if ($hasKids) {
-      $todo = 0; $done = 0;
-      if (!empty($byParent[$id])) {
-        foreach ($byParent[$id] as $c) {
-          if (($c['worker_status'] ?? '') === 'todo') $todo++;
-          if (($c['worker_status'] ?? '') === 'done') $done++;
-        }
-      }
-      $parts = [];
-      if ($todo > 0) $parts[] = 'ToDo: ' . $todo;
-      if ($done > 0) $parts[] = 'Done: ' . $done;
-      $statusText = $parts ? implode(' | ', $parts) : '';
-    } else {
-      $work = (string)($n['worker_status'] ?? '');
-      $workMap = ['todo'=>'todo','done'=>'erledigt'];
-      $statusText = ($workMap[$work] ?? $work);
-    }
+    // right tag: subtree totals (descendants). If leaf: counts reflect own status.
+    [$todo, $done] = subtreeCounts($byParent, $byId, $id, $countsMemo);
+    $parts = [];
+    if ($todo > 0) $parts[] = 'ToDo: ' . $todo;
+    if ($done > 0) $parts[] = 'Done: ' . $done;
+    $statusText = $parts ? implode(' | ', $parts) : '';
 
     $shade = max(0, min(4, $depth));
     $col = ['#d4af37','#f2d98a','#f6e7b9','#fbf3dc','#e8eefc'][$shade];
@@ -229,7 +236,7 @@ function renderTree(array $byParent, array $open, int $currentId, int $parentId=
         . '</a>';
       if ($statusText !== '') echo '<span class="tag" style="margin-left:auto">' . h($statusText) . '</span>';
       echo '</summary>';
-      renderTree($byParent, $open, $currentId, $id, $depth+1, $numParts);
+      renderTree($byParent, $byId, $sectionByIdAll, $open, $currentId, $id, $depth+1, $numParts, $countsMemo);
       echo '</details>';
     } else {
       echo '<div class="tree-leaf" style="margin-left:' . $indent . 'px">';
@@ -291,7 +298,7 @@ renderHeader('Dashboard');
     <div style="height:10px"></div>
 
     <div class="tree">
-      <?php renderTree($byParent, $open, (int)$nodeId, 0, 0); ?>
+      <?php renderTree($byParent, $byId, $sectionByIdAll, $open, (int)$nodeId, 0, 0); ?>
     </div>
   </div>
 
