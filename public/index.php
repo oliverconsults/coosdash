@@ -26,6 +26,26 @@ function buildSectionMap(array $byParentAll, int $parentId=0, string $section=''
   return $out;
 }
 
+function propagateDelegation(PDO $pdo, int $rootId, string $from, string $to): int {
+  $count = 0;
+  $stack = [$rootId];
+  while ($stack) {
+    $cur = array_pop($stack);
+    $st = $pdo->prepare('SELECT id, worker_status FROM nodes WHERE parent_id=?');
+    $st->execute([$cur]);
+    $kids = $st->fetchAll();
+    foreach ($kids as $k) {
+      $kid = (int)$k['id'];
+      $stack[] = $kid;
+      if (($k['worker_status'] ?? '') === $from) {
+        $pdo->prepare('UPDATE nodes SET worker_status=? WHERE id=?')->execute([$to, $kid]);
+        $count++;
+      }
+    }
+  }
+  return $count;
+}
+
 // handle actions
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $action = $_POST['action'] ?? '';
@@ -99,6 +119,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($nid && in_array($worker, $allowed, true)) {
       $st = $pdo->prepare('UPDATE nodes SET worker_status=? WHERE id=?');
       $st->execute([$worker, $nid]);
+
+      // append change into description
+      $ts = date('d.m.Y H:i');
+      $pdo->prepare('UPDATE nodes SET description=CONCAT(COALESCE(description,\'\'), ?) WHERE id=?')
+          ->execute(["\n\n[oliver] {$ts} Statusänderung: {$worker}", $nid]);
+
+      // delegation rule: if delegating to James, cascade todo_oliver descendants to todo_james
+      if ($worker === 'todo_james') {
+        $moved = propagateDelegation($pdo, $nid, 'todo_oliver', 'todo_james');
+        if ($moved > 0) {
+          $pdo->prepare('UPDATE nodes SET description=CONCAT(COALESCE(description,\'\'), ?) WHERE id=?')
+              ->execute(["\n\n[oliver] {$ts} Delegation: {$moved} Subtasks zu James", $nid]);
+        }
+      }
+
       flash_set('Status gespeichert.', 'info');
       header('Location: /?id=' . $nid);
       exit;
@@ -408,18 +443,18 @@ renderHeader('Dashboard');
               <form method="post" style="margin:0">
                 <input type="hidden" name="action" value="set_worker">
                 <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
-                <button class="btn btn-gold" name="worker_status" value="todo_james" type="submit">an James</button>
+                <button class="btn" name="worker_status" value="todo_james" type="submit">an James</button>
               </form>
               <form method="post" style="margin:0">
                 <input type="hidden" name="action" value="set_worker">
                 <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
-                <button class="btn btn-gold" name="worker_status" value="todo_oliver" type="submit">an Oliver</button>
+                <button class="btn" name="worker_status" value="todo_oliver" type="submit">an Oliver</button>
               </form>
             <?php elseif ($ws === 'todo_oliver'): ?>
               <form method="post" style="margin:0">
                 <input type="hidden" name="action" value="set_worker">
                 <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
-                <button class="btn btn-gold" name="worker_status" value="todo_james" type="submit">an James</button>
+                <button class="btn" name="worker_status" value="todo_james" type="submit">an James</button>
               </form>
               <form method="post" style="margin:0">
                 <input type="hidden" name="action" value="set_worker">
