@@ -46,6 +46,24 @@ function propagateDelegation(PDO $pdo, int $rootId, string $from, string $to): i
   return $count;
 }
 
+function propagateStatusAllDescendants(PDO $pdo, int $rootId, string $to): int {
+  $count = 0;
+  $stack = [$rootId];
+  while ($stack) {
+    $cur = array_pop($stack);
+    $st = $pdo->prepare('SELECT id FROM nodes WHERE parent_id=?');
+    $st->execute([$cur]);
+    $kids = $st->fetchAll();
+    foreach ($kids as $k) {
+      $kid = (int)$k['id'];
+      $stack[] = $kid;
+      $pdo->prepare('UPDATE nodes SET worker_status=? WHERE id=?')->execute([$to, $kid]);
+      $count++;
+    }
+  }
+  return $count;
+}
+
 // handle actions
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $action = $_POST['action'] ?? '';
@@ -131,6 +149,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($moved > 0) {
           $pdo->prepare('UPDATE nodes SET description=CONCAT(COALESCE(description,\'\'), ?) WHERE id=?')
               ->execute(["\n\n[oliver] {$ts} Delegation: {$moved} Subtasks zu James", $nid]);
+        }
+      }
+
+      // done rule: when marking a node done, mark ALL descendants done as well
+      if ($worker === 'done') {
+        $nDone = propagateStatusAllDescendants($pdo, $nid, 'done');
+        if ($nDone > 0) {
+          $pdo->prepare('UPDATE nodes SET description=CONCAT(COALESCE(description,\'\'), ?) WHERE id=?')
+              ->execute(["\n\n[oliver] {$ts} Done: {$nDone} Subtasks erledigt", $nid]);
         }
       }
 
