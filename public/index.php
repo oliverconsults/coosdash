@@ -100,6 +100,23 @@ while ($cur && isset($byId[$cur]) && $byId[$cur]['parent_id'] !== null) {
   $cur = $pid;
 }
 
+// numbering map for breadcrumb + display
+$numMap = buildNumMap($byParent, 0, []);
+
+function buildNumMap(array $byParent, int $parentId=0, array $prefix=[]): array {
+  $out = [];
+  if (empty($byParent[$parentId])) return $out;
+  $i = 0;
+  foreach ($byParent[$parentId] as $n) {
+    $i++;
+    $id = (int)$n['id'];
+    $parts = array_merge($prefix, [$i]);
+    $out[$id] = implode('.', $parts) . '.';
+    $out += buildNumMap($byParent, $id, $parts);
+  }
+  return $out;
+}
+
 function renderTree(array $byParent, array $open, int $currentId, int $parentId=0, int $depth=0, array $prefix=[]): void {
   if (empty($byParent[$parentId])) return;
 
@@ -120,17 +137,17 @@ function renderTree(array $byParent, array $open, int $currentId, int $parentId=
 
     $statusText = ($n['main_status'] ?? '') . ' | ' . ($n['worker_status'] ?? '');
 
+    $shade = max(0, min(4, $depth));
+    $col = ['#d4af37','#f2d98a','#f6e7b9','#fbf3dc','#e8eefc'][$shade];
+
     if ($hasKids) {
       $forceOpenAll = (!empty($_GET['open']) && $_GET['open'] === 'all');
       $isOpen = $forceOpenAll || ($open[$id] ?? $isActive);
       echo '<details class="tree-branch" ' . ($isOpen ? 'open' : '') . ' style="margin-left:' . $indent . 'px">';
-      $shade = max(0, min(4, $depth));
-      // gold -> white gradient by depth
-      $col = ['#d4af37','#f2d98a','#f6e7b9','#fbf3dc','#e8eefc'][$shade];
-
       echo '<summary class="tree-item ' . ($isActive ? 'active' : '') . '">';
       echo '<a href="/?id=' . $id . '" style="display:flex;align-items:center;gap:0;">'
-        . '<span style="color:' . $col . ';">' . h($num . ' ') . '</span>'
+        . '<span style="color:' . $col . ';">' . h($num) . '</span>'
+        . '&nbsp;'
         . '<span style="color:' . $col . ';">' . h($title) . h($countTxt) . '</span>'
         . '</a>';
       echo '<span class="tag" style="margin-left:auto">' . h($statusText) . '</span>';
@@ -139,13 +156,10 @@ function renderTree(array $byParent, array $open, int $currentId, int $parentId=
       echo '</details>';
     } else {
       echo '<div class="tree-leaf" style="margin-left:' . $indent . 'px">';
-      $shade = max(0, min(4, $depth));
-      // gold -> white gradient by depth
-      $col = ['#d4af37','#f2d98a','#f6e7b9','#fbf3dc','#e8eefc'][$shade];
-
       echo '<div class="tree-item ' . ($isActive ? 'active' : '') . '">';
       echo '<a href="/?id=' . $id . '" style="display:flex;align-items:center;gap:0;">'
-        . '<span style="color:' . $col . ';">' . h($num . ' ') . '</span>'
+        . '<span style="color:' . $col . ';">' . h($num) . '</span>'
+        . '&nbsp;'
         . '<span style="color:' . $col . ';">' . h($title) . h($countTxt) . '</span>'
         . '</a>';
       echo '<span class="tag" style="margin-left:auto">' . h($statusText) . '</span>';
@@ -199,11 +213,33 @@ renderHeader('Dashboard');
   <div>
     <?php if ($node): ?>
       <div class="card">
+        <?php
+          // breadcrumb
+          $crumbIds = [];
+          $cur = (int)$node['id'];
+          while ($cur && isset($byId[$cur])) {
+            $crumbIds[] = $cur;
+            $p = $byId[$cur]['parent_id'];
+            if ($p === null) break;
+            $cur = (int)$p;
+          }
+          $crumbIds = array_reverse($crumbIds);
+          $crumbParts = [];
+          foreach ($crumbIds as $cid) {
+            $nn = $numMap[$cid] ?? '';
+            $tt = $byId[$cid]['title'] ?? '';
+            $crumbParts[] = trim($nn . ' ' . $tt);
+          }
+          $crumb = implode(' > ', $crumbParts);
+        ?>
+
+        <div class="meta" style="margin-bottom:6px; color: var(--muted);"><?php echo h($crumb); ?></div>
+
         <div class="row" style="justify-content:space-between">
           <h2 style="margin:0;"><?php echo h($node['title']); ?></h2>
-          <span class="tag gold"><?php echo h($node['status']); ?></span>
+          <span class="tag gold"><?php echo h(($node['main_status'] ?? '') . ' | ' . ($node['worker_status'] ?? '')); ?></span>
         </div>
-        <div class="meta">#<?php echo (int)$node['id']; ?> • <?php echo h($node['type']); ?> • created_by=<?php echo h($node['created_by']); ?></div>
+        <div class="meta">#<?php echo (int)$node['id']; ?> • created_by=<?php echo h($node['created_by']); ?></div>
 
         <div class="row" style="margin-top:10px">
           <form method="post" style="display:flex;gap:8px;flex-wrap:wrap">
