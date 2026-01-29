@@ -94,22 +94,20 @@ function renderTree(array $byParent, array $open, int $currentId, int $parentId=
     $num = implode('.', $numParts) . '.';
 
     $directCount = !empty($byParent[$id]) ? count($byParent[$id]) : 0;
-    $showCount = ($depth === 0); // only for top-level projects
-    $countTxt = $showCount ? ' (' . $directCount . ')' : '';
+    $countTxt = $hasKids ? ' (' . $directCount . ')' : '';
 
     if ($hasKids) {
       $forceOpenAll = (!empty($_GET['open']) && $_GET['open'] === 'all');
       $isOpen = $forceOpenAll || ($open[$id] ?? $isActive);
       echo '<details class="tree-branch" ' . ($isOpen ? 'open' : '') . ' style="margin-left:' . $indent . 'px">';
       $shade = max(0, min(4, $depth));
-      $numColor = ['rgba(212,175,55,1)','rgba(232,238,252,.92)','rgba(232,238,252,.88)','rgba(232,238,252,.84)','rgba(232,238,252,.80)'][$shade];
-      $titleColor = ['rgba(212,175,55,1)','rgba(232,238,252,.96)','rgba(232,238,252,.92)','rgba(232,238,252,.88)','rgba(232,238,252,.84)'][$shade];
+      // gold -> white gradient by depth
+      $col = ['#d4af37','#f2d98a','#f6e7b9','#fbf3dc','#e8eefc'][$shade];
 
       echo '<summary class="tree-item ' . ($isActive ? 'active' : '') . '">';
       echo '<a href="/?id=' . $id . '" style="display:flex;align-items:center;gap:0;">'
-        . '<span style="color:' . $numColor . ';">' . h($num) . '</span>'
-        . ' '
-        . '<span style="color:' . $titleColor . ';">' . h($title) . h($countTxt) . '</span>'
+        . '<span style="color:' . $col . ';">' . h($num . ' ') . '</span>'
+        . '<span style="color:' . $col . ';">' . h($title) . h($countTxt) . '</span>'
         . '</a>';
       echo '<span class="tag" style="margin-left:auto">' . h($n['status']) . '</span>';
       echo '</summary>';
@@ -118,14 +116,13 @@ function renderTree(array $byParent, array $open, int $currentId, int $parentId=
     } else {
       echo '<div class="tree-leaf" style="margin-left:' . $indent . 'px">';
       $shade = max(0, min(4, $depth));
-      $numColor = ['rgba(212,175,55,1)','rgba(232,238,252,.92)','rgba(232,238,252,.88)','rgba(232,238,252,.84)','rgba(232,238,252,.80)'][$shade];
-      $titleColor = ['rgba(212,175,55,1)','rgba(232,238,252,.96)','rgba(232,238,252,.92)','rgba(232,238,252,.88)','rgba(232,238,252,.84)'][$shade];
+      // gold -> white gradient by depth
+      $col = ['#d4af37','#f2d98a','#f6e7b9','#fbf3dc','#e8eefc'][$shade];
 
       echo '<div class="tree-item ' . ($isActive ? 'active' : '') . '">';
       echo '<a href="/?id=' . $id . '" style="display:flex;align-items:center;gap:0;">'
-        . '<span style="color:' . $numColor . ';">' . h($num) . '</span>'
-        . ' '
-        . '<span style="color:' . $titleColor . ';">' . h($title) . h($countTxt) . '</span>'
+        . '<span style="color:' . $col . ';">' . h($num . ' ') . '</span>'
+        . '<span style="color:' . $col . ';">' . h($title) . h($countTxt) . '</span>'
         . '</a>';
       echo '<span class="tag" style="margin-left:auto">' . h($n['status']) . '</span>';
       echo '</div></div>';
