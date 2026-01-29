@@ -185,13 +185,21 @@ function buildNumMap(array $byParent, int $parentId=0, array $prefix=[]): array 
 function subtreeCounts(array $byParent, array $byId, int $id, array &$memo): array {
   if (isset($memo[$id])) return $memo[$id];
   $todo = 0; $done = 0;
-  // include self if it's a leaf
+
   $hasKids = !empty($byParent[$id]);
-  if (!$hasKids) {
+
+  // Container roots (Ideen/Projekte/Später/Gelöscht) should not count as tasks.
+  $isRoot = array_key_exists('parent_id', $byId[$id] ?? []) && ($byId[$id]['parent_id'] === null);
+  $title = (string)($byId[$id]['title'] ?? '');
+  $isContainerRoot = $isRoot && in_array($title, ['Ideen','Projekte','Später','Gelöscht'], true);
+
+  // include self only if it's a leaf AND not a container root
+  if (!$hasKids && !$isContainerRoot) {
     $st = (string)($byId[$id]['worker_status'] ?? '');
     if ($st === 'todo') $todo++;
     if ($st === 'done') $done++;
   }
+
   if (!empty($byParent[$id])) {
     foreach ($byParent[$id] as $c) {
       $cid = (int)$c['id'];
@@ -199,6 +207,7 @@ function subtreeCounts(array $byParent, array $byId, int $id, array &$memo): arr
       $todo += $ct; $done += $cd;
     }
   }
+
   return $memo[$id] = [$todo, $done];
 }
 
