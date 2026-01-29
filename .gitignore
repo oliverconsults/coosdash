@@ -1,0 +1,6 @@
+# runtime
+/var/
+/shared/
+
+# local
+.DS_Store
