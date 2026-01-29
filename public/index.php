@@ -27,17 +27,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   if ($action === 'add_child') {
     $parentId = (int)($_POST['parent_id'] ?? 0);
     $title = trim((string)($_POST['title'] ?? ''));
-    $type = (string)($_POST['type'] ?? 'idea');
-    $priority = $_POST['priority'] !== '' ? (int)$_POST['priority'] : null;
-    if ($parentId && $title !== '') {
+    $note = trim((string)($_POST['note'] ?? ''));
+
+    // always create an active subproject that is ready to work on
+    $type = 'task';
+
+    if ($parentId && $title !== '' && $note !== '') {
       $st = $pdo->prepare('INSERT INTO nodes (parent_id, type, status, title, description, priority, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)');
-      $st->execute([$parentId, $type, 'new', $title, null, $priority, 'oliver']);
+      $st->execute([$parentId, $type, 'active', $title, null, null, 'oliver']);
       $newId = (int)$pdo->lastInsertId();
-      flash_set('Child node created.', 'info');
+
+      // first note is required
+      $st = $pdo->prepare('INSERT INTO node_notes (node_id, author, note) VALUES (?, ?, ?)');
+      $st->execute([$newId, 'oliver', $note]);
+
+      flash_set('Subprojekt created.', 'info');
       header('Location: /?id=' . $newId);
       exit;
     }
-    flash_set('Missing title.', 'err');
+    flash_set('Missing title or note.', 'err');
   }
 
   if ($action === 'set_status') {
@@ -200,24 +208,11 @@ renderHeader('Dashboard');
           <input type="hidden" name="action" value="add_child">
           <input type="hidden" name="parent_id" value="<?php echo (int)$node['id']; ?>">
 
-          <label>Titel (kurz)</label>
+          <label>Neuer Subprojekt-Titel (kurz)</label>
           <input name="title" required placeholder="max. 3–4 Wörter">
 
-          <div class="row">
-            <div style="flex:1; min-width:180px">
-              <label>Type</label>
-              <select name="type">
-                <option value="task">task</option>
-                <option value="idea">idea</option>
-                <option value="project">project</option>
-                <option value="research">research</option>
-              </select>
-            </div>
-            <div style="flex:1; min-width:140px">
-              <label>Priority</label>
-              <input name="priority" type="number" min="1" max="5" placeholder="1-5">
-            </div>
-          </div>
+          <label>Erste Notiz (Pflicht)</label>
+          <textarea name="note" required placeholder="[oliver] <?php echo h(date('d.m.Y H:i')); ?> - ..."></textarea>
 
           <div style="margin-top:12px">
             <button class="btn btn-gold" type="submit">Create</button>
