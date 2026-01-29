@@ -361,6 +361,12 @@ renderHeader('Dashboard');
           $sec = (string)($sectionByIdAll[(int)$node['id']] ?? '');
         ?>
 
+        <?php
+          $isRoot = (($byId[(int)$node['id']]['parent_id'] ?? null) === null);
+          $isContainerRoot = $isRoot && in_array((string)$node['title'], ['Ideen','Projekte','Später','Gelöscht'], true);
+        ?>
+
+        <?php if (!$isContainerRoot): ?>
         <div class="row" style="margin-top:10px; align-items:center">
           <div class="meta">Optionen:</div>
 
@@ -385,13 +391,14 @@ renderHeader('Dashboard');
               <button class="btn" type="submit">später</button>
             </form>
 
-            <form method="post" action="/actions.php" style="margin:0" onsubmit="return confirm('Wirklich nach „Gelöscht“ verschieben? (inkl. Subprojekte & Notizen)');">
+            <form method="post" action="/actions.php" style="margin:0" onsubmit="return confirm('Wirklich nach „Gelöscht" verschieben? (inkl. Subtasks)');">
               <input type="hidden" name="action" value="remove_recursive">
               <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
               <button class="btn" type="submit">löschen</button>
             </form>
           <?php endif; ?>
         </div>
+        <?php endif; ?>
       </div>
 
       <div class="card" style="margin-top:16px">

@@ -8,8 +8,24 @@ $action = $_POST['action'] ?? '';
 $nodeId = (int)($_POST['node_id'] ?? 0);
 
 if (!$nodeId) {
-  flash_set('Missing node.', 'err');
+  flash_set('Projekt fehlt.', 'err');
   header('Location: /');
+  exit;
+}
+
+// Disallow actions on top-level container roots
+$st = $pdo->prepare('SELECT id, parent_id, title FROM nodes WHERE id=?');
+$st->execute([$nodeId]);
+$curNode = $st->fetch();
+if (!$curNode) {
+  flash_set('Projekt nicht gefunden.', 'err');
+  header('Location: /');
+  exit;
+}
+$isContainerRoot = ($curNode['parent_id'] === null) && in_array((string)$curNode['title'], ['Ideen','Projekte','Später','Gelöscht'], true);
+if ($isContainerRoot) {
+  flash_set('Für Oberprojekte gibt es keine Aktionen.', 'err');
+  header('Location: /?id=' . $nodeId);
   exit;
 }
 
