@@ -30,44 +30,56 @@ function buildSectionMap(array $byParentAll, int $parentId=0, string $section=''
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $action = $_POST['action'] ?? '';
 
-  if ($action === 'add_note_or_child') {
+  if ($action === 'save_task') {
     $nid = (int)($_POST['node_id'] ?? 0);
-
-    // keep raw input for re-render (don't lose user's text)
-    $formNote = (string)($_POST['note'] ?? '');
-    $formAsChild = !empty($_POST['as_child']);
-    $formChildTitle = (string)($_POST['child_title'] ?? '');
-
-    $note = trim($formNote);
-    $asChild = $formAsChild;
-    $title = trim($formChildTitle);
+    $formNote = (string)($_POST['description'] ?? '');
 
     if (!$nid) {
       flash_set('Projekt fehlt.', 'err');
-    } elseif ($note === '') {
-      flash_set('Notiz fehlt.', 'err');
-    } elseif ($asChild && $title === '') {
-      flash_set('Namen für Subprojekt bitte eingeben.', 'err');
+    } elseif (trim($formNote) === '') {
+      flash_set('Text fehlt.', 'err');
     } else {
-      if ($asChild) {
-        // create a subproject under current node
-        $st = $pdo->prepare('INSERT INTO nodes (parent_id, title, description, priority, created_by, worker_status) VALUES (?, ?, ?, ?, ?, ?)');
-        $st->execute([$nid, $title, null, null, 'oliver', 'todo']);
-        $newId = (int)$pdo->lastInsertId();
+      $ts = date('d.m.Y H:i');
+      $newDesc = rtrim($formNote);
+      $newDesc .= "\n\n[oliver] {$ts} Statusänderung: todo";
 
-        $st = $pdo->prepare('INSERT INTO node_notes (node_id, author, note) VALUES (?, ?, ?)');
-        $st->execute([$newId, 'oliver', $note]);
+      $st = $pdo->prepare('UPDATE nodes SET description=?, worker_status="todo" WHERE id=?');
+      $st->execute([$newDesc, $nid]);
 
-        flash_set('Subprojekt angelegt.', 'info');
-        header('Location: /?id=' . $newId);
-        exit;
-      }
-
-      // just add note to current node
-      $st = $pdo->prepare('INSERT INTO node_notes (node_id, author, note) VALUES (?, ?, ?)');
-      $st->execute([$nid, 'oliver', $note]);
-      flash_set('Notiz gespeichert.', 'info');
+      flash_set('Gespeichert.', 'info');
       header('Location: /?id=' . $nid);
+      exit;
+    }
+  }
+
+  if ($action === 'add_subtask') {
+    $parentId = (int)($_POST['parent_id'] ?? 0);
+    $formChildTitle = (string)($_POST['title'] ?? '');
+    $formChildBody = (string)($_POST['description'] ?? '');
+
+    $title = trim($formChildTitle);
+    $body = trim($formChildBody);
+
+    if (!$parentId) {
+      flash_set('Projekt fehlt.', 'err');
+    } elseif ($title === '') {
+      flash_set('Titel für Subtask bitte eingeben.', 'err');
+    } elseif ($body === '') {
+      flash_set('Beschreibung für Subtask bitte eingeben.', 'err');
+    } else {
+      $ts = date('d.m.Y H:i');
+      $desc = rtrim($formChildBody) . "\n\n[oliver] {$ts} Statusänderung: todo";
+
+      $st = $pdo->prepare('INSERT INTO nodes (parent_id, title, description, priority, created_by, worker_status) VALUES (?, ?, ?, ?, ?, ?)');
+      $st->execute([$parentId, $title, $desc, null, 'oliver', 'todo']);
+      $newId = (int)$pdo->lastInsertId();
+
+      // also append a short line into parent description
+      $st = $pdo->prepare('UPDATE nodes SET description=CONCAT(COALESCE(description,\'\'), ?) WHERE id=?');
+      $st->execute(["\n\n[oliver] {$ts} Subtask angelegt: {$title}", $parentId]);
+
+      flash_set('Subtask angelegt.', 'info');
+      header('Location: /?id=' . $newId);
       exit;
     }
   }
@@ -111,8 +123,8 @@ if ($q !== '') {
   $st->execute([$needle]);
   $matchIds = array_map(fn($r) => (int)$r['node_id'], $st->fetchAll());
 
-  $st = $pdo->prepare('SELECT id FROM nodes WHERE title LIKE ?');
-  $st->execute([$needle]);
+  $st = $pdo->prepare('SELECT id FROM nodes WHERE title LIKE ? OR description LIKE ?');
+  $st->execute([$needle, $needle]);
   foreach ($st->fetchAll() as $r) $matchIds[] = (int)$r['id'];
 
   $matchIds = array_values(array_unique($matchIds));
@@ -266,9 +278,8 @@ if ($nodeId) {
   $st->execute([$nodeId]);
   $children = $st->fetchAll();
 
-  $st = $pdo->prepare('SELECT author, created_at, note FROM node_notes WHERE node_id=? ORDER BY id DESC LIMIT 50');
-  $st->execute([$nodeId]);
-  $notes = $st->fetchAll();
+  // legacy notes no longer rendered (we use nodes.description as the editable task text)
+  $notes = [];
 }
 
 renderHeader('Dashboard');
@@ -375,34 +386,34 @@ renderHeader('Dashboard');
       </div>
 
       <div class="card" style="margin-top:16px">
-        <form method="post" style="margin:0" onsubmit="if (this.as_child && this.as_child.checked) { return confirm('Subprojekt anlegen?'); } return true;">
-          <input type="hidden" name="action" value="add_note_or_child">
+        <form method="post" style="margin:0">
+          <input type="hidden" name="action" value="save_task">
           <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
 
-          <label>Neue Notiz anlegen:</label>
-          <textarea name="note" placeholder="[oliver] <?php echo h(date('d.m.Y H:i')); ?> - ..." required><?php echo h($formNote); ?></textarea>
+          <label>Aufgabe / Notiz:</label>
+          <textarea name="description" required><?php echo h((string)($node['description'] ?? '')); ?></textarea>
 
-          <div class="row" style="align-items:center; gap:10px; margin-top:10px; flex-wrap:wrap">
-            <label style="display:flex;align-items:center;gap:8px;margin:0; white-space:nowrap;">
-              als Subprojekt anlegen:
-              <input type="checkbox" name="as_child" value="1" <?php echo $formAsChild ? 'checked' : ''; ?>>
-            </label>
-
-            <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:320px">
-              <span class="meta" style="white-space:nowrap">Name:</span>
-              <input name="child_title" placeholder="max. 3–4 Wörter" style="flex:1" value="<?php echo h($formChildTitle); ?>">
-            </div>
-
-            <button class="btn btn-gold" type="submit">Absenden</button>
+          <div style="margin-top:10px">
+            <button class="btn btn-gold" type="submit">Speichern</button>
           </div>
         </form>
 
-        <?php foreach ($notes as $n): ?>
-          <div class="note">
-            <div class="head">[<?php echo h($n['author']); ?>] <?php echo h($n['created_at']); ?></div>
-            <div><?php echo nl2br(h($n['note'])); ?></div>
+        <div style="height:14px"></div>
+
+        <form method="post" style="margin:0">
+          <input type="hidden" name="action" value="add_subtask">
+          <input type="hidden" name="parent_id" value="<?php echo (int)$node['id']; ?>">
+
+          <label>Neuen Subtask anlegen: <span class="meta">Titel</span></label>
+          <input name="title" placeholder="max. 3–4 Wörter" required>
+
+          <label>Beschreibung</label>
+          <textarea name="description" required></textarea>
+
+          <div style="margin-top:10px">
+            <button class="btn btn-gold" type="submit">Absenden</button>
           </div>
-        <?php endforeach; ?>
+        </form>
       </div>
 
     <?php else: ?>

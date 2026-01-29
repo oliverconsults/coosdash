@@ -55,8 +55,9 @@ if ($action === 'set_later') {
 
   $pdo->prepare('UPDATE nodes SET parent_id=?, worker_status="done" WHERE id=?')->execute([$spId ?: null, $nodeId]);
   $n = propagateDone($pdo, $nodeId);
-  $pdo->prepare('INSERT INTO node_notes (node_id, author, note) VALUES (?, "oliver", ?)')
-      ->execute([$nodeId, 'Später: verschoben, Status erledigt. Descendants done: ' . $n]);
+  $ts = date('d.m.Y H:i');
+  $line = "\n\n[oliver] {$ts} Statusänderung: done (verschoben nach Später; Descendants: {$n})";
+  $pdo->prepare('UPDATE nodes SET description=CONCAT(COALESCE(description,\'\'), ?) WHERE id=?')->execute([$line, $nodeId]);
   flash_set('Auf später gesetzt (erledigt) & verschoben.', 'info');
   header('Location: /?id=' . ($spId ?: $nodeId));
   exit;
@@ -87,16 +88,18 @@ if ($action === 'set_active') {
 
   if ($moveToProjects && $projId) {
     $pdo->prepare('UPDATE nodes SET parent_id=?, worker_status="todo" WHERE id=?')->execute([$projId, $nodeId]);
-    $pdo->prepare('INSERT INTO node_notes (node_id, author, note) VALUES (?, "oliver", ?)')
-        ->execute([$nodeId, 'Aktiviert: nach Projekte verschoben (todo).']);
+    $ts = date('d.m.Y H:i');
+    $line = "\n\n[oliver] {$ts} Statusänderung: todo (aktiviert; nach Projekte verschoben)";
+    $pdo->prepare('UPDATE nodes SET description=CONCAT(COALESCE(description,\'\'), ?) WHERE id=?')->execute([$line, $nodeId]);
     flash_set('Aktiviert: nach Projekte verschoben (todo).', 'info');
     header('Location: /?id=' . $nodeId);
     exit;
   }
 
   $pdo->prepare('UPDATE nodes SET worker_status="todo" WHERE id=?')->execute([$nodeId]);
-  $pdo->prepare('INSERT INTO node_notes (node_id, author, note) VALUES (?, "oliver", ?)')
-      ->execute([$nodeId, 'Aktiviert: worker_status=todo']);
+  $ts = date('d.m.Y H:i');
+  $line = "\n\n[oliver] {$ts} Statusänderung: todo (aktiviert)";
+  $pdo->prepare('UPDATE nodes SET description=CONCAT(COALESCE(description,\'\'), ?) WHERE id=?')->execute([$line, $nodeId]);
   flash_set('Aktiviert (todo).', 'info');
   header('Location: /?id=' . $nodeId);
   exit;
@@ -143,8 +146,9 @@ if ($action === 'remove_recursive') {
     $moved = countSubtree($pdo, $nodeId);
     moveSubtreeRoot($pdo, $nodeId, $deletedRootId);
     $pdo->prepare('UPDATE nodes SET worker_status="done" WHERE id=?')->execute([$nodeId]);
-    $pdo->prepare('INSERT INTO node_notes (node_id, author, note) VALUES (?, "oliver", ?)')
-        ->execute([$nodeId, 'Gelöscht: nach „Gelöscht“ verschoben (Subtree behalten).']);
+    $ts = date('d.m.Y H:i');
+    $line = "\n\n[oliver] {$ts} Statusänderung: done (nach Gelöscht verschoben; Subtree behalten)";
+    $pdo->prepare('UPDATE nodes SET description=CONCAT(COALESCE(description,\'\'), ?) WHERE id=?')->execute([$line, $nodeId]);
     $pdo->commit();
   } catch (Throwable $e) {
     $pdo->rollBack();
