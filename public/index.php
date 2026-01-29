@@ -102,7 +102,7 @@ function renderTree(array $byParent, array $open, int $currentId, int $parentId=
       $isOpen = $forceOpenAll || ($open[$id] ?? $isActive);
       echo '<details class="tree-branch" ' . ($isOpen ? 'open' : '') . ' style="margin-left:' . $indent . 'px">';
       echo '<summary class="tree-item ' . ($isActive ? 'active' : '') . '">';
-      echo '<span class="meta" style="min-width:52px">' . h($num) . '</span>';
+      echo '<span class="tree-num">' . h($num) . '</span>';
       echo '<a href="/?id=' . $id . '">' . h($title) . h($countTxt) . '</a>';
       echo '<span class="tag" style="margin-left:auto">' . h($n['status']) . '</span>';
       echo '</summary>';
@@ -111,7 +111,7 @@ function renderTree(array $byParent, array $open, int $currentId, int $parentId=
     } else {
       echo '<div class="tree-leaf" style="margin-left:' . $indent . 'px">';
       echo '<div class="tree-item ' . ($isActive ? 'active' : '') . '">';
-      echo '<span class="meta" style="min-width:52px">' . h($num) . '</span>';
+      echo '<span class="tree-num">' . h($num) . '</span>';
       echo '<a href="/?id=' . $id . '">' . h($title) . h($countTxt) . '</a>';
       echo '<span class="tag" style="margin-left:auto">' . h($n['status']) . '</span>';
       echo '</div></div>';
