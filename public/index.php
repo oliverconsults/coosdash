@@ -222,6 +222,12 @@ renderHeader('Dashboard');
             <button class="btn" name="worker_status" value="approve">approve</button>
             <button class="btn" name="worker_status" value="done">done</button>
           </form>
+
+          <form method="post" action="/actions.php" style="display:flex;gap:8px;flex-wrap:wrap">
+            <input type="hidden" name="action" value="approve_to_todo_recursive">
+            <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
+            <button class="btn" type="submit">Freigeben (rekursiv)</button>
+          </form>
         </div>
       </div>
 
