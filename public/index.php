@@ -269,7 +269,7 @@ renderHeader('Dashboard');
             <form method="post" action="/actions.php" style="margin:0">
               <input type="hidden" name="action" value="set_active">
               <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
-              <button class="btn btn-gold" type="submit">active</button>
+              <button class="btn btn-gold" type="submit">activate</button>
             </form>
           <?php endif; ?>
 
