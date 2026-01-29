@@ -140,11 +140,15 @@ function renderTree(array $byParent, array $open, int $currentId, int $parentId=
     $shade = max(0, min(4, $depth));
     $col = ['#d4af37','#f2d98a','#f6e7b9','#fbf3dc','#e8eefc'][$shade];
 
+    $msClass = '';
+    if (($n['main_status'] ?? '') === 'canceled') $msClass = ' ms-canceled';
+    if (($n['main_status'] ?? '') === 'later') $msClass = ' ms-later';
+
     if ($hasKids) {
       $forceOpenAll = (!empty($_GET['open']) && $_GET['open'] === 'all');
       $isOpen = $forceOpenAll || ($open[$id] ?? $isActive);
       echo '<details class="tree-branch" ' . ($isOpen ? 'open' : '') . ' style="margin-left:' . $indent . 'px">';
-      echo '<summary class="tree-item ' . ($isActive ? 'active' : '') . '">';
+      echo '<summary class="tree-item ' . ($isActive ? 'active' : '') . $msClass . '">';
       echo '<a href="/?id=' . $id . '" style="display:flex;align-items:center;gap:0;">'
         . '<span style="color:' . $col . ';">' . h($num) . '</span>'
         . '&nbsp;'
@@ -156,7 +160,7 @@ function renderTree(array $byParent, array $open, int $currentId, int $parentId=
       echo '</details>';
     } else {
       echo '<div class="tree-leaf" style="margin-left:' . $indent . 'px">';
-      echo '<div class="tree-item ' . ($isActive ? 'active' : '') . '">';
+      echo '<div class="tree-item ' . ($isActive ? 'active' : '') . $msClass . '">';
       echo '<a href="/?id=' . $id . '" style="display:flex;align-items:center;gap:0;">'
         . '<span style="color:' . $col . ';">' . h($num) . '</span>'
         . '&nbsp;'
