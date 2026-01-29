@@ -153,11 +153,19 @@ renderHeader('Dashboard');
 
 <div class="grid">
   <div class="card">
-    <h2>Projects</h2>
-    <div class="row" style="justify-content:space-between; margin-bottom:10px;">
-      <div></div>
-      <a class="btn" style="padding:6px 10px; font-size:12px" href="/?open=all<?php echo $nodeId ? '&id='.(int)$nodeId : ''; ?>">Alles aufklappen</a>
+    <div class="row" style="justify-content:space-between; align-items:center;">
+      <h2 style="margin:0;">Projects / Ideas (<?php echo count($roots); ?>)</h2>
+      <form method="get" style="margin:0;">
+        <?php if ($nodeId): ?><input type="hidden" name="id" value="<?php echo (int)$nodeId; ?>"><?php endif; ?>
+        <select name="open" onchange="this.form.submit()" style="width:auto; padding:6px 10px; font-size:12px;">
+          <option value="">close all</option>
+          <option value="all" <?php echo (!empty($_GET['open']) && $_GET['open']==='all') ? 'selected' : ''; ?>>open all</option>
+        </select>
+      </form>
     </div>
+
+    <div style="height:10px"></div>
+
     <div class="tree">
       <?php renderTree($byParent, $open, (int)$nodeId, 0, 0); ?>
     </div>
