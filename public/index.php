@@ -190,9 +190,24 @@ function renderTree(array $byParent, array $open, int $currentId, int $parentId=
     $countTxt = $hasKids ? ' (' . $directCount . ')' : '';
 
     // right tag: show statuses in German (DB values stay English)
-    $work = (string)($n['worker_status'] ?? '');
-    $workMap = ['todo'=>'todo','done'=>'erledigt'];
-    $statusText = ($workMap[$work] ?? $work);
+    // right tag: show direct-children counts if node has kids; otherwise show own status
+    if ($hasKids) {
+      $todo = 0; $done = 0;
+      if (!empty($byParent[$id])) {
+        foreach ($byParent[$id] as $c) {
+          if (($c['worker_status'] ?? '') === 'todo') $todo++;
+          if (($c['worker_status'] ?? '') === 'done') $done++;
+        }
+      }
+      $parts = [];
+      if ($todo > 0) $parts[] = 'ToDo: ' . $todo;
+      if ($done > 0) $parts[] = 'Done: ' . $done;
+      $statusText = $parts ? implode(' | ', $parts) : '';
+    } else {
+      $work = (string)($n['worker_status'] ?? '');
+      $workMap = ['todo'=>'todo','done'=>'erledigt'];
+      $statusText = ($workMap[$work] ?? $work);
+    }
 
     $shade = max(0, min(4, $depth));
     $col = ['#d4af37','#f2d98a','#f6e7b9','#fbf3dc','#e8eefc'][$shade];
@@ -212,7 +227,7 @@ function renderTree(array $byParent, array $open, int $currentId, int $parentId=
         . '&nbsp;'
         . '<span style="color:' . $col . ';">' . h($title) . h($countTxt) . '</span>'
         . '</a>';
-      echo '<span class="tag" style="margin-left:auto">' . h($statusText) . '</span>';
+      if ($statusText !== '') echo '<span class="tag" style="margin-left:auto">' . h($statusText) . '</span>';
       echo '</summary>';
       renderTree($byParent, $open, $currentId, $id, $depth+1, $numParts);
       echo '</details>';
@@ -224,7 +239,7 @@ function renderTree(array $byParent, array $open, int $currentId, int $parentId=
         . '&nbsp;'
         . '<span style="color:' . $col . ';">' . h($title) . h($countTxt) . '</span>'
         . '</a>';
-      echo '<span class="tag" style="margin-left:auto">' . h($statusText) . '</span>';
+      if ($statusText !== '') echo '<span class="tag" style="margin-left:auto">' . h($statusText) . '</span>';
       echo '</div></div>';
     }
   }
