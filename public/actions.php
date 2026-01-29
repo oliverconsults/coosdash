@@ -136,6 +136,20 @@ function moveSubtreeRoot(PDO $pdo, int $nodeId, int $newParentId): void {
   $pdo->prepare('UPDATE nodes SET parent_id=? WHERE id=?')->execute([$newParentId, $nodeId]);
 }
 
+function deleteSubtreePermanent(PDO $pdo, int $nodeId): int {
+  $count = 0;
+  $st = $pdo->prepare('SELECT id FROM nodes WHERE parent_id=?');
+  $st->execute([$nodeId]);
+  foreach ($st->fetchAll() as $row) {
+    $count += deleteSubtreePermanent($pdo, (int)$row['id']);
+  }
+
+  // delete legacy notes + node itself
+  $pdo->prepare('DELETE FROM node_notes WHERE node_id=?')->execute([$nodeId]);
+  $pdo->prepare('DELETE FROM nodes WHERE id=?')->execute([$nodeId]);
+  return $count + 1;
+}
+
 if ($action === 'remove_recursive') {
   // Soft-delete: move under root "Gelöscht" (keep notes + subtree)
   $st = $pdo->prepare('SELECT id, title FROM nodes WHERE id=?');
@@ -174,6 +188,40 @@ if ($action === 'remove_recursive') {
   }
 
   flash_set('Verschoben nach Gelöscht (' . $moved . ' Items).', 'info');
+  header('Location: /?id=' . $deletedRootId);
+  exit;
+}
+
+if ($action === 'delete_permanent') {
+  // Hard-delete: only allowed from inside "Gelöscht" section
+  $st = $pdo->prepare('SELECT id FROM nodes WHERE parent_id IS NULL AND title="Gelöscht" LIMIT 1');
+  $st->execute();
+  $del = $st->fetch();
+  $deletedRootId = $del ? (int)$del['id'] : 0;
+  if (!$deletedRootId) {
+    flash_set('Missing root: Gelöscht', 'err');
+    header('Location: /?id=' . $nodeId);
+    exit;
+  }
+
+  if (!isUnderRoot($pdo, $nodeId, $deletedRootId) && (int)$curNode['parent_id'] !== $deletedRootId) {
+    flash_set('Endgültig löschen ist nur in „Gelöscht“ erlaubt.', 'err');
+    header('Location: /?id=' . $nodeId);
+    exit;
+  }
+
+  $pdo->beginTransaction();
+  try {
+    $n = deleteSubtreePermanent($pdo, $nodeId);
+    $pdo->commit();
+  } catch (Throwable $e) {
+    $pdo->rollBack();
+    flash_set('Endgültig löschen fehlgeschlagen: ' . $e->getMessage(), 'err');
+    header('Location: /?id=' . $nodeId);
+    exit;
+  }
+
+  flash_set('Endgültig gelöscht (' . $n . ' Items).', 'info');
   header('Location: /?id=' . $deletedRootId);
   exit;
 }

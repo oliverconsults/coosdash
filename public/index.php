@@ -518,6 +518,12 @@ renderHeader('Dashboard');
               <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
               <button class="btn" type="submit">löschen</button>
             </form>
+          <?php elseif ($sec === 'Gelöscht'): ?>
+            <form method="post" action="/actions.php" style="margin:0" onsubmit="return confirm('ENDGÜLTIG löschen? Das entfernt den Node + alle Subtasks + alle Notes unwiderruflich.');">
+              <input type="hidden" name="action" value="delete_permanent">
+              <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
+              <button class="btn" type="submit">endgültig löschen</button>
+            </form>
           <?php endif; ?>
         </div>
         <?php endif; ?>
