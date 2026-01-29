@@ -78,7 +78,7 @@ if ($action === 'accept') {
   $pdo->prepare('UPDATE nodes SET main_status="active", worker_status="todo" WHERE id=?')->execute([$nodeId]);
   $pdo->prepare('INSERT INTO node_notes (node_id, author, note) VALUES (?, "oliver", ?)')
       ->execute([$nodeId, 'Akzeptiert: new→active und approve→todo']);
-  flash_set('Akzeptiert.', 'info');
+  flash_set('Angenommen.', 'info');
   header('Location: /?id=' . $nodeId);
   exit;
 }
@@ -94,7 +94,7 @@ if ($action === 'set_later') {
   $n = propagateDone($pdo, $nodeId);
   $pdo->prepare('INSERT INTO node_notes (node_id, author, note) VALUES (?, "oliver", ?)')
       ->execute([$nodeId, 'Status: later (worker done) + moved to Später. Descendants done: ' . $n]);
-  flash_set('Auf later gesetzt (done) & verschoben.', 'info');
+  flash_set('Auf später gesetzt (erledigt) & verschoben.', 'info');
   header('Location: /?id=' . ($spId ?: $nodeId));
   exit;
 }
@@ -104,7 +104,7 @@ if ($action === 'set_cancel') {
   $n = propagateDone($pdo, $nodeId);
   $pdo->prepare('INSERT INTO node_notes (node_id, author, note) VALUES (?, "oliver", ?)')
       ->execute([$nodeId, 'Status: canceled (worker done). Descendants done: ' . $n]);
-  flash_set('Canceled (done).', 'info');
+  flash_set('Abgebrochen (erledigt).', 'info');
   header('Location: /?id=' . $nodeId);
   exit;
 }
@@ -134,7 +134,7 @@ if ($action === 'set_active') {
     $pdo->prepare('UPDATE nodes SET parent_id=?, main_status="active", worker_status="todo" WHERE id=?')->execute([$projId, $nodeId]);
     $pdo->prepare('INSERT INTO node_notes (node_id, author, note) VALUES (?, "oliver", ?)')
         ->execute([$nodeId, 'Activate: moved to Projekte; main_status=active, worker_status=todo']);
-    flash_set('Activate: verschoben nach Projekte (todo).', 'info');
+    flash_set('Aktiviert: nach Projekte verschoben (todo).', 'info');
     header('Location: /?id=' . $nodeId);
     exit;
   }
@@ -142,7 +142,7 @@ if ($action === 'set_active') {
   $pdo->prepare('UPDATE nodes SET main_status="active", worker_status="todo" WHERE id=?')->execute([$nodeId]);
   $pdo->prepare('INSERT INTO node_notes (node_id, author, note) VALUES (?, "oliver", ?)')
       ->execute([$nodeId, 'Activate: main_status=active, worker_status=todo']);
-  flash_set('Activate (todo).', 'info');
+  flash_set('Aktiviert (todo).', 'info');
   header('Location: /?id=' . $nodeId);
   exit;
 }
@@ -203,11 +203,11 @@ if ($action === 'remove_recursive') {
     exit;
   }
 
-  flash_set('Removed (' . $moved . ' items) → Gelöscht.', 'info');
+  flash_set('Verschoben nach Gelöscht (' . $moved . ' Items).', 'info');
   header('Location: /?id=' . $deletedRootId);
   exit;
 }
 
-flash_set('Unknown action.', 'err');
+flash_set('Unbekannte Aktion.', 'err');
 header('Location: /?id=' . $nodeId);
 exit;

@@ -29,9 +29,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $title = trim($formChildTitle);
 
     if (!$nid) {
-      flash_set('Missing node.', 'err');
+      flash_set('Projekt fehlt.', 'err');
     } elseif ($note === '') {
-      flash_set('Missing note.', 'err');
+      flash_set('Notiz fehlt.', 'err');
     } elseif ($asChild && $title === '') {
       flash_set('Namen für Subprojekt bitte eingeben.', 'err');
     } else {
@@ -44,7 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $st = $pdo->prepare('INSERT INTO node_notes (node_id, author, note) VALUES (?, ?, ?)');
         $st->execute([$newId, 'oliver', $note]);
 
-        flash_set('Subprojekt created.', 'info');
+        flash_set('Subprojekt angelegt.', 'info');
         header('Location: /?id=' . $newId);
         exit;
       }
@@ -52,7 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       // just add note to current node
       $st = $pdo->prepare('INSERT INTO node_notes (node_id, author, note) VALUES (?, ?, ?)');
       $st->execute([$nid, 'oliver', $note]);
-      flash_set('Note added.', 'info');
+      flash_set('Notiz gespeichert.', 'info');
       header('Location: /?id=' . $nid);
       exit;
     }
@@ -65,11 +65,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($nid && in_array($worker, $allowed, true)) {
       $st = $pdo->prepare('UPDATE nodes SET worker_status=? WHERE id=?');
       $st->execute([$worker, $nid]);
-      flash_set('Worker status updated.', 'info');
+      flash_set('Status gespeichert.', 'info');
       header('Location: /?id=' . $nid);
       exit;
     }
-    flash_set('Invalid worker status.', 'err');
+    flash_set('Ungültiger Status.', 'err');
   }
 
   if ($action === 'set_main') {
@@ -79,11 +79,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($nid && in_array($main, $allowed, true)) {
       $st = $pdo->prepare('UPDATE nodes SET main_status=? WHERE id=?');
       $st->execute([$main, $nid]);
-      flash_set('Main status updated.', 'info');
+      flash_set('Status gespeichert.', 'info');
       header('Location: /?id=' . $nid);
       exit;
     }
-    flash_set('Invalid main status.', 'err');
+    flash_set('Ungültiger Status.', 'err');
   }
 }
 
@@ -185,8 +185,12 @@ function renderTree(array $byParent, array $open, int $currentId, int $parentId=
     $directCount = !empty($byParent[$id]) ? count($byParent[$id]) : 0;
     $countTxt = $hasKids ? ' (' . $directCount . ')' : '';
 
-    // right tag stays as main_status | worker_status
-    $statusText = ($n['main_status'] ?? '') . ' | ' . ($n['worker_status'] ?? '');
+    // right tag: show statuses in German (DB values stay English)
+    $main = (string)($n['main_status'] ?? '');
+    $work = (string)($n['worker_status'] ?? '');
+    $mainMap = ['new'=>'neu','active'=>'aktiv','later'=>'später','canceled'=>'abgebrochen'];
+    $workMap = ['todo'=>'todo','approve'=>'freigabe','done'=>'erledigt'];
+    $statusText = ($mainMap[$main] ?? $main) . ' | ' . ($workMap[$work] ?? $work);
 
     $shade = max(0, min(4, $depth));
     $col = ['#d4af37','#f2d98a','#f6e7b9','#fbf3dc','#e8eefc'][$shade];
@@ -196,7 +200,7 @@ function renderTree(array $byParent, array $open, int $currentId, int $parentId=
     if (($n['main_status'] ?? '') === 'later') $msClass = ' ms-later';
 
     if ($hasKids) {
-      $forceOpenAll = (!empty($_GET['open']) && $_GET['open'] === 'all');
+      $forceOpenAll = (!empty($_GET['open']) && $_GET['open'] === 'all') || !empty($_GET['q']);
       $isOpen = $forceOpenAll || ($open[$id] ?? $isActive);
       echo '<details class="tree-branch" ' . ($isOpen ? 'open' : '') . ' style="margin-left:' . $indent . 'px">';
       echo '<summary class="tree-item ' . ($isActive ? 'active' : '') . $msClass . '">';
@@ -248,7 +252,7 @@ renderHeader('Dashboard');
 <div class="grid">
   <div class="card">
     <div class="row" style="justify-content:space-between; align-items:center;">
-      <h2 style="margin:0;">Projects / Ideas (<?php echo count($roots); ?>)</h2>
+      <h2 style="margin:0;">Projekte / Ideen (<?php echo count($roots); ?>)</h2>
       <form method="get" style="margin:0;">
         <?php if ($nodeId): ?><input type="hidden" name="id" value="<?php echo (int)$nodeId; ?>"><?php endif; ?>
         <?php if (!empty($_GET['q'])): ?><input type="hidden" name="q" value="<?php echo h((string)$_GET['q']); ?>"><?php endif; ?>
@@ -260,11 +264,11 @@ renderHeader('Dashboard');
     </div>
 
     <form method="get" style="margin:8px 0 0 0; display:flex; gap:10px;">
-      <input type="text" name="q" placeholder="Search notes..." value="<?php echo h((string)($_GET['q'] ?? '')); ?>" style="flex:1">
+      <input type="text" name="q" placeholder="Notizen durchsuchen..." value="<?php echo h((string)($_GET['q'] ?? '')); ?>" style="flex:1">
       <?php if ($nodeId): ?><input type="hidden" name="id" value="<?php echo (int)$nodeId; ?>"><?php endif; ?>
       <?php if (!empty($_GET['open'])): ?><input type="hidden" name="open" value="<?php echo h((string)$_GET['open']); ?>"><?php endif; ?>
-      <button class="btn" type="submit">Search</button>
-      <?php if (!empty($_GET['q'])): ?><a class="btn" href="/?<?php echo ($nodeId ? 'id='.(int)$nodeId.'&' : '') . (!empty($_GET['open']) ? 'open='.urlencode((string)$_GET['open']).'&' : ''); ?>">Clear</a><?php endif; ?>
+      <button class="btn" type="submit">Suchen</button>
+      <?php if (!empty($_GET['q'])): ?><a class="btn" href="/?<?php echo ($nodeId ? 'id='.(int)$nodeId.'&' : '') . (!empty($_GET['open']) ? 'open='.urlencode((string)$_GET['open']).'&' : ''); ?>">Zurück</a><?php endif; ?>
     </form>
 
     <div style="height:10px"></div>
@@ -299,7 +303,14 @@ renderHeader('Dashboard');
 
         <div class="row" style="justify-content:space-between; align-items:center">
           <h2 style="margin:0;"><?php echo h($crumb); ?></h2>
-          <span class="tag gold"><?php echo h(($node['main_status'] ?? '') . ' | ' . ($node['worker_status'] ?? '')); ?></span>
+          <?php
+            $main = (string)($node['main_status'] ?? '');
+            $work = (string)($node['worker_status'] ?? '');
+            $mainMap = ['new'=>'neu','active'=>'aktiv','later'=>'später','canceled'=>'abgebrochen'];
+            $workMap = ['todo'=>'todo','approve'=>'freigabe','done'=>'erledigt'];
+            $statusLabel = ($mainMap[$main] ?? $main) . ' | ' . ($workMap[$work] ?? $work);
+          ?>
+          <span class="tag gold"><?php echo h($statusLabel); ?></span>
         </div>
         <div class="meta">#<?php echo (int)$node['id']; ?> • created_by=<?php echo h($node['created_by']); ?></div>
 
@@ -315,7 +326,7 @@ renderHeader('Dashboard');
             <form method="post" action="/actions.php" style="margin:0">
               <input type="hidden" name="action" value="accept">
               <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
-              <button class="btn btn-gold" type="submit">accept</button>
+              <button class="btn btn-gold" type="submit">annehmen</button>
             </form>
           <?php endif; ?>
 
@@ -323,7 +334,7 @@ renderHeader('Dashboard');
             <form method="post" action="/actions.php" style="margin:0">
               <input type="hidden" name="action" value="approve_to_todo_recursive">
               <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
-              <button class="btn btn-gold" type="submit">release</button>
+              <button class="btn btn-gold" type="submit">freigeben</button>
             </form>
           <?php endif; ?>
 
@@ -331,7 +342,7 @@ renderHeader('Dashboard');
             <form method="post" action="/actions.php" style="margin:0">
               <input type="hidden" name="action" value="set_active">
               <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
-              <button class="btn btn-gold" type="submit">activate</button>
+              <button class="btn btn-gold" type="submit">aktivieren</button>
             </form>
           <?php endif; ?>
 
@@ -339,7 +350,7 @@ renderHeader('Dashboard');
             <form method="post" action="/actions.php" style="margin:0">
               <input type="hidden" name="action" value="set_later">
               <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
-              <button class="btn" type="submit">later</button>
+              <button class="btn" type="submit">später</button>
             </form>
           <?php endif; ?>
 
@@ -347,15 +358,15 @@ renderHeader('Dashboard');
             <form method="post" action="/actions.php" style="margin:0">
               <input type="hidden" name="action" value="set_cancel">
               <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
-              <button class="btn" type="submit">cancel</button>
+              <button class="btn" type="submit">abbrechen</button>
             </form>
           <?php endif; ?>
 
           <?php if ($ms === 'canceled'): ?>
-            <form method="post" action="/actions.php" style="margin:0" onsubmit="return confirm('Wirklich endgültig löschen? Das löscht auch alle Subprojekte und Notizen.');">
+            <form method="post" action="/actions.php" style="margin:0" onsubmit="return confirm('Wirklich löschen? Wird nach „Gelöscht“ verschoben (inkl. Subprojekte & Notizen).');">
               <input type="hidden" name="action" value="remove_recursive">
               <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
-              <button class="btn" type="submit">remove</button>
+              <button class="btn" type="submit">entfernen</button>
             </form>
           <?php endif; ?>
         </div>
