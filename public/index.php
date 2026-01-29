@@ -268,7 +268,6 @@ renderHeader('Dashboard');
       <?php if ($nodeId): ?><input type="hidden" name="id" value="<?php echo (int)$nodeId; ?>"><?php endif; ?>
       <?php if (!empty($_GET['open'])): ?><input type="hidden" name="open" value="<?php echo h((string)$_GET['open']); ?>"><?php endif; ?>
       <button class="btn" type="submit">Suchen</button>
-      <?php if (!empty($_GET['q'])): ?><a class="btn" href="/?<?php echo ($nodeId ? 'id='.(int)$nodeId.'&' : '') . (!empty($_GET['open']) ? 'open='.urlencode((string)$_GET['open']).'&' : ''); ?>">Zurück</a><?php endif; ?>
     </form>
 
     <div style="height:10px"></div>
