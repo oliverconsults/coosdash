@@ -12,6 +12,20 @@ $formNote = '';
 $formAsChild = false;
 $formChildTitle = '';
 
+// resolve root sections (Ideen/Projekte/Später/Gelöscht) for styling + actions
+function buildSectionMap(array $byParentAll, int $parentId=0, string $section=''): array {
+  $out = [];
+  if (empty($byParentAll[$parentId])) return $out;
+  foreach ($byParentAll[$parentId] as $n) {
+    $id = (int)$n['id'];
+    $sec = $section;
+    if ($parentId === 0) $sec = (string)$n['title'];
+    $out[$id] = $sec;
+    $out += buildSectionMap($byParentAll, $id, $sec);
+  }
+  return $out;
+}
+
 // handle actions
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $action = $_POST['action'] ?? '';
@@ -37,8 +51,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
       if ($asChild) {
         // create a subproject under current node
-        $st = $pdo->prepare('INSERT INTO nodes (parent_id, title, description, priority, created_by, main_status, worker_status) VALUES (?, ?, ?, ?, ?, ?, ?)');
-        $st->execute([$nid, $title, null, null, 'oliver', 'active', 'todo']);
+        $st = $pdo->prepare('INSERT INTO nodes (parent_id, title, description, priority, created_by, worker_status) VALUES (?, ?, ?, ?, ?, ?)');
+        $st->execute([$nid, $title, null, null, 'oliver', 'todo']);
         $newId = (int)$pdo->lastInsertId();
 
         $st = $pdo->prepare('INSERT INTO node_notes (node_id, author, note) VALUES (?, ?, ?)');
@@ -72,23 +86,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     flash_set('Ungültiger Status.', 'err');
   }
 
-  if ($action === 'set_main') {
-    $nid = (int)($_POST['node_id'] ?? 0);
-    $main = (string)($_POST['main_status'] ?? '');
-    $allowed = ['new','active','later','canceled'];
-    if ($nid && in_array($main, $allowed, true)) {
-      $st = $pdo->prepare('UPDATE nodes SET main_status=? WHERE id=?');
-      $st->execute([$main, $nid]);
-      flash_set('Status gespeichert.', 'info');
-      header('Location: /?id=' . $nid);
-      exit;
-    }
-    flash_set('Ungültiger Status.', 'err');
-  }
+  // set_main removed (main_status dropped)
 }
 
 // Load full tree for nav
-$allNodes = $pdo->query("SELECT id, parent_id, title, main_status, worker_status, priority FROM nodes ORDER BY COALESCE(priority,999), id")->fetchAll();
+$allNodes = $pdo->query("SELECT id, parent_id, title, worker_status, priority FROM nodes ORDER BY COALESCE(priority,999), id")->fetchAll();
 $byParentAll = [];
 $byIdAll = [];
 foreach ($allNodes as $n) {
@@ -96,6 +98,8 @@ foreach ($allNodes as $n) {
   $byParentAll[$pid][] = $n;
   $byIdAll[(int)$n['id']] = $n;
 }
+
+$sectionByIdAll = buildSectionMap($byParentAll, 0, '');
 
 // optional search: filter tree to only paths that match notes/titles
 $q = trim((string)($_GET['q'] ?? ''));
@@ -186,18 +190,17 @@ function renderTree(array $byParent, array $open, int $currentId, int $parentId=
     $countTxt = $hasKids ? ' (' . $directCount . ')' : '';
 
     // right tag: show statuses in German (DB values stay English)
-    $main = (string)($n['main_status'] ?? '');
     $work = (string)($n['worker_status'] ?? '');
-    $mainMap = ['new'=>'neu','active'=>'aktiv','later'=>'später','canceled'=>'abgebrochen'];
     $workMap = ['todo'=>'todo','approve'=>'freigabe','done'=>'erledigt'];
-    $statusText = ($mainMap[$main] ?? $main) . ' | ' . ($workMap[$work] ?? $work);
+    $statusText = ($workMap[$work] ?? $work);
 
     $shade = max(0, min(4, $depth));
     $col = ['#d4af37','#f2d98a','#f6e7b9','#fbf3dc','#e8eefc'][$shade];
 
+    $sec = (string)($sectionByIdAll[$id] ?? '');
     $msClass = '';
-    if (($n['main_status'] ?? '') === 'canceled') $msClass = ' ms-canceled';
-    if (($n['main_status'] ?? '') === 'later') $msClass = ' ms-later';
+    if ($sec === 'Gelöscht') $msClass = ' ms-canceled';
+    if ($sec === 'Später') $msClass = ' ms-later';
 
     if ($hasKids) {
       $forceOpenAll = (!empty($_GET['open']) && $_GET['open'] === 'all') || !empty($_GET['q']);
@@ -237,7 +240,7 @@ if ($nodeId) {
   $node = $st->fetch();
 
   // children list removed from UI; keep query minimal for potential future use
-  $st = $pdo->prepare('SELECT id,title,main_status,worker_status FROM nodes WHERE parent_id=? ORDER BY id');
+  $st = $pdo->prepare('SELECT id,title,worker_status FROM nodes WHERE parent_id=? ORDER BY id');
   $st->execute([$nodeId]);
   $children = $st->fetchAll();
 
@@ -303,41 +306,23 @@ renderHeader('Dashboard');
         <div class="row" style="justify-content:space-between; align-items:center">
           <h2 style="margin:0;"><?php echo h($crumb); ?></h2>
           <?php
-            $main = (string)($node['main_status'] ?? '');
             $work = (string)($node['worker_status'] ?? '');
-            $mainMap = ['new'=>'neu','active'=>'aktiv','later'=>'später','canceled'=>'abgebrochen'];
             $workMap = ['todo'=>'todo','approve'=>'freigabe','done'=>'erledigt'];
-            $statusLabel = ($mainMap[$main] ?? $main) . ' | ' . ($workMap[$work] ?? $work);
+            $statusLabel = ($workMap[$work] ?? $work);
           ?>
           <span class="tag gold"><?php echo h($statusLabel); ?></span>
         </div>
         <div class="meta">#<?php echo (int)$node['id']; ?> • created_by=<?php echo h($node['created_by']); ?></div>
 
         <?php
-          $ms = (string)($node['main_status'] ?? '');
           $ws = (string)($node['worker_status'] ?? '');
+          $sec = (string)($sectionByIdAll[(int)$node['id']] ?? '');
         ?>
 
         <div class="row" style="margin-top:10px; align-items:center">
           <div class="meta">Optionen:</div>
 
-          <?php if ($ms === 'new' && $ws === 'approve'): ?>
-            <form method="post" action="/actions.php" style="margin:0">
-              <input type="hidden" name="action" value="accept">
-              <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
-              <button class="btn btn-gold" type="submit">annehmen</button>
-            </form>
-          <?php endif; ?>
-
-          <?php if ($ms === 'active' && $ws === 'approve'): ?>
-            <form method="post" action="/actions.php" style="margin:0">
-              <input type="hidden" name="action" value="approve_to_todo_recursive">
-              <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
-              <button class="btn btn-gold" type="submit">freigeben</button>
-            </form>
-          <?php endif; ?>
-
-          <?php if ($ms === 'later' || $ms === 'canceled'): ?>
+          <?php if ($sec !== 'Projekte'): ?>
             <form method="post" action="/actions.php" style="margin:0">
               <input type="hidden" name="action" value="set_active">
               <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
@@ -345,27 +330,23 @@ renderHeader('Dashboard');
             </form>
           <?php endif; ?>
 
-          <?php if ($ms !== 'later'): ?>
+          <?php if ($sec === 'Projekte'): ?>
+            <form method="post" style="margin:0">
+              <input type="hidden" name="action" value="set_worker">
+              <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
+              <button class="btn btn-gold" name="worker_status" value="<?php echo $ws === 'done' ? 'todo' : 'done'; ?>" type="submit"><?php echo $ws === 'done' ? 'wieder öffnen' : 'erledigt'; ?></button>
+            </form>
+
             <form method="post" action="/actions.php" style="margin:0">
               <input type="hidden" name="action" value="set_later">
               <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
               <button class="btn" type="submit">später</button>
             </form>
-          <?php endif; ?>
 
-          <?php if ($ms !== 'canceled'): ?>
-            <form method="post" action="/actions.php" style="margin:0">
-              <input type="hidden" name="action" value="set_cancel">
-              <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
-              <button class="btn" type="submit">abbrechen</button>
-            </form>
-          <?php endif; ?>
-
-          <?php if ($ms === 'canceled'): ?>
-            <form method="post" action="/actions.php" style="margin:0" onsubmit="return confirm('Wirklich löschen? Wird nach „Gelöscht“ verschoben (inkl. Subprojekte & Notizen).');">
+            <form method="post" action="/actions.php" style="margin:0" onsubmit="return confirm('Wirklich nach „Gelöscht“ verschieben? (inkl. Subprojekte & Notizen)');">
               <input type="hidden" name="action" value="remove_recursive">
               <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
-              <button class="btn" type="submit">entfernen</button>
+              <button class="btn" type="submit">löschen</button>
             </form>
           <?php endif; ?>
         </div>
