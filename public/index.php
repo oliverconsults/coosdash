@@ -302,6 +302,14 @@ renderHeader('Dashboard');
               <button class="btn" type="submit">cancel</button>
             </form>
           <?php endif; ?>
+
+          <?php if ($ms === 'canceled'): ?>
+            <form method="post" action="/actions.php" style="margin:0" onsubmit="return confirm('Wirklich endgültig löschen? Das löscht auch alle Subprojekte und Notizen.');">
+              <input type="hidden" name="action" value="remove_recursive">
+              <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
+              <button class="btn" type="submit">remove</button>
+            </form>
+          <?php endif; ?>
         </div>
       </div>
 

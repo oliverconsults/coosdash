@@ -98,6 +98,55 @@ if ($action === 'set_active') {
   exit;
 }
 
+function deleteSubtree(PDO $pdo, int $nodeId): int {
+  $count = 0;
+  $st = $pdo->prepare('SELECT id FROM nodes WHERE parent_id=?');
+  $st->execute([$nodeId]);
+  $kids = $st->fetchAll();
+  foreach ($kids as $k) {
+    $count += deleteSubtree($pdo, (int)$k['id']);
+  }
+
+  // delete notes first, then node
+  $pdo->prepare('DELETE FROM node_notes WHERE node_id=?')->execute([$nodeId]);
+  $pdo->prepare('DELETE FROM nodes WHERE id=?')->execute([$nodeId]);
+  return $count + 1;
+}
+
+if ($action === 'remove_recursive') {
+  // Safety: only allow hard-delete if node is canceled
+  $st = $pdo->prepare('SELECT id, parent_id, main_status, title FROM nodes WHERE id=?');
+  $st->execute([$nodeId]);
+  $n = $st->fetch();
+  if (!$n) {
+    flash_set('Node not found.', 'err');
+    header('Location: /');
+    exit;
+  }
+  if (($n['main_status'] ?? '') !== 'canceled') {
+    flash_set('Remove is only allowed for canceled items.', 'err');
+    header('Location: /?id=' . $nodeId);
+    exit;
+  }
+
+  $parentId = $n['parent_id'] === null ? 0 : (int)$n['parent_id'];
+
+  $pdo->beginTransaction();
+  try {
+    $deleted = deleteSubtree($pdo, $nodeId);
+    $pdo->commit();
+  } catch (Throwable $e) {
+    $pdo->rollBack();
+    flash_set('Remove failed: ' . $e->getMessage(), 'err');
+    header('Location: /?id=' . $nodeId);
+    exit;
+  }
+
+  flash_set('Removed permanently (' . $deleted . ' items).', 'info');
+  header('Location: /?id=' . $parentId);
+  exit;
+}
+
 flash_set('Unknown action.', 'err');
 header('Location: /?id=' . $nodeId);
 exit;
