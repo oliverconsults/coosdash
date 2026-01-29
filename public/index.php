@@ -22,7 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($note === '') {
       flash_set('Missing note.', 'err');
     } elseif ($asChild && $title === '') {
-      flash_set('Missing subproject name.', 'err');
+      flash_set('Namen für Subprojekt bitte eingeben.', 'err');
     } else {
       if ($asChild) {
         // create a subproject under current node
