@@ -48,23 +48,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     flash_set('Missing title or note.', 'err');
   }
 
-  if ($action === 'set_status') {
+  if ($action === 'set_worker') {
     $nid = (int)($_POST['node_id'] ?? 0);
-    $status = (string)($_POST['status'] ?? '');
-    $allowed = ['new','accepted','deferred','rejected','active','done'];
-    if ($nid && in_array($status, $allowed, true)) {
-      $st = $pdo->prepare('UPDATE nodes SET status=? WHERE id=?');
-      $st->execute([$status, $nid]);
-      flash_set('Status updated.', 'info');
+    $worker = (string)($_POST['worker_status'] ?? '');
+    $allowed = ['todo','approve','done'];
+    if ($nid && in_array($worker, $allowed, true)) {
+      $st = $pdo->prepare('UPDATE nodes SET worker_status=? WHERE id=?');
+      $st->execute([$worker, $nid]);
+      flash_set('Worker status updated.', 'info');
       header('Location: /?id=' . $nid);
       exit;
     }
-    flash_set('Invalid status.', 'err');
+    flash_set('Invalid worker status.', 'err');
+  }
+
+  if ($action === 'set_main') {
+    $nid = (int)($_POST['node_id'] ?? 0);
+    $main = (string)($_POST['main_status'] ?? '');
+    $allowed = ['new','active','later','canceled'];
+    if ($nid && in_array($main, $allowed, true)) {
+      $st = $pdo->prepare('UPDATE nodes SET main_status=? WHERE id=?');
+      $st->execute([$main, $nid]);
+      flash_set('Main status updated.', 'info');
+      header('Location: /?id=' . $nid);
+      exit;
+    }
+    flash_set('Invalid main status.', 'err');
   }
 }
 
 // Load full tree for nav
-$allNodes = $pdo->query("SELECT id, parent_id, title, type, status, priority FROM nodes ORDER BY COALESCE(priority,999), id")->fetchAll();
+$allNodes = $pdo->query("SELECT id, parent_id, title, main_status, worker_status, priority FROM nodes ORDER BY COALESCE(priority,999), id")->fetchAll();
 $byParent = [];
 $byId = [];
 foreach ($allNodes as $n) {
@@ -104,6 +118,8 @@ function renderTree(array $byParent, array $open, int $currentId, int $parentId=
     $directCount = !empty($byParent[$id]) ? count($byParent[$id]) : 0;
     $countTxt = $hasKids ? ' (' . $directCount . ')' : '';
 
+    $statusText = ($n['main_status'] ?? '') . ' | ' . ($n['worker_status'] ?? '');
+
     if ($hasKids) {
       $forceOpenAll = (!empty($_GET['open']) && $_GET['open'] === 'all');
       $isOpen = $forceOpenAll || ($open[$id] ?? $isActive);
@@ -117,7 +133,7 @@ function renderTree(array $byParent, array $open, int $currentId, int $parentId=
         . '<span style="color:' . $col . ';">' . h($num . ' ') . '</span>'
         . '<span style="color:' . $col . ';">' . h($title) . h($countTxt) . '</span>'
         . '</a>';
-      echo '<span class="tag" style="margin-left:auto">' . h($n['status']) . '</span>';
+      echo '<span class="tag" style="margin-left:auto">' . h($statusText) . '</span>';
       echo '</summary>';
       renderTree($byParent, $open, $currentId, $id, $depth+1, $numParts);
       echo '</details>';
@@ -132,7 +148,7 @@ function renderTree(array $byParent, array $open, int $currentId, int $parentId=
         . '<span style="color:' . $col . ';">' . h($num . ' ') . '</span>'
         . '<span style="color:' . $col . ';">' . h($title) . h($countTxt) . '</span>'
         . '</a>';
-      echo '<span class="tag" style="margin-left:auto">' . h($n['status']) . '</span>';
+      echo '<span class="tag" style="margin-left:auto">' . h($statusText) . '</span>';
       echo '</div></div>';
     }
   }
@@ -190,11 +206,20 @@ renderHeader('Dashboard');
 
         <div class="row" style="margin-top:10px">
           <form method="post" style="display:flex;gap:8px;flex-wrap:wrap">
-            <input type="hidden" name="action" value="set_status">
+            <input type="hidden" name="action" value="set_main">
             <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
-            <button class="btn" name="status" value="accepted">annehmen</button>
-            <button class="btn" name="status" value="deferred">zurückstellen</button>
-            <button class="btn" name="status" value="rejected">ablehnen</button>
+            <button class="btn" name="main_status" value="active">active</button>
+            <button class="btn" name="main_status" value="later">later</button>
+            <button class="btn" name="main_status" value="canceled">canceled</button>
+            <button class="btn" name="main_status" value="new">new</button>
+          </form>
+
+          <form method="post" style="display:flex;gap:8px;flex-wrap:wrap">
+            <input type="hidden" name="action" value="set_worker">
+            <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
+            <button class="btn btn-gold" name="worker_status" value="todo">todo</button>
+            <button class="btn" name="worker_status" value="approve">approve</button>
+            <button class="btn" name="worker_status" value="done">done</button>
           </form>
         </div>
       </div>
