@@ -78,30 +78,41 @@ while ($cur && isset($byId[$cur]) && $byId[$cur]['parent_id'] !== null) {
   $cur = $pid;
 }
 
-function renderTree(array $byParent, array $open, int $currentId, int $parentId=0, int $depth=0): void {
+function renderTree(array $byParent, array $open, int $currentId, int $parentId=0, int $depth=0, array $prefix=[]): void {
   if (empty($byParent[$parentId])) return;
+
+  $i = 0;
   foreach ($byParent[$parentId] as $n) {
+    $i++;
     $id = (int)$n['id'];
     $title = $n['title'];
     $hasKids = !empty($byParent[$id]);
     $isActive = ($id === (int)$currentId);
 
     $indent = $depth * 14;
+    $numParts = array_merge($prefix, [$i]);
+    $num = implode('.', $numParts) . '.';
+
+    $directCount = !empty($byParent[$id]) ? count($byParent[$id]) : 0;
+    $showCount = ($depth === 0); // only for top-level projects
+    $countTxt = $showCount ? ' (' . $directCount . ')' : '';
 
     if ($hasKids) {
       $forceOpenAll = (!empty($_GET['open']) && $_GET['open'] === 'all');
       $isOpen = $forceOpenAll || ($open[$id] ?? $isActive);
       echo '<details class="tree-branch" ' . ($isOpen ? 'open' : '') . ' style="margin-left:' . $indent . 'px">';
       echo '<summary class="tree-item ' . ($isActive ? 'active' : '') . '">';
-      echo '<a href="/?id=' . $id . '">' . h($title) . '</a>';
+      echo '<span class="meta" style="min-width:52px">' . h($num) . '</span>';
+      echo '<a href="/?id=' . $id . '">' . h($title) . h($countTxt) . '</a>';
       echo '<span class="tag" style="margin-left:auto">' . h($n['status']) . '</span>';
       echo '</summary>';
-      renderTree($byParent, $open, $currentId, $id, $depth+1);
+      renderTree($byParent, $open, $currentId, $id, $depth+1, $numParts);
       echo '</details>';
     } else {
       echo '<div class="tree-leaf" style="margin-left:' . $indent . 'px">';
       echo '<div class="tree-item ' . ($isActive ? 'active' : '') . '">';
-      echo '<a href="/?id=' . $id . '">' . h($title) . '</a>';
+      echo '<span class="meta" style="min-width:52px">' . h($num) . '</span>';
+      echo '<a href="/?id=' . $id . '">' . h($title) . h($countTxt) . '</a>';
       echo '<span class="tag" style="margin-left:auto">' . h($n['status']) . '</span>';
       echo '</div></div>';
     }
