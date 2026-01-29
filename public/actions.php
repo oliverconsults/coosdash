@@ -13,24 +13,7 @@ if (!$nodeId) {
   exit;
 }
 
-// Recursively set worker_status=todo for active|approve descendants
-function propagateTodo(PDO $pdo, int $nodeId): int {
-  $count = 0;
-  $st = $pdo->prepare('SELECT id FROM nodes WHERE parent_id=? AND worker_status="approve"');
-  $st->execute([$nodeId]);
-  $children = $st->fetchAll();
-
-  foreach ($children as $c) {
-    $cid = (int)$c['id'];
-    $pdo->prepare('UPDATE nodes SET worker_status="todo" WHERE id=?')->execute([$cid]);
-    $pdo->prepare('INSERT INTO node_notes (node_id, author, note) VALUES (?, "james", ?)')
-        ->execute([$cid, 'Auto: propagated todo from parent approval.']);
-    $count++;
-    $count += propagateTodo($pdo, $cid);
-  }
-
-  return $count;
-}
+// legacy: approve->todo propagation was removed (worker_status now only todo/done)
 
 function propagateDone(PDO $pdo, int $nodeId): int {
   $count = 0;
@@ -61,27 +44,7 @@ function isUnderRoot(PDO $pdo, int $nodeId, int $rootId): bool {
   return false;
 }
 
-if ($action === 'approve_to_todo_recursive') {
-  // Only meaningful for active|approve.
-  $pdo->prepare('UPDATE nodes SET worker_status="todo" WHERE id=?')->execute([$nodeId]);
-  $pdo->prepare('INSERT INTO node_notes (node_id, author, note) VALUES (?, "oliver", ?)')
-      ->execute([$nodeId, 'Freigabe: approve→todo (rekursiv)']);
-
-  $n = propagateTodo($pdo, $nodeId);
-  flash_set('Freigegeben. Rekursiv aktiviert: ' . $n . ' Unterpunkte.', 'info');
-  header('Location: /?id=' . $nodeId);
-  exit;
-}
-
-if ($action === 'accept') {
-  // new -> active|todo
-  $pdo->prepare('UPDATE nodes SET worker_status="todo" WHERE id=?')->execute([$nodeId]);
-  $pdo->prepare('INSERT INTO node_notes (node_id, author, note) VALUES (?, "oliver", ?)')
-      ->execute([$nodeId, 'Angenommen: worker_status approve→todo']);
-  flash_set('Angenommen.', 'info');
-  header('Location: /?id=' . $nodeId);
-  exit;
-}
+// legacy actions removed: approve_to_todo_recursive, accept (worker_status is now only todo/done)
 
 if ($action === 'set_later') {
   // Move to "Später" root
@@ -93,7 +56,7 @@ if ($action === 'set_later') {
   $pdo->prepare('UPDATE nodes SET parent_id=?, worker_status="done" WHERE id=?')->execute([$spId ?: null, $nodeId]);
   $n = propagateDone($pdo, $nodeId);
   $pdo->prepare('INSERT INTO node_notes (node_id, author, note) VALUES (?, "oliver", ?)')
-      ->execute([$nodeId, 'Status: later (worker done) + moved to Später. Descendants done: ' . $n]);
+      ->execute([$nodeId, 'Später: verschoben, Status erledigt. Descendants done: ' . $n]);
   flash_set('Auf später gesetzt (erledigt) & verschoben.', 'info');
   header('Location: /?id=' . ($spId ?: $nodeId));
   exit;

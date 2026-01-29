@@ -75,7 +75,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   if ($action === 'set_worker') {
     $nid = (int)($_POST['node_id'] ?? 0);
     $worker = (string)($_POST['worker_status'] ?? '');
-    $allowed = ['todo','approve','done'];
+    $allowed = ['todo','done'];
     if ($nid && in_array($worker, $allowed, true)) {
       $st = $pdo->prepare('UPDATE nodes SET worker_status=? WHERE id=?');
       $st->execute([$worker, $nid]);
@@ -191,7 +191,7 @@ function renderTree(array $byParent, array $open, int $currentId, int $parentId=
 
     // right tag: show statuses in German (DB values stay English)
     $work = (string)($n['worker_status'] ?? '');
-    $workMap = ['todo'=>'todo','approve'=>'freigabe','done'=>'erledigt'];
+    $workMap = ['todo'=>'todo','done'=>'erledigt'];
     $statusText = ($workMap[$work] ?? $work);
 
     $shade = max(0, min(4, $depth));
@@ -307,7 +307,7 @@ renderHeader('Dashboard');
           <h2 style="margin:0;"><?php echo h($crumb); ?></h2>
           <?php
             $work = (string)($node['worker_status'] ?? '');
-            $workMap = ['todo'=>'todo','approve'=>'freigabe','done'=>'erledigt'];
+            $workMap = ['todo'=>'todo','done'=>'erledigt'];
             $statusLabel = ($workMap[$work] ?? $work);
           ?>
           <span class="tag gold"><?php echo h($statusLabel); ?></span>
