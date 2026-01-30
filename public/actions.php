@@ -62,6 +62,57 @@ function isUnderRoot(PDO $pdo, int $nodeId, int $rootId): bool {
 
 // legacy actions removed: approve_to_todo_recursive, accept (worker_status is now only todo/done)
 
+if ($action === 'set_block') {
+  $blockedUntilRaw = trim((string)($_POST['blocked_until'] ?? ''));
+  $blockedByRaw = (int)($_POST['blocked_by_node_id'] ?? 0);
+
+  // datetime-local comes as YYYY-MM-DDTHH:MM
+  $blockedUntil = null;
+  if ($blockedUntilRaw !== '') {
+    $blockedUntilRaw = str_replace('T', ' ', $blockedUntilRaw);
+    $dt = DateTime::createFromFormat('Y-m-d H:i', $blockedUntilRaw);
+    if ($dt) {
+      $blockedUntil = $dt->format('Y-m-d H:i:00');
+    }
+  }
+
+  // validate blocked_by exists (and prevent self-ref)
+  $blockedBy = null;
+  if ($blockedByRaw > 0 && $blockedByRaw !== $nodeId) {
+    $st = $pdo->prepare('SELECT id FROM nodes WHERE id=?');
+    $st->execute([$blockedByRaw]);
+    if ($st->fetch()) $blockedBy = $blockedByRaw;
+  }
+
+  $pdo->prepare('UPDATE nodes SET blocked_until=?, blocked_by_node_id=? WHERE id=?')
+      ->execute([$blockedUntil, $blockedBy, $nodeId]);
+
+  $ts = date('d.m.Y H:i');
+  $bits = [];
+  if ($blockedUntil) $bits[] = 'bis ' . date('d.m.Y H:i', strtotime($blockedUntil));
+  if ($blockedBy) $bits[] = 'wartet auf #' . $blockedBy;
+  $txt = $bits ? implode(' · ', $bits) : 'gesetzt';
+  $line = "[oliver] {$ts} Blocker: {$txt}\n\n";
+  $pdo->prepare('UPDATE nodes SET description=CONCAT(?, COALESCE(description,\'\')) WHERE id=?')
+      ->execute([$line, $nodeId]);
+
+  flash_set('Blocker gespeichert.', 'info');
+  header('Location: /?id=' . $nodeId);
+  exit;
+}
+
+if ($action === 'clear_block') {
+  $pdo->prepare('UPDATE nodes SET blocked_until=NULL, blocked_by_node_id=NULL WHERE id=?')
+      ->execute([$nodeId]);
+  $ts = date('d.m.Y H:i');
+  $line = "[oliver] {$ts} Blocker: entfernt\n\n";
+  $pdo->prepare('UPDATE nodes SET description=CONCAT(?, COALESCE(description,\'\')) WHERE id=?')
+      ->execute([$line, $nodeId]);
+  flash_set('Blocker entfernt.', 'info');
+  header('Location: /?id=' . $nodeId);
+  exit;
+}
+
 if ($action === 'set_later') {
   // Move to "Später" root
   $st = $pdo->prepare('SELECT id FROM nodes WHERE parent_id IS NULL AND title="Später" LIMIT 1');

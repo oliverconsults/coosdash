@@ -175,7 +175,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // Load full tree for nav
-$allNodes = $pdo->query("SELECT id, parent_id, title, worker_status, priority, created_at, updated_at FROM nodes ORDER BY COALESCE(priority,999), id")->fetchAll();
+$allNodes = $pdo->query("SELECT id, parent_id, title, worker_status, priority, created_at, updated_at, blocked_until, blocked_by_node_id FROM nodes ORDER BY COALESCE(priority,999), id")->fetchAll();
 $byParentAll = [];
 $byIdAll = [];
 foreach ($allNodes as $n) {
@@ -453,6 +453,24 @@ renderHeader('Dashboard');
         <div class="meta">#<?php echo (int)$node['id']; ?> • created_by=<?php echo h($node['created_by']); ?></div>
 
         <?php
+          $blockedUntil = (string)($node['blocked_until'] ?? '');
+          $blockedBy = (int)($node['blocked_by_node_id'] ?? 0);
+          $isBlockedUntil = ($blockedUntil !== '' && strtotime($blockedUntil) && strtotime($blockedUntil) > time());
+          $isBlockedBy = ($blockedBy > 0);
+        ?>
+        <?php if ($isBlockedUntil || $isBlockedBy): ?>
+          <div class="meta" style="margin-top:6px">
+            Blockiert
+            <?php if ($isBlockedUntil): ?>
+              bis <?php echo h(date('d.m.Y H:i:s', strtotime($blockedUntil))); ?>
+            <?php endif; ?>
+            <?php if ($isBlockedBy): ?>
+              <?php if ($isBlockedUntil): ?>·<?php endif; ?> wartet auf #<?php echo (int)$blockedBy; ?>
+            <?php endif; ?>
+          </div>
+        <?php endif; ?>
+
+        <?php
           $ws = (string)($node['worker_status'] ?? '');
           $sec = (string)($sectionByIdAll[(int)$node['id']] ?? '');
           $isInProjekte = ($sec === 'Projekte');
@@ -466,6 +484,19 @@ renderHeader('Dashboard');
         <?php if (!$isContainerRoot): ?>
         <div class="row" style="margin-top:10px; align-items:center">
           <div class="meta">Optionen:</div>
+
+          <form method="post" action="/actions.php" style="margin:0; display:flex; gap:8px; align-items:center; flex-wrap:wrap">
+            <input type="hidden" name="action" value="set_block">
+            <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
+            <input type="datetime-local" name="blocked_until" value="" style="width:auto; min-width:210px;">
+            <input type="number" name="blocked_by_node_id" placeholder="#Node" value="" style="width:110px;">
+            <button class="btn" type="submit">blocken</button>
+          </form>
+          <form method="post" action="/actions.php" style="margin:0">
+            <input type="hidden" name="action" value="clear_block">
+            <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
+            <button class="btn" type="submit">unblock</button>
+          </form>
 
           <?php if ($sec !== 'Projekte'): ?>
             <form method="post" action="/actions.php" style="margin:0">
