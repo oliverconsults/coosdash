@@ -465,7 +465,7 @@ renderHeader('Dashboard');
               bis <?php echo h(date('d.m.Y H:i:s', strtotime($blockedUntil))); ?>
             <?php endif; ?>
             <?php if ($isBlockedBy): ?>
-              <?php if ($isBlockedUntil): ?>·<?php endif; ?> wartet auf #<?php echo (int)$blockedBy; ?>
+              <?php if ($isBlockedUntil): ?>·<?php endif; ?> wartet auf <a href="/?id=<?php echo (int)$blockedBy; ?>">#<?php echo (int)$blockedBy; ?></a>
             <?php endif; ?>
           </div>
         <?php endif; ?>
