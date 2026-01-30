@@ -64,6 +64,29 @@ function flash_get(): ?array {
   return $f;
 }
 
+function james_state_path(): string {
+  return '/var/www/coosdash/shared/data/james_state.json';
+}
+
+function james_enabled(): bool {
+  $p = james_state_path();
+  if (!is_file($p)) return false; // default: sleeps
+  $raw = @file_get_contents($p);
+  $j = $raw ? json_decode($raw, true) : null;
+  if (!is_array($j)) return false;
+  return !empty($j['enabled']);
+}
+
+function james_set_enabled(bool $enabled): bool {
+  $p = james_state_path();
+  @mkdir(dirname($p), 0775, true);
+  $payload = [
+    'enabled' => $enabled ? 1 : 0,
+    'updated_at' => date('Y-m-d H:i:s'),
+  ];
+  return @file_put_contents($p, json_encode($payload, JSON_PRETTY_PRINT|JSON_UNESCAPED_UNICODE)) !== false;
+}
+
 function renderHeader(string $title='COOS'): void {
   $f = flash_get();
   ?>
@@ -150,6 +173,8 @@ function renderHeader(string $title='COOS'): void {
         <div class="row">
           <?php if (isLoggedIn()): ?>
             <a class="btn" href="/">Dashboard</a>
+            <?php $jOn = james_enabled(); ?>
+            <a class="btn <?php echo $jOn ? 'btn-gold' : ''; ?>" href="/james.php?toggle=1"><?php echo $jOn ? 'James aktiv' : 'James sleeps'; ?></a>
             <a class="btn" href="/workerlog.php">Worker Log</a>
             <a class="btn" href="/logout.php">Logout</a>
           <?php endif; ?>
