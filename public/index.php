@@ -929,6 +929,67 @@ renderHeader('Dashboard');
           'blocked' => 'BLOCKED',
           'done' => 'Done',
         ];
+
+        // Depth indicator (based on last worker.log entry) relative to max depth under Projekte
+        $projectsRootId = $projectsRootId ?: 0;
+        $depthOf = function(int $nodeId) use ($byIdAll, $projectsRootId): int {
+          if (!$projectsRootId) return 0;
+          $d = 0;
+          $cur = $nodeId;
+          for ($i=0; $i<80; $i++) {
+            $row = $byIdAll[$cur] ?? null;
+            if (!$row) return 0;
+            $pid = $row['parent_id'];
+            if ($pid === null) return 0;
+            $pid = (int)$pid;
+            $d++;
+            if ($pid === $projectsRootId) return $d;
+            $cur = $pid;
+          }
+          return 0;
+        };
+
+        $maxDepthProjects = 0;
+        if ($projectsRootId) {
+          foreach ($byIdAll as $id2 => $n2) {
+            $id2 = (int)$id2;
+            // consider only nodes under Projekte
+            if (!$isUnder($id2, $projectsRootId)) continue;
+            $dd = $depthOf($id2);
+            if ($dd > $maxDepthProjects) $maxDepthProjects = $dd;
+          }
+        }
+
+        $lastWorkedNodeId = 0;
+        $lastWorkedDepth = 0;
+        try {
+          $logPath = '/var/www/coosdash/shared/logs/worker.log';
+          if (is_readable($logPath)) {
+            $f = new SplFileObject($logPath, 'r');
+            $f->seek(PHP_INT_MAX);
+            $line = '';
+            for ($i=0; $i<50; $i++) {
+              $idx = $f->key();
+              if ($idx <= 0) break;
+              $line = trim((string)$f->current());
+              if ($line !== '') break;
+              $f->seek(max(0, $idx-1));
+            }
+            if ($line && preg_match('/#(\d+)/', $line, $m)) {
+              $lastWorkedNodeId = (int)$m[1];
+              $lastWorkedDepth = $depthOf($lastWorkedNodeId);
+            }
+          }
+        } catch (Throwable $e) {
+          $lastWorkedNodeId = 0;
+          $lastWorkedDepth = 0;
+        }
+
+        $depthPct = 0;
+        if ($maxDepthProjects > 0 && $lastWorkedDepth > 0) {
+          $depthPct = max(0, min(100, (int)round(($lastWorkedDepth / $maxDepthProjects) * 100)));
+        }
+
       ?>
 
       <div class="card">
@@ -940,6 +1001,14 @@ renderHeader('Dashboard');
                 <span><?php echo h($colTitle[$col]); ?></span>
                 <span class="pill dim"><?php echo count($cards[$col]); ?></span>
               </h3>
+
+              <?php if ($depthPct > 0): ?>
+                <div title="Letzter Worker-Task: Tiefe <?php echo (int)$lastWorkedDepth; ?> / <?php echo (int)$maxDepthProjects; ?> (#<?php echo (int)$lastWorkedNodeId; ?>)" style="height:8px; border-radius:999px; background:rgba(255,255,255,0.08); overflow:hidden; margin:6px 0 10px 0;">
+                  <div style="height:100%; width:<?php echo (int)$depthPct; ?>%; background:linear-gradient(90deg, rgba(120,255,170,0.9), rgba(255,200,90,0.9), rgba(255,120,120,0.95));"></div>
+                </div>
+              <?php else: ?>
+                <div style="height:8px; border-radius:999px; background:rgba(255,255,255,0.05); margin:6px 0 10px 0;"></div>
+              <?php endif; ?>
 
               <?php if (empty($cards[$col])): ?>
                 <div class="meta" style="padding:8px 2px;">—</div>
