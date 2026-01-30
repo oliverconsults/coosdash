@@ -84,7 +84,7 @@ function renderHeader(string $title='COOS'): void {
         color:var(--text);font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial;}
       a{color:var(--gold);text-decoration:none}
       a:hover{text-decoration:underline}
-      .wrap{max-width:1200px;margin:0 auto;padding:22px}
+      .wrap{max-width:1200px;margin:0;padding:12px 14px}
       .top{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
       .brand{font-weight:800;letter-spacing:.08em}
       .brand span{color:var(--gold)}
