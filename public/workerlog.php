@@ -35,11 +35,11 @@ $renderLine = function(string $line): string {
   <div class="meta" style="margin-top:6px;">Quelle: <?php echo h($logPath); ?> (letzte <?php echo (int)$maxLines; ?> Zeilen)</div>
   <div style="height:10px"></div>
 
-  <div class="note" style="white-space:pre-wrap; font-family: ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;">
+  <div class="note" style="white-space:pre-wrap; font-family: ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:11px; line-height:1.35;">
 <?php if (empty($lines)): ?>
 —
 <?php else: ?>
-<?php foreach ($lines as $ln): ?>
+<?php foreach (array_reverse($lines) as $ln): ?>
 <?php echo $renderLine($ln) . "\n"; ?>
 <?php endforeach; ?>
 <?php endif; ?>
