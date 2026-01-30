@@ -51,6 +51,29 @@ if ($action === 'job_claim') {
   out(true, 'claimed', ['job'=>$job]);
 }
 
+if ($action === 'job_claim_next') {
+  $who = trim((string)($_REQUEST['claimed_by'] ?? 'james-worker'));
+
+  // claim oldest open job
+  $st = $pdo->prepare("SELECT id FROM worker_queue WHERE status='open' ORDER BY created_at ASC, id ASC LIMIT 1");
+  $st->execute();
+  $r = $st->fetch();
+  if (!$r) out(true, 'no job', ['job'=>null]);
+  $jid = (int)$r['id'];
+
+  $st = $pdo->prepare("UPDATE worker_queue SET status='claimed', claimed_by=?, claimed_at=NOW() WHERE id=? AND status='open'");
+  $st->execute([$who, $jid]);
+  if ($st->rowCount() !== 1) {
+    // race: someone else claimed; caller can retry next tick
+    out(true, 'no job', ['job'=>null]);
+  }
+
+  $st = $pdo->prepare('SELECT id,status,node_id,prompt_text,selector_meta,fail_count FROM worker_queue WHERE id=?');
+  $st->execute([$jid]);
+  $job = $st->fetch();
+  out(true, 'claimed', ['job'=>$job]);
+}
+
 if ($action === 'job_done') {
   if ($jobId <= 0) out(false, 'missing job_id');
   $pdo->prepare("UPDATE worker_queue SET status='done', done_at=NOW() WHERE id=? AND status IN ('open','claimed')")->execute([$jobId]);
