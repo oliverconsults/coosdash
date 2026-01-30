@@ -118,8 +118,12 @@ function renderHeader(string $title='COOS'): void {
       .btn-sm{padding:6px 10px;border-radius:10px;font-size:12px;line-height:1.1}
       .btn:hover{background:rgba(15,22,35,1);border-color:rgba(212,175,55,.35);box-shadow:0 10px 26px rgba(0,0,0,.35), 0 0 0 1px rgba(212,175,55,.08) inset;transform:translateY(-1px)}
       .btn:active{transform:translateY(0px);box-shadow:0 6px 14px rgba(0,0,0,.28)}
-      .btn-gold{border-color:rgba(212,175,55,.6);box-shadow:0 0 0 1px rgba(212,175,55,.12) inset}
-      .btn-gold:hover{border-color:rgba(212,175,55,.85);box-shadow:0 12px 30px rgba(0,0,0,.38), 0 0 0 1px rgba(212,175,55,.18) inset}
+      .btn-gold{border-color:rgba(212,175,55,.85);background:linear-gradient(180deg, rgba(212,175,55,.28) 0%, rgba(212,175,55,.14) 60%, rgba(15,22,35,.92) 100%);box-shadow:0 0 0 1px rgba(212,175,55,.18) inset, 0 10px 26px rgba(0,0,0,.28)}
+      .btn-gold:hover{border-color:rgba(255,215,128,.95);box-shadow:0 12px 34px rgba(0,0,0,.38), 0 0 0 1px rgba(255,215,128,.22) inset}
+
+      /* subtle pulsing glow for "active" James button */
+      @keyframes goldPulse{0%,100%{box-shadow:0 0 0 1px rgba(212,175,55,.18) inset, 0 10px 26px rgba(0,0,0,.28)}50%{box-shadow:0 0 0 1px rgba(255,215,128,.26) inset, 0 14px 34px rgba(0,0,0,.36), 0 0 18px rgba(212,175,55,.18)}}
+      .btn-gold{animation:goldPulse 2.2s ease-in-out infinite}
       .grid{display:grid;grid-template-columns:360px 1fr;gap:16px}
       .card{background:rgba(15,22,35,.92);border:1px solid var(--border);border-radius:16px;padding:14px}
       .card h2{margin:0 0 10px 0;font-size:15px;letter-spacing:.02em}
