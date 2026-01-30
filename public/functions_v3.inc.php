@@ -131,7 +131,7 @@ function renderHeader(string $title='COOS'): void {
       .btn-gold:hover{border-color:rgba(255,215,128,.95);box-shadow:0 12px 34px rgba(0,0,0,.38), 0 0 0 1px rgba(255,215,128,.22) inset}
 
       /* James button: keep gold style, no animation */
-      .btn-james{padding:6px 12px; border-radius:12px;}
+      .btn-james{padding:4px 12px; border-radius:12px;}
       .btn-james span{line-height:1.1}
       .grid{display:grid;grid-template-columns:360px 1fr;gap:16px}
       .card{background:rgba(15,22,35,.92);border:1px solid var(--border);border-radius:16px;padding:14px}
