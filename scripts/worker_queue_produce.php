@@ -99,6 +99,18 @@ $prompt .= "\nAttachment rule:\n";
 $prompt .= "- If you generate any file (PDF/CSV/JSON/TXT/etc.): ALWAYS attach it via add_attachment, and reference only the attachment/link in the update (no server paths).\n";
 $prompt .= "- If the node already has relevant attachments: mention them briefly as input.\n";
 
+$prompt .= "\nTools:\n";
+$prompt .= "- You may use shell/files/browser/tools as needed (but keep scope minimal).\n";
+$prompt .= "- You may write small helper scripts (PHP/Python/SQL) to automate repetitive work.\n";
+$prompt .= "- No external/public actions (posting/email/new integrations) without Oliver OK.\n";
+
+$prompt .= "\nHygiene (when DONE):\n";
+$prompt .= "- Check: verification run? QA/edge cases? integration/deploy/monitoring? docs/how-to?\n";
+$prompt .= "- If missing: add 1–4 subtasks under the same parent (max 4) + short reason.\n";
+
+$prompt .= "\nConstraints:\n";
+$prompt .= "- New task titles <= 40 chars.\n";
+
 $prompt .= "\nRules:\n";
 $prompt .= "- Always verify runs before marking done.\n";
 $prompt .= "- If you cannot proceed: call job_fail with a short reason. After 3 fails the system will block it.\n";
