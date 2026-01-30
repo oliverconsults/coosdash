@@ -37,10 +37,8 @@ $orig = ($displayName !== '' ? $displayName : ($isUrl ? $src : basename($src)));
 $allowedExt = [
   // preferred
   'url','pdf','png','jpg','jpeg','webp','gif','doc','docx','xls','xlsx',
-  // common
-  'csv','txt','ppt','pptx','zip','html','htm','md','json','xml','yml','yaml','sql',
-  // code (served via attdl.php download handler; never executed)
-  'php','js','py','sh'
+  // common business artifacts
+  'csv','ppt','pptx'
 ];
 
 // sanitize filename
