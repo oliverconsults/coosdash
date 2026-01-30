@@ -611,8 +611,7 @@ renderHeader('Dashboard');
                     $tok = (string)($a['token'] ?? '');
                     $stored = (string)($a['stored_name'] ?? '');
                     $orig = (string)($a['orig_name'] ?? $stored);
-                    // Serve via download handler to avoid executing active content (e.g. .php)
-                    $url = '/attdl.php?t=' . $tok . '&f=' . rawurlencode($stored);
+                    $url = '/att/' . $tok . '/' . $stored;
                     $sz = $a['size_bytes'] ?? null;
                     $szTxt = '';
                     if ($sz !== null && $sz !== '') {
