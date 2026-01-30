@@ -90,6 +90,7 @@ function renderHeader(string $title='COOS'): void {
       .brand span{color:var(--gold)}
       .meta{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--muted);font-size:12px}
       .btn{display:inline-block;padding:10px 14px;border:1px solid var(--border);border-radius:12px;background:rgba(15,22,35,.9);color:var(--text);transition:transform .08s ease, box-shadow .12s ease, border-color .12s ease, background .12s ease;}
+      .btn-md{padding:7px 12px;border-radius:11px;font-size:13px;line-height:1.15}
       .btn-sm{padding:6px 10px;border-radius:10px;font-size:12px;line-height:1.1}
       .btn:hover{background:rgba(15,22,35,1);border-color:rgba(212,175,55,.35);box-shadow:0 10px 26px rgba(0,0,0,.35), 0 0 0 1px rgba(212,175,55,.08) inset;transform:translateY(-1px)}
       .btn:active{transform:translateY(0px);box-shadow:0 6px 14px rgba(0,0,0,.28)}
