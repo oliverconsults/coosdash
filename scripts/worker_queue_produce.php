@@ -66,17 +66,32 @@ for ($i=0; $i<40; $i++) {
 }
 $chain = array_reverse($chain);
 
-$prompt = "# COOS Worker Job\n\n";
+$prompt = "# COOS Worker Job (from queue)\n\n";
+$prompt .= "JOB_ID={JOB_ID}\n";
 $prompt .= "TARGET_NODE_ID={$nodeId}\n";
 $prompt .= "TITLE=" . (string)$node['title'] . "\n\n";
 $prompt .= "Chain:\n- " . implode("\n- ", $chain) . "\n\n";
-$prompt .= "Rules:\n";
-$prompt .= "- Do NOT run raw SQL writes. Use the Worker API for: set status, blockers, prepend updates, add children, add attachments.\n";
-$prompt .= "- If you cannot proceed: mark failure (fail_count++) and on 3 fails, block the node with a short reason.\n";
-$prompt .= "- Always verify runs when claiming done.\n";
+$prompt .= "How to write (MANDATORY):\n";
+$prompt .= "- NO raw SQL writes. Use the CLI wrapper: php /home/deploy/projects/coos/scripts/worker_api_cli.php ...\n";
+$prompt .= "- Example: php /home/deploy/projects/coos/scripts/worker_api_cli.php action=ping\n";
+$prompt .= "\nAllowed actions:\n";
+$prompt .= "- prepend_update (headline, body)\n";
+$prompt .= "- set_status (worker_status=todo_james|todo_oliver|done)\n";
+$prompt .= "- set_blocked_by (blocked_by_node_id)\n";
+$prompt .= "- set_blocked_until (blocked_until=YYYY-MM-DD HH:MM)\n";
+$prompt .= "- add_children (titles = newline separated, max 6)\n";
+$prompt .= "- add_attachment (path, display_name optional)\n";
+$prompt .= "- job_done / job_fail (job_id, reason optional)\n";
+$prompt .= "\nRules:\n";
+$prompt .= "- Always verify runs before marking done.\n";
+$prompt .= "- If you cannot proceed: call job_fail with a short reason. After 3 fails the system will block it.\n";
 
 $stIns = $pdo->prepare('INSERT INTO worker_queue (status, node_id, prompt_text, selector_meta) VALUES (\'open\', ?, ?, ?)');
 $stIns->execute([$nodeId, $prompt, json_encode($meta, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)]);
 $jobId = (int)$pdo->lastInsertId();
+
+// replace placeholder in stored prompt
+$promptFinal = str_replace('{JOB_ID}', (string)$jobId, $prompt);
+$pdo->prepare('UPDATE worker_queue SET prompt_text=? WHERE id=?')->execute([$promptFinal, $jobId]);
 
 echo "OK queued job_id={$jobId} node_id={$nodeId}\n";
