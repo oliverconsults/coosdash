@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/functions.inc.php';
+require_once __DIR__ . '/functions_v2.inc.php';
 requireLogin();
 
 renderHeader('Worker Log');

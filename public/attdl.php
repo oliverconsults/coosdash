@@ -3,7 +3,7 @@
 // Serves files from /var/www/coosdash/shared/att/<token>/<stored_name>
 // while forcing download (prevents accidental execution of .php etc.).
 
-require_once __DIR__ . '/functions.inc.php';
+require_once __DIR__ . '/functions_v2.inc.php';
 requireLogin();
 
 $token = preg_replace('/[^a-f0-9]/i', '', (string)($_GET['t'] ?? ''));
