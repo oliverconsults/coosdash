@@ -131,6 +131,7 @@ $prompt .= "- Neue Task-Titel <= 40 Zeichen.\n";
 $prompt .= "\nRegeln:\n";
 $prompt .= "- Vor done immer Runs/Ergebnis verifizieren.\n";
 $prompt .= "- WICHTIG: Sobald du set_status todo_oliver setzt (Delegation an Oliver), ist der Job für dich beendet: KEINE weiteren Aktionen wie add_children / set_blocked_* / attachments danach. Direkt job_done.\n";
+$prompt .= "- Delegation ist NUR im Notfall erlaubt: Stelle GENAU 1 präzise Frage an Oliver (max. 2 Zeilen), dann set_status todo_oliver, dann job_done.\n";
 $prompt .= "- Wenn dir Info fehlt: nutze D) FRAGE AN OLIVER (Delegation).\n";
 $prompt .= "- Wenn du nicht weiterkommst: job_fail mit kurzem Grund. Nach 3 fails blockt das System den Task.\n";
 $prompt .= "- Tool-KB: Wenn du ein Tool erfolgreich nutzt/installierst: /home/deploy/clawd/TOOLS.md + /home/deploy/clawd/tools/<tool>.md kurz updaten.\n";
