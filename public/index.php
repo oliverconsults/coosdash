@@ -573,7 +573,106 @@ renderHeader('Dashboard');
       </div>
 
     <?php else: ?>
-      <div class="card"><h2>No node selected</h2></div>
+      <?php
+        // Kanban overview (leaf nodes only) for Ideen + Projekte
+        $ideasRootId = 0;
+        $projectsRootId = 0;
+        foreach ($roots as $r) {
+          $t = (string)($r['title'] ?? '');
+          if ($t === 'Ideen') $ideasRootId = (int)$r['id'];
+          if ($t === 'Projekte') $projectsRootId = (int)$r['id'];
+        }
+
+        // helper: is node under a specific root (by walking parents in $byIdAll)
+        $isUnder = function(int $nodeId, int $rootId) use ($byIdAll): bool {
+          if (!$rootId) return false;
+          $cur = $nodeId;
+          for ($i=0; $i<60; $i++) {
+            $row = $byIdAll[$cur] ?? null;
+            if (!$row) return false;
+            $pid = $row['parent_id'];
+            if ($pid === null) return false;
+            $pid = (int)$pid;
+            if ($pid === $rootId) return true;
+            $cur = $pid;
+          }
+          return false;
+        };
+
+        $cards = [
+          'todo_oliver' => [],
+          'todo_james' => [],
+          'done' => [],
+        ];
+
+        foreach ($byIdAll as $id => $n) {
+          $id = (int)$id;
+          // leaf only
+          $hasKids = !empty($byParentAll[$id]);
+          if ($hasKids) continue;
+
+          // only Ideen + Projekte
+          if (!($isUnder($id, $ideasRootId) || $isUnder($id, $projectsRootId))) continue;
+
+          $st = (string)($n['worker_status'] ?? '');
+          if (!isset($cards[$st])) continue;
+
+          $sec = (string)($sectionByIdAll[$id] ?? '');
+          if ($sec !== 'Ideen' && $sec !== 'Projekte') continue;
+
+          $cards[$st][] = [
+            'id' => $id,
+            'title' => (string)($n['title'] ?? ''),
+            'section' => $sec,
+            'updated_at' => (string)($n['updated_at'] ?? ''),
+          ];
+        }
+
+        // sort newest updated first (fallback to id)
+        foreach ($cards as $k => $arr) {
+          usort($arr, function($a, $b) {
+            $ta = $a['updated_at'] ?? '';
+            $tb = $b['updated_at'] ?? '';
+            if ($ta === $tb) return ($b['id'] <=> $a['id']);
+            return strcmp($tb, $ta);
+          });
+          $cards[$k] = $arr;
+        }
+
+        $colTitle = [
+          'todo_oliver' => 'ToDo (Oliver)',
+          'todo_james' => 'ToDo (James)',
+          'done' => 'Done',
+        ];
+      ?>
+
+      <div class="card">
+        <h2 style="margin-bottom:10px">Kanban (Leafs: Ideen + Projekte)</h2>
+        <div class="kanban">
+          <?php foreach (['todo_oliver','todo_james','done'] as $col): ?>
+            <div class="kanban-col">
+              <h3>
+                <span><?php echo h($colTitle[$col]); ?></span>
+                <span class="pill dim"><?php echo count($cards[$col]); ?></span>
+              </h3>
+
+              <?php if (empty($cards[$col])): ?>
+                <div class="meta" style="padding:8px 2px;">—</div>
+              <?php else: ?>
+                <?php foreach ($cards[$col] as $c): ?>
+                  <a class="kanban-card" href="/?id=<?php echo (int)$c['id']; ?>">
+                    <div class="kanban-title"><?php echo h($c['title']); ?></div>
+                    <div class="kanban-meta">
+                      <span class="pill section"><?php echo h($c['section']); ?></span>
+                      <span class="pill dim">#<?php echo (int)$c['id']; ?></span>
+                    </div>
+                  </a>
+                <?php endforeach; ?>
+              <?php endif; ?>
+            </div>
+          <?php endforeach; ?>
+        </div>
+      </div>
     <?php endif; ?>
   </div>
 </div>

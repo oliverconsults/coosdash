@@ -112,6 +112,17 @@ function renderHeader(string $title='COOS'): void {
       .tree-branch{padding-left:0;border-left:1px dashed rgba(212,175,55,.18)}
       .tree-leaf{padding-left:0}
       .tag{display:inline-block;font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid rgba(212,175,55,.22);color:var(--muted)}
+      .kanban{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+      .kanban-col{background:rgba(5,7,11,.22);border:1px solid rgba(212,175,55,.14);border-radius:14px;padding:10px}
+      .kanban-col h3{margin:0 0 10px 0;font-size:12px;letter-spacing:.04em;color:var(--muted);text-transform:uppercase;display:flex;justify-content:space-between;align-items:center}
+      .kanban-card{display:block;padding:10px 10px;border-radius:12px;border:1px solid rgba(212,175,55,.14);background:rgba(15,22,35,.55);color:var(--text)}
+      .kanban-card:hover{border-color:rgba(212,175,55,.5);background:rgba(15,22,35,.8);text-decoration:none}
+      .kanban-card + .kanban-card{margin-top:8px}
+      .kanban-title{font-size:13px;line-height:1.2;margin:0}
+      .kanban-meta{margin-top:6px;display:flex;gap:8px;align-items:center;justify-content:space-between}
+      .pill{display:inline-block;font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid rgba(212,175,55,.22);color:var(--muted);white-space:nowrap}
+      .pill.section{color:rgba(242,217,138,.95)}
+      .pill.dim{color:rgba(154,166,195,.9)}
       .tag.gold{color:var(--gold);border-color:rgba(212,175,55,.55)}
       .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
       textarea,input,select{width:100%;padding:10px 12px;border-radius:12px;border:1px solid rgba(212,175,55,.22);background:rgba(5,7,11,.55);color:var(--text)}
