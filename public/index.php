@@ -220,6 +220,34 @@ try {
   $attCountById = [];
 }
 
+// hourly metrics for progress chart (last ~72h)
+$metricsRows = [];
+try {
+  $st = $pdo->prepare('SELECT ts, projects_todo_oliver, projects_todo_james, projects_blocked, projects_done, ideas_todo_oliver, ideas_todo_james, ideas_blocked, ideas_done, later_total, deleted_total FROM metrics_hourly ORDER BY ts DESC LIMIT 96');
+  $st->execute();
+  $metricsRows = array_reverse($st->fetchAll());
+} catch (Throwable $e) {
+  $metricsRows = [];
+}
+
+function svg_polyline_points(array $vals, float $w, float $h, int $pad=6): string {
+  $n = count($vals);
+  if ($n <= 0) return '';
+  $min = min($vals);
+  $max = max($vals);
+  if ($min === $max) { $min = $min - 1; $max = $max + 1; }
+  $x0 = $pad; $y0 = $pad; $x1 = $w - $pad; $y1 = $h - $pad;
+  $pts = [];
+  for ($i=0; $i<$n; $i++) {
+    $x = ($n === 1) ? $x0 : ($x0 + ($x1-$x0) * ($i/($n-1)));
+    $v = (float)$vals[$i];
+    $t = ($v - $min) / ($max - $min);
+    $y = $y1 - ($y1-$y0) * $t;
+    $pts[] = number_format($x, 2, '.', '') . ',' . number_format($y, 2, '.', '');
+  }
+  return implode(' ', $pts);
+}
+
 // optional search: filter tree to only paths that match notes/titles
 $q = trim((string)($_GET['q'] ?? ''));
 $byParent = $byParentAll;
@@ -463,6 +491,29 @@ renderHeader('Dashboard');
     <div class="tree">
       <?php renderTree($byParent, $byId, $sectionByIdAll, $open, $attCountById, (int)$nodeId, 0, 0); ?>
     </div>
+
+    <?php if (!empty($metricsRows) && count($metricsRows) >= 2): ?>
+      <?php
+        $w = 320; $h = 92;
+        $pTodoJ = array_map(fn($r) => (int)$r['projects_todo_james'], $metricsRows);
+        $pDone  = array_map(fn($r) => (int)$r['projects_done'], $metricsRows);
+        $pTodoO = array_map(fn($r) => (int)$r['projects_todo_oliver'], $metricsRows);
+        $last = $metricsRows[count($metricsRows)-1];
+        $lastTs = strtotime((string)$last['ts']);
+      ?>
+      <div class="note" style="margin-top:12px">
+        <div class="head">Fortschritt (stündlich)</div>
+        <svg viewBox="0 0 <?php echo (int)$w; ?> <?php echo (int)$h; ?>" width="100%" height="<?php echo (int)$h; ?>" preserveAspectRatio="none" style="display:block; background:rgba(255,255,255,0.03); border-radius:8px;">
+          <polyline fill="none" stroke="rgba(255,215,128,0.95)" stroke-width="2" points="<?php echo h(svg_polyline_points($pDone, $w, $h)); ?>" />
+          <polyline fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="2" points="<?php echo h(svg_polyline_points($pTodoJ, $w, $h)); ?>" />
+          <polyline fill="none" stroke="rgba(120,200,255,0.75)" stroke-width="2" points="<?php echo h(svg_polyline_points($pTodoO, $w, $h)); ?>" />
+        </svg>
+        <div class="meta" style="margin-top:6px">
+          Done: <?php echo (int)$last['projects_done']; ?> · ToDo(J): <?php echo (int)$last['projects_todo_james']; ?> · ToDo(O): <?php echo (int)$last['projects_todo_oliver']; ?>
+          <?php if ($lastTs): ?> · Stand <?php echo h(date('H:i', $lastTs)); ?><?php endif; ?>
+        </div>
+      </div>
+    <?php endif; ?>
   </div>
 
   <div>
