@@ -664,11 +664,12 @@ renderHeader('Dashboard');
                     <div class="kanban-title"><?php echo h($c['title']); ?></div>
                     <div class="kanban-meta">
                       <span class="pill section"><?php echo h($c['section']); ?></span>
+                      <?php $right = '#' . (int)$c['id']; ?>
                       <?php if ($col === 'done'): ?>
                         <?php $ts = strtotime((string)($c['updated_at'] ?? '')); ?>
-                        <span class="pill dim"><?php echo $ts ? h(date('d.m.Y H:i:s', $ts)) : '—'; ?></span>
+                        <?php if ($ts) $right = date('d.m.Y H:i:s', $ts) . ' · ' . $right; ?>
                       <?php endif; ?>
-                      <span class="pill dim">#<?php echo (int)$c['id']; ?></span>
+                      <span class="pill dim"><?php echo h($right); ?></span>
                     </div>
                   </a>
                 <?php endforeach; ?>
