@@ -485,18 +485,21 @@ renderHeader('Dashboard');
         <div class="row" style="margin-top:10px; align-items:center">
           <div class="meta">Optionen:</div>
 
-          <form method="post" action="/actions.php" style="margin:0; display:flex; gap:8px; align-items:center; flex-wrap:wrap">
-            <input type="hidden" name="action" value="set_block">
-            <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
-            <input type="datetime-local" name="blocked_until" value="" style="width:auto; min-width:210px;">
-            <input type="number" name="blocked_by_node_id" placeholder="#Node" value="" style="width:110px;">
-            <button class="btn" type="submit">blocken</button>
-          </form>
-          <form method="post" action="/actions.php" style="margin:0">
-            <input type="hidden" name="action" value="clear_block">
-            <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
-            <button class="btn" type="submit">unblock</button>
-          </form>
+          <?php $u = strtolower((string)($_SESSION['username'] ?? '')); ?>
+          <?php if ($u === 'james'): ?>
+            <form method="post" action="/actions.php" style="margin:0; display:flex; gap:8px; align-items:center; flex-wrap:wrap">
+              <input type="hidden" name="action" value="set_block">
+              <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
+              <input type="datetime-local" name="blocked_until" value="" style="width:auto; min-width:210px;">
+              <input type="number" name="blocked_by_node_id" placeholder="#Node" value="" style="width:110px;">
+              <button class="btn" type="submit">blocken</button>
+            </form>
+            <form method="post" action="/actions.php" style="margin:0">
+              <input type="hidden" name="action" value="clear_block">
+              <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
+              <button class="btn" type="submit">unblock</button>
+            </form>
+          <?php endif; ?>
 
           <?php if ($sec !== 'Projekte'): ?>
             <form method="post" action="/actions.php" style="margin:0">

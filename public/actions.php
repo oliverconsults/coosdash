@@ -63,6 +63,14 @@ function isUnderRoot(PDO $pdo, int $nodeId, int $rootId): bool {
 // legacy actions removed: approve_to_todo_recursive, accept (worker_status is now only todo/done)
 
 if ($action === 'set_block') {
+  // Only James manages blockers for now
+  $u = strtolower((string)($_SESSION['username'] ?? ''));
+  if ($u !== 'james') {
+    flash_set('Blocker-Optionen werden aktuell nur von James verwaltet.', 'err');
+    header('Location: /?id=' . $nodeId);
+    exit;
+  }
+
   $blockedUntilRaw = trim((string)($_POST['blocked_until'] ?? ''));
   $blockedByRaw = (int)($_POST['blocked_by_node_id'] ?? 0);
 
@@ -102,6 +110,14 @@ if ($action === 'set_block') {
 }
 
 if ($action === 'clear_block') {
+  // Only James manages blockers for now
+  $u = strtolower((string)($_SESSION['username'] ?? ''));
+  if ($u !== 'james') {
+    flash_set('Blocker-Optionen werden aktuell nur von James verwaltet.', 'err');
+    header('Location: /?id=' . $nodeId);
+    exit;
+  }
+
   $pdo->prepare('UPDATE nodes SET blocked_until=NULL, blocked_by_node_id=NULL WHERE id=?')
       ->execute([$nodeId]);
   $ts = date('d.m.Y H:i');
