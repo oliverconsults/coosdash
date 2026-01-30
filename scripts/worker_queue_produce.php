@@ -90,6 +90,15 @@ $prompt .= "- set_blocked_until (blocked_until=YYYY-MM-DD HH:MM)\n";
 $prompt .= "- add_children (titles = newline separated, max 6)\n";
 $prompt .= "- add_attachment (path, display_name optional)\n";
 $prompt .= "- job_done / job_fail (job_id, reason optional)\n";
+$prompt .= "\nExpected outcome (pick one):\n";
+$prompt .= "A) DONE: prepend_update + add_attachment(s) (if any) + set_status done + job_done\n";
+$prompt .= "B) SPLIT: add_children (4–6) + prepend_update (plan) + job_done\n";
+$prompt .= "C) BLOCK: set_blocked_until OR set_blocked_by + prepend_update (why) + job_done\n";
+
+$prompt .= "\nAttachment rule:\n";
+$prompt .= "- If you generate any file (PDF/CSV/JSON/TXT/etc.): ALWAYS attach it via add_attachment, and reference only the attachment/link in the update (no server paths).\n";
+$prompt .= "- If the node already has relevant attachments: mention them briefly as input.\n";
+
 $prompt .= "\nRules:\n";
 $prompt .= "- Always verify runs before marking done.\n";
 $prompt .= "- If you cannot proceed: call job_fail with a short reason. After 3 fails the system will block it.\n";
