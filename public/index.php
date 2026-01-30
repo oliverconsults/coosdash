@@ -105,6 +105,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
       }
 
+      workerlog_append($nid, "[oliver] {$ts} UI: save_task");
+
       flash_set('Gespeichert.', 'info');
       header('Location: /?id=' . $nid);
       exit;
@@ -152,6 +154,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $st = $pdo->prepare('UPDATE nodes SET description=CONCAT(?, COALESCE(description,\'\')) WHERE id=?');
       $st->execute(["[oliver] {$ts} Subtask angelegt: {$title}\n\n", $parentId]);
 
+      workerlog_append($newId, "[oliver] {$ts} UI: add_subtask (parent #{$parentId})");
+
       flash_set('Subtask angelegt.', 'info');
       header('Location: /?id=' . $newId);
       exit;
@@ -188,6 +192,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
               ->execute(["[oliver] {$ts} Done: {$nDone} Subtasks erledigt\n\n", $nid]);
         }
       }
+
+      workerlog_append($nid, "[oliver] {$ts} UI: set_worker -> {$worker}");
 
       flash_set('Status gespeichert.', 'info');
       header('Location: /?id=' . $nid);

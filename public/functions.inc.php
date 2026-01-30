@@ -87,6 +87,14 @@ function james_set_enabled(bool $enabled): bool {
   return @file_put_contents($p, json_encode($payload, JSON_PRETTY_PRINT|JSON_UNESCAPED_UNICODE)) !== false;
 }
 
+function workerlog_append(int $nodeId, string $line): void {
+  $ts = date('Y-m-d H:i:s');
+  $p = '/var/www/coosdash/shared/logs/worker.log';
+  @mkdir(dirname($p), 0775, true);
+  // Format: YYYY-MM-DD HH:MM:SS  #<node_id>  <line>
+  @file_put_contents($p, $ts . '  #' . (int)$nodeId . '  ' . $line . "\n", FILE_APPEND);
+}
+
 function renderHeader(string $title='COOS'): void {
   $f = flash_get();
   ?>

@@ -104,6 +104,9 @@ if ($action === 'set_block') {
   $pdo->prepare('UPDATE nodes SET description=CONCAT(?, COALESCE(description,\'\')) WHERE id=?')
       ->execute([$line, $nodeId]);
 
+  $ts = date('d.m.Y H:i');
+  workerlog_append($nodeId, "[oliver] {$ts} UI: set_block");
+
   flash_set('Blocker gespeichert.', 'info');
   header('Location: /?id=' . $nodeId);
   exit;
@@ -124,6 +127,9 @@ if ($action === 'clear_block') {
   $line = "[oliver] {$ts} Blocker: entfernt\n\n";
   $pdo->prepare('UPDATE nodes SET description=CONCAT(?, COALESCE(description,\'\')) WHERE id=?')
       ->execute([$line, $nodeId]);
+  $ts = date('d.m.Y H:i');
+  workerlog_append($nodeId, "[oliver] {$ts} UI: clear_block");
+
   flash_set('Blocker entfernt.', 'info');
   header('Location: /?id=' . $nodeId);
   exit;
@@ -141,6 +147,9 @@ if ($action === 'set_later') {
   $ts = date('d.m.Y H:i');
   $line = "[oliver] {$ts} Statusänderung: done (verschoben nach Später; Descendants: {$n})\n\n";
   $pdo->prepare('UPDATE nodes SET description=CONCAT(?, COALESCE(description,\'\')) WHERE id=?')->execute([$line, $nodeId]);
+  $ts = date('d.m.Y H:i');
+  workerlog_append($nodeId, "[oliver] {$ts} UI: set_later -> Später");
+
   flash_set('Auf später gesetzt (erledigt) & verschoben.', 'info');
   header('Location: /?id=' . ($spId ?: $nodeId));
   exit;
@@ -183,6 +192,9 @@ if ($action === 'set_active') {
   $ts = date('d.m.Y H:i');
   $line = "[oliver] {$ts} Statusänderung: todo_james (aktiviert)\n\n";
   $pdo->prepare('UPDATE nodes SET description=CONCAT(?, COALESCE(description,\'\')) WHERE id=?')->execute([$line, $nodeId]);
+  $ts = date('d.m.Y H:i');
+  workerlog_append($nodeId, "[oliver] {$ts} UI: set_active -> todo_james");
+
   flash_set('Aktiviert (James).', 'info');
   header('Location: /?id=' . $nodeId);
   exit;
