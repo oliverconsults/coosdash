@@ -1,5 +1,59 @@
 const fs = require('fs');
-const { PDFDocument, PDFName, PDFDict } = require('pdf-lib');
+const { PDFDocument, PDFName, PDFDict, PDFArray } = require('pdf-lib');
+
+function asDict(pdf, o) {
+  if (!o) return null;
+  try {
+    return (o instanceof PDFDict) ? o : pdf.context.lookup(o, PDFDict);
+  } catch (_) {
+    return null;
+  }
+}
+
+function fontEmbeddedFromFontDescriptor(pdf, fdRefOrDict) {
+  const fdd = asDict(pdf, fdRefOrDict);
+  if (!fdd) return { embedded: null, fontFileKey: null };
+
+  for (const k of ['FontFile', 'FontFile2', 'FontFile3']) {
+    const key = PDFName.of(k);
+    if (fdd.has(key)) return { embedded: true, fontFileKey: k };
+  }
+  return { embedded: false, fontFileKey: null };
+}
+
+function fontEmbeddedBestEffort(pdf, fontDict) {
+  if (!fontDict) return { embedded: null, fontFileKey: null, hasFontDescriptor: false };
+
+  const fd = fontDict.get(PDFName.of('FontDescriptor'));
+  if (fd) {
+    const r = fontEmbeddedFromFontDescriptor(pdf, fd);
+    return { ...r, hasFontDescriptor: true };
+  }
+
+  const subtype = fontDict.get(PDFName.of('Subtype'));
+  if (subtype && subtype.toString() === '/Type0') {
+    const desc = fontDict.get(PDFName.of('DescendantFonts'));
+    let arr = null;
+    try { arr = desc ? pdf.context.lookup(desc, PDFArray) : null; } catch (_) { arr = null; }
+
+    if (arr) {
+      for (let i = 0; i < arr.size(); i++) {
+        const child = asDict(pdf, arr.get(i));
+        if (!child) continue;
+        const childFd = child.get(PDFName.of('FontDescriptor'));
+        if (!childFd) continue;
+        const r = fontEmbeddedFromFontDescriptor(pdf, childFd);
+        if (r.embedded !== null) {
+          return { ...r, hasFontDescriptor: true };
+        }
+      }
+    }
+
+    return { embedded: null, fontFileKey: null, hasFontDescriptor: false };
+  }
+
+  return { embedded: null, fontFileKey: null, hasFontDescriptor: false };
+}
 
 async function main(){
   const p = process.argv[2];
@@ -12,38 +66,26 @@ async function main(){
 
   const allFonts = [];
 
-  // Iterate all indirect objects and collect FontDescriptor dictionaries.
   for (const [ref, obj] of pdf.context.enumerateIndirectObjects()) {
     if (!(obj instanceof PDFDict)) continue;
     const type = obj.get(PDFName.of('Type'));
     const subtype = obj.get(PDFName.of('Subtype'));
 
-    // Font dictionaries have /Type /Font
     if (type && type.toString() === '/Font') {
       const baseFont = obj.get(PDFName.of('BaseFont'));
-      const fd = obj.get(PDFName.of('FontDescriptor'));
-      let embedded = null;
-      let fontFileKey = null;
-      if (fd) {
-        const fdd = pdf.context.lookup(fd, PDFDict);
-        for (const k of ['FontFile', 'FontFile2', 'FontFile3']) {
-          const key = PDFName.of(k);
-          if (fdd.has(key)) { embedded = true; fontFileKey = k; break; }
-        }
-        if (embedded === null) embedded = false;
-      }
+      const emb = fontEmbeddedBestEffort(pdf, obj);
+
       allFonts.push({
         ref: ref.toString(),
         subtype: subtype ? subtype.toString() : null,
         baseFont: baseFont ? baseFont.toString() : null,
-        hasFontDescriptor: !!fd,
-        embedded,
-        fontFileKey,
+        hasFontDescriptor: emb.hasFontDescriptor,
+        embedded: emb.embedded,
+        fontFileKey: emb.fontFileKey,
       });
     }
   }
 
-  // Page-level usage: what fonts are referenced in each page's /Resources /Font dict?
   const pageFonts = [];
   const pages = pdf.getPages();
   for (let i=0;i<pages.length;i++) {
@@ -72,7 +114,6 @@ async function main(){
     pageFonts.push({ page: i+1, fonts });
   }
 
-  // Deduplicate global font list by baseFont+embedded+subtype
   const key = (r) => [r.baseFont,r.subtype,r.embedded,r.fontFileKey].join('|');
   const seen = new Set();
   const uniq = [];
