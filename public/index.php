@@ -993,11 +993,13 @@ renderHeader('Dashboard');
               ?>
 
               <?php if ($pct > 0): ?>
-                <div title="<?php echo h($tt); ?>" style="height:8px; border-radius:999px; background:rgba(255,255,255,0.08); overflow:hidden; margin:6px 0 10px 0;">
-                  <div style="height:100%; width:<?php echo (int)$pct; ?>%; background:linear-gradient(90deg, rgba(120,255,170,0.9), rgba(255,200,90,0.9), rgba(255,120,120,0.95));"></div>
+                <div title="<?php echo h($tt); ?>" style="position:relative; height:8px; border-radius:999px; background:linear-gradient(90deg, rgba(120,255,170,0.9), rgba(255,200,90,0.9), rgba(255,120,120,0.95)); overflow:hidden; margin:6px 0 10px 0;">
+                  <div style="position:absolute; top:0; right:0; height:100%; width:<?php echo (int)(100-$pct); ?>%; background:rgba(0,0,0,0.55);"></div>
                 </div>
               <?php else: ?>
-                <div title="<?php echo h($tt); ?>" style="height:8px; border-radius:999px; background:rgba(255,255,255,0.05); margin:6px 0 10px 0;"></div>
+                <div title="<?php echo h($tt); ?>" style="position:relative; height:8px; border-radius:999px; background:linear-gradient(90deg, rgba(120,255,170,0.9), rgba(255,200,90,0.9), rgba(255,120,120,0.95)); overflow:hidden; margin:6px 0 10px 0;">
+                  <div style="position:absolute; top:0; right:0; height:100%; width:100%; background:rgba(0,0,0,0.65);"></div>
+                </div>
               <?php endif; ?>
 
               <?php if (empty($cards[$col])): ?>
