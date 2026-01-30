@@ -377,6 +377,7 @@ function renderTree(array $byParent, array $byId, array $sectionByIdAll, array $
 $node = null;
 $children = [];
 $notes = [];
+$attachments = [];
 
 if ($nodeId) {
   $st = $pdo->prepare('SELECT * FROM nodes WHERE id=?');
@@ -387,6 +388,15 @@ if ($nodeId) {
   $st = $pdo->prepare('SELECT id,title,worker_status FROM nodes WHERE parent_id=? ORDER BY id');
   $st->execute([$nodeId]);
   $children = $st->fetchAll();
+
+  // attachments (created by James, served via token URL)
+  try {
+    $st = $pdo->prepare('SELECT id, token, orig_name, stored_name, mime, size_bytes, created_at, created_by FROM node_attachments WHERE node_id=? ORDER BY created_at DESC, id DESC');
+    $st->execute([$nodeId]);
+    $attachments = $st->fetchAll();
+  } catch (Throwable $e) {
+    $attachments = [];
+  }
 
   // legacy notes no longer rendered (we use nodes.description as the editable task text)
   $notes = [];
@@ -579,6 +589,40 @@ renderHeader('Dashboard');
 
       <div class="card" style="margin-top:16px">
         <?php if (!$isContainerRoot): ?>
+
+          <?php if (!empty($attachments)): ?>
+            <div class="note" style="margin:0 0 12px 0;">
+              <div class="head">Attachments</div>
+              <ul style="margin:0; padding-left:18px;">
+                <?php foreach ($attachments as $a): ?>
+                  <?php
+                    $tok = (string)($a['token'] ?? '');
+                    $stored = (string)($a['stored_name'] ?? '');
+                    $orig = (string)($a['orig_name'] ?? $stored);
+                    $url = '/att/' . $tok . '/' . $stored;
+                    $sz = $a['size_bytes'] ?? null;
+                    $szTxt = '';
+                    if ($sz !== null && $sz !== '') {
+                      $n = (float)$sz;
+                      if ($n >= 1024*1024) $szTxt = number_format($n/(1024*1024), 1, '.', '') . ' MB';
+                      elseif ($n >= 1024) $szTxt = number_format($n/1024, 0, '.', '') . ' KB';
+                      else $szTxt = (int)$n . ' B';
+                    }
+                    $cts = strtotime((string)($a['created_at'] ?? ''));
+                    $meta = [];
+                    if ($szTxt !== '') $meta[] = $szTxt;
+                    if ($cts) $meta[] = date('d.m.Y H:i', $cts);
+                    $metaTxt = $meta ? (' • ' . implode(' • ', $meta)) : '';
+                  ?>
+                  <li>
+                    <a href="<?php echo h($url); ?>" target="_blank" rel="noopener"><?php echo h($orig); ?></a>
+                    <span class="meta"><?php echo h($metaTxt); ?></span>
+                  </li>
+                <?php endforeach; ?>
+              </ul>
+            </div>
+          <?php endif; ?>
+
           <form method="post" style="margin:0">
             <input type="hidden" name="action" value="save_task">
             <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">

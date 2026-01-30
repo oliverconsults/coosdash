@@ -51,3 +51,25 @@ CREATE TABLE IF NOT EXISTS node_notes (
     ON DELETE CASCADE
     ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Attachments: James can publish artifacts (PDF/CSV/images/etc.) via token URLs
+CREATE TABLE IF NOT EXISTS node_attachments (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  node_id BIGINT UNSIGNED NOT NULL,
+  token CHAR(32) NOT NULL,
+  orig_name VARCHAR(255) NOT NULL,
+  stored_name VARCHAR(255) NOT NULL,
+  mime VARCHAR(120) NULL,
+  size_bytes BIGINT UNSIGNED NULL,
+  created_by ENUM('oliver','james') NOT NULL DEFAULT 'james',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  PRIMARY KEY (id),
+  UNIQUE KEY uniq_token_file (token, stored_name),
+  KEY idx_node_time (node_id, created_at),
+
+  CONSTRAINT fk_node_attachments_node
+    FOREIGN KEY (node_id) REFERENCES nodes(id)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

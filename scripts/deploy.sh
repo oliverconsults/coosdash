@@ -12,7 +12,7 @@ RELEASE_DIR="${RUNTIME_DIR}/releases/${REL_ID}"
 echo "Deploying ${PROJECT} release=${REL_ID}"
 
 mkdir -p "${RUNTIME_DIR}/releases" "${RUNTIME_DIR}/shared"
-mkdir -p "${RUNTIME_DIR}/shared/data" "${RUNTIME_DIR}/shared/logs" "${RUNTIME_DIR}/shared/tmp" "${RUNTIME_DIR}/shared/uploads"
+mkdir -p "${RUNTIME_DIR}/shared/data" "${RUNTIME_DIR}/shared/logs" "${RUNTIME_DIR}/shared/tmp" "${RUNTIME_DIR}/shared/uploads" "${RUNTIME_DIR}/shared/att"
 
 mkdir -p "${RELEASE_DIR}"
 
@@ -24,6 +24,11 @@ for d in data logs tmp uploads; do
   rm -rf "${RELEASE_DIR}/${d}" 2>/dev/null || true
   ln -sfn "${RUNTIME_DIR}/shared/${d}" "${RELEASE_DIR}/${d}"
 done
+
+# Public attachments (token URLs)
+mkdir -p "${RUNTIME_DIR}/shared/att"
+rm -rf "${RELEASE_DIR}/public/att" 2>/dev/null || true
+ln -sfn "${RUNTIME_DIR}/shared/att" "${RELEASE_DIR}/public/att"
 
 # Switch current
 ln -sfn "${RELEASE_DIR}" "${RUNTIME_DIR}/current"
