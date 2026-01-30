@@ -87,34 +87,14 @@ if (!$cands) {
   exit(0);
 }
 
-// Pick (and stick to) one project subtree until it is done
-$statePath = '/var/www/coosdash/shared/data/james_worker_state.json';
-$activeProject = 0;
-$state = [];
-if (is_file($statePath)) {
-  $raw = @file_get_contents($statePath);
-  $j = $raw ? json_decode($raw, true) : null;
-  if (is_array($j)) {
-    $state = $j;
-    $activeProject = (int)($j['active_project_id'] ?? 0);
-  }
-}
-
+// Choose a random project subtree each tick (fair distribution)
 $eligibleProjects = [];
 foreach ($cands as $c) $eligibleProjects[(int)$c['project_id']] = true;
 $eligibleProjects = array_keys($eligibleProjects);
 
-if ($activeProject <= 0 || !in_array($activeProject, $eligibleProjects, true)) {
-  // choose a random project among eligible ones
-  $activeProject = (int)$eligibleProjects[array_rand($eligibleProjects)];
-  $state = [
-    'active_project_id' => $activeProject,
-    'picked_at' => date('Y-m-d H:i:s'),
-  ];
-  @file_put_contents($statePath, json_encode($state, JSON_PRETTY_PRINT|JSON_UNESCAPED_UNICODE));
-}
+$activeProject = (int)$eligibleProjects[array_rand($eligibleProjects)];
 
-// Filter to the active project only
+// Filter to the chosen project only
 $cands = array_values(array_filter($cands, fn($c) => (int)$c['project_id'] === (int)$activeProject));
 
 // Within the chosen project: pick deepest; tie-break by smallest id
