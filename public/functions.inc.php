@@ -129,9 +129,23 @@ function renderHeader(string $title='COOS'): void {
       .btn-gold{border-color:rgba(212,175,55,.85);background:linear-gradient(180deg, rgba(212,175,55,.28) 0%, rgba(212,175,55,.14) 60%, rgba(15,22,35,.92) 100%);box-shadow:0 0 0 1px rgba(212,175,55,.18) inset, 0 10px 26px rgba(0,0,0,.28)}
       .btn-gold:hover{border-color:rgba(255,215,128,.95);box-shadow:0 12px 34px rgba(0,0,0,.38), 0 0 0 1px rgba(255,215,128,.22) inset}
 
-      /* subtle pulsing glow for "active" James button */
-      @keyframes goldPulse{0%,100%{box-shadow:0 0 0 1px rgba(212,175,55,.18) inset, 0 10px 26px rgba(0,0,0,.28)}50%{box-shadow:0 0 0 1px rgba(255,215,128,.26) inset, 0 14px 34px rgba(0,0,0,.36), 0 0 18px rgba(212,175,55,.18)}}
-      .btn-gold{animation:goldPulse 2.2s ease-in-out infinite}
+      /* cooler pulsing glow for "active" James button */
+      @keyframes goldPulse{
+        0%{transform:translateY(0); box-shadow:0 0 0 1px rgba(212,175,55,.18) inset, 0 10px 26px rgba(0,0,0,.28), 0 0 0 rgba(255,215,128,0)}
+        50%{transform:translateY(-1px); box-shadow:0 0 0 1px rgba(255,215,128,.30) inset, 0 14px 34px rgba(0,0,0,.38), 0 0 22px rgba(255,215,128,.22)}
+        100%{transform:translateY(0); box-shadow:0 0 0 1px rgba(212,175,55,.18) inset, 0 10px 26px rgba(0,0,0,.28), 0 0 0 rgba(255,215,128,0)}
+      }
+      .btn-gold{position:relative; animation:goldPulse 1.6s ease-in-out infinite;}
+      .btn-gold::after{
+        content:"";
+        position:absolute; inset:-2px;
+        border-radius:14px;
+        background:radial-gradient(120px 40px at 30% 0%, rgba(255,215,128,.35), rgba(255,215,128,0) 70%);
+        opacity:.0;
+        pointer-events:none;
+        animation:glint 1.6s ease-in-out infinite;
+      }
+      @keyframes glint{0%{opacity:0; transform:translateX(-6px)}45%{opacity:.55}70%{opacity:.0; transform:translateX(8px)}100%{opacity:0; transform:translateX(8px)}}
       .grid{display:grid;grid-template-columns:360px 1fr;gap:16px}
       .card{background:rgba(15,22,35,.92);border:1px solid var(--border);border-radius:16px;padding:14px}
       .card h2{margin:0 0 10px 0;font-size:15px;letter-spacing:.02em}
