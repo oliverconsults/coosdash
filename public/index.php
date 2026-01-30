@@ -352,7 +352,7 @@ function renderTree(array $byParent, array $byId, array $sectionByIdAll, array $
     if ($sec === 'Später') $msClass = ' ms-later';
 
     $hasAtt = !empty($attCountById[$id]);
-    $attIcon = $hasAtt ? ' <span class="att-clip" title="Attachment" style="margin-left:4px;">📎</span>' : '';
+    $attIcon = $hasAtt ? ' <span class="att-clip" title="Attachment" style="margin-left:4px;">📁</span>' : '';
 
     if ($hasKids) {
       $forceOpenAll = (!empty($_GET['open']) && $_GET['open'] === 'all') || !empty($_GET['q']);
@@ -770,7 +770,7 @@ renderHeader('Dashboard');
               <?php else: ?>
                 <?php foreach ($cards[$col] as $c): ?>
                   <a class="kanban-card" href="/?id=<?php echo (int)$c['id']; ?>">
-                    <div class="kanban-title"><?php echo h($c['title']); ?><?php if (!empty($c['has_att'])): ?> <span class="att-clip" title="Attachment">📎</span><?php endif; ?></div>
+                    <div class="kanban-title"><?php echo h($c['title']); ?><?php if (!empty($c['has_att'])): ?> <span class="att-clip" title="Attachment">📁</span><?php endif; ?></div>
                     <div class="kanban-meta">
                       <span class="pill section"><?php echo h($c['section']); ?></span>
                       <?php $right = '#' . (int)$c['id']; ?>
