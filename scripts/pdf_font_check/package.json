@@ -1,0 +1,11 @@
+{
+  "name": "coos-pdf-font-check",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Lightweight PDF font inspection helper (pdf-lib)",
+  "license": "UNLICENSED",
+  "type": "commonjs",
+  "dependencies": {
+    "pdf-lib": "^1.17.1"
+  }
+}
