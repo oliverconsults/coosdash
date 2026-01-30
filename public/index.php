@@ -220,12 +220,18 @@ try {
   $attCountById = [];
 }
 
-// hourly metrics for progress chart (last ~72h)
+// hourly metrics for progress chart (always anchored to latest ts)
 $metricsRows = [];
 try {
-  $st = $pdo->prepare('SELECT ts, projects_todo_oliver, projects_todo_james, projects_blocked, projects_done, ideas_todo_oliver, ideas_todo_james, ideas_blocked, ideas_done, later_total, deleted_total FROM metrics_hourly ORDER BY ts DESC LIMIT 96');
+  // Pull an anchored window so the chart always ends at the latest available hour.
+  $st = $pdo->prepare("SELECT ts, projects_todo_oliver, projects_todo_james, projects_blocked, projects_done,
+                               ideas_todo_oliver, ideas_todo_james, ideas_blocked, ideas_done,
+                               later_total, deleted_total
+                        FROM metrics_hourly
+                        WHERE ts >= (SELECT DATE_SUB(MAX(ts), INTERVAL 72 HOUR) FROM metrics_hourly)
+                        ORDER BY ts ASC");
   $st->execute();
-  $metricsRows = array_reverse($st->fetchAll());
+  $metricsRows = $st->fetchAll();
 } catch (Throwable $e) {
   $metricsRows = [];
 }
@@ -554,9 +560,8 @@ renderHeader('Dashboard');
           return $d;
         };
 
-        // time legend ticks (left/mid/right)
+        // time legend ticks (left/right)
         $tsFirst = strtotime((string)$metricsRows[0]['ts']);
-        $tsMid = strtotime((string)$metricsRows[(int)floor(($n-1)/2)]['ts']);
         $tsLast = strtotime((string)$metricsRows[$n-1]['ts']);
       ?>
       <div class="note" style="margin-top:12px">
@@ -585,7 +590,6 @@ renderHeader('Dashboard');
 
         <div class="row" style="justify-content:space-between; margin-top:6px;">
           <span class="meta"><?php echo h(date('d.m H:i', $tsFirst)); ?></span>
-          <span class="meta"><?php echo h(date('d.m H:i', $tsMid)); ?></span>
           <span class="meta"><?php echo h(date('d.m H:i', $tsLast)); ?></span>
         </div>
 
