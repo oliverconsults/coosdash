@@ -225,9 +225,9 @@ if ($q !== '') {
   }
 }
 
-// pick default selection: first root
+// roots (top-level containers)
 $roots = $byParent[0] ?? [];
-if (!$nodeId && $roots) $nodeId = (int)$roots[0]['id'];
+// default: no selection on load (keeps tree collapsed)
 
 // compute open-path (ancestors of current)
 $open = [];
@@ -344,7 +344,8 @@ function renderTree(array $byParent, array $byId, array $sectionByIdAll, array $
 
     if ($hasKids) {
       $forceOpenAll = (!empty($_GET['open']) && $_GET['open'] === 'all') || !empty($_GET['q']);
-      $isOpen = $forceOpenAll || ($open[$id] ?? $isActive);
+      // Default: collapsed. Open only when forced (search/open-all) or when the node is on the open-path to the current selection.
+      $isOpen = $forceOpenAll || !empty($open[$id]);
 
       // Important: apply indentation to the clickable row, not the <details> wrapper.
       // Otherwise browser default <details> layout can add extra indentation when fully expanded (search).
@@ -398,14 +399,9 @@ renderHeader('Dashboard');
   <div class="card">
     <div class="row" style="justify-content:space-between; align-items:center;">
       <h2 style="margin:0;">Projekte / Ideen (<?php echo count($roots); ?>)</h2>
-      <form method="get" style="margin:0;">
-        <?php if ($nodeId): ?><input type="hidden" name="id" value="<?php echo (int)$nodeId; ?>"><?php endif; ?>
-        <?php if (!empty($_GET['q'])): ?><input type="hidden" name="q" value="<?php echo h((string)$_GET['q']); ?>"><?php endif; ?>
-        <select name="open" onchange="this.form.submit()" style="width:auto; padding:6px 10px; font-size:12px;">
-          <option value="">close all</option>
-          <option value="all" <?php echo (!empty($_GET['open']) && $_GET['open']==='all') ? 'selected' : ''; ?>>open all</option>
-        </select>
-      </form>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <a class="btn" href="/">Reset</a>
+      </div>
     </div>
 
     <form method="get" style="margin:8px 0 0 0; display:flex; gap:10px;">
