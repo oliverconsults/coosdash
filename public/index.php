@@ -175,7 +175,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // Load full tree for nav
-$allNodes = $pdo->query("SELECT id, parent_id, title, worker_status, priority FROM nodes ORDER BY COALESCE(priority,999), id")->fetchAll();
+$allNodes = $pdo->query("SELECT id, parent_id, title, worker_status, priority, created_at, updated_at FROM nodes ORDER BY COALESCE(priority,999), id")->fetchAll();
 $byParentAll = [];
 $byIdAll = [];
 foreach ($allNodes as $n) {
@@ -665,7 +665,8 @@ renderHeader('Dashboard');
                     <div class="kanban-meta">
                       <span class="pill section"><?php echo h($c['section']); ?></span>
                       <?php if ($col === 'done'): ?>
-                        <span class="pill dim"><?php echo h(date('d.m.Y H:i:s', strtotime((string)$c['updated_at']))); ?></span>
+                        <?php $ts = strtotime((string)($c['updated_at'] ?? '')); ?>
+                        <span class="pill dim"><?php echo $ts ? h(date('d.m.Y H:i:s', $ts)) : '—'; ?></span>
                       <?php endif; ?>
                       <span class="pill dim">#<?php echo (int)$c['id']; ?></span>
                     </div>
