@@ -191,7 +191,7 @@ function renderHeader(string $title='COOS'): void {
               $jIcon = ($jOn ? '/img/james_active.gif' : '/img/james_sleep.png') . '?v=' . rawurlencode($iconVer);
             ?>
             <a class="btn <?php echo $jOn ? 'btn-gold' : ''; ?>" href="/james.php?toggle=1" style="display:flex; align-items:center; gap:8px;">
-              <img src="<?php echo h($jIcon); ?>" alt="James" width="18" height="18" style="display:block; flex:0 0 auto; border-radius:4px;">
+              <img src="<?php echo h($jIcon); ?>" alt="James" width="30" height="30" style="display:block; flex:0 0 auto; border-radius:6px;">
               <span><?php echo $jOn ? 'James aktiv' : 'James sleeps'; ?></span>
             </a>
             <a class="btn" href="/workerlog.php">Worker Log</a>
