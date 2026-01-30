@@ -52,6 +52,9 @@ if (!$node) {
   exit(3);
 }
 
+$blockedUntil = (string)($node['blocked_until'] ?? '');
+$blockedBy = (int)($node['blocked_by_node_id'] ?? 0);
+
 // parent chain (up to root)
 $chain = [];
 $cur = $nodeId;
@@ -71,6 +74,11 @@ $prompt .= "JOB_ID={JOB_ID}\n";
 $prompt .= "TARGET_NODE_ID={$nodeId}\n";
 $prompt .= "TITLE=" . (string)$node['title'] . "\n\n";
 $prompt .= "Chain:\n- " . implode("\n- ", $chain) . "\n\n";
+$prompt .= "Context:\n";
+if ($blockedBy > 0) $prompt .= "- BLOCKED_BY_NODE_ID={$blockedBy}\n";
+if ($blockedUntil !== '' && strtotime($blockedUntil)) $prompt .= "- BLOCKED_UNTIL={$blockedUntil}\n";
+$prompt .= "\n";
+
 $prompt .= "How to write (MANDATORY):\n";
 $prompt .= "- NO raw SQL writes. Use the CLI wrapper: php /home/deploy/projects/coos/scripts/worker_api_cli.php ...\n";
 $prompt .= "- Example: php /home/deploy/projects/coos/scripts/worker_api_cli.php action=ping\n";
@@ -85,6 +93,7 @@ $prompt .= "- job_done / job_fail (job_id, reason optional)\n";
 $prompt .= "\nRules:\n";
 $prompt .= "- Always verify runs before marking done.\n";
 $prompt .= "- If you cannot proceed: call job_fail with a short reason. After 3 fails the system will block it.\n";
+$prompt .= "- Tool KB: if you successfully use/install a tool, update /home/deploy/clawd/TOOLS.md + /home/deploy/clawd/tools/<tool>.md (keep it short).\n";
 
 $stIns = $pdo->prepare('INSERT INTO worker_queue (status, node_id, prompt_text, selector_meta) VALUES (\'open\', ?, ?, ?)');
 $stIns->execute([$nodeId, $prompt, json_encode($meta, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)]);
