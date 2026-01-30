@@ -87,12 +87,42 @@ if (!$cands) {
   exit(0);
 }
 
-// Choose a random project subtree each tick (fair distribution)
+// Choose project fairly: round-robin across all eligible projects (avoids streaks)
 $eligibleProjects = [];
 foreach ($cands as $c) $eligibleProjects[(int)$c['project_id']] = true;
 $eligibleProjects = array_keys($eligibleProjects);
 
-$activeProject = (int)$eligibleProjects[array_rand($eligibleProjects)];
+$statePath = '/var/www/coosdash/shared/data/james_worker_state.json';
+$state = ['queue'=>[]];
+if (is_file($statePath)) {
+  $raw = @file_get_contents($statePath);
+  $j = $raw ? json_decode($raw, true) : null;
+  if (is_array($j)) $state = array_merge($state, $j);
+}
+
+$queue = array_values(array_filter(array_map('intval', (array)($state['queue'] ?? []))));
+
+// keep only currently eligible projects
+$eligibleSet = array_flip($eligibleProjects);
+$queue = array_values(array_filter($queue, fn($pid) => isset($eligibleSet[$pid])));
+
+// append newly eligible projects (shuffled)
+$missing = array_values(array_filter($eligibleProjects, fn($pid) => !in_array((int)$pid, $queue, true)));
+if ($missing) {
+  shuffle($missing);
+  $queue = array_merge($queue, $missing);
+}
+
+// if still empty (shouldn't happen), fallback to random
+if (!$queue) {
+  $activeProject = (int)$eligibleProjects[array_rand($eligibleProjects)];
+} else {
+  $activeProject = (int)$queue[0];
+  // rotate: move picked to end
+  $queue = array_merge(array_slice($queue, 1), [$activeProject]);
+}
+
+@file_put_contents($statePath, json_encode(['queue'=>$queue,'picked_at'=>date('Y-m-d H:i:s')], JSON_PRETTY_PRINT|JSON_UNESCAPED_UNICODE));
 
 // Filter to the chosen project only
 $cands = array_values(array_filter($cands, fn($c) => (int)$c['project_id'] === (int)$activeProject));
