@@ -19,6 +19,13 @@ mkdir -p "${RELEASE_DIR}"
 # Copy code
 rsync -a --exclude '.git' "${REPO_DIR}/" "${RELEASE_DIR}/"
 
+# Sync shared-template assets into shared/ (non-destructive; does not touch node_modules)
+# This keeps runtime prototypes (e.g. tmp/pdfembed_proto/embed.js) reproducible across deploys.
+if [[ -d "${RELEASE_DIR}/shared-template/tmp/pdfembed_proto" ]]; then
+  mkdir -p "${RUNTIME_DIR}/shared/tmp/pdfembed_proto"
+  rsync -a "${RELEASE_DIR}/shared-template/tmp/pdfembed_proto/" "${RUNTIME_DIR}/shared/tmp/pdfembed_proto/"
+fi
+
 # Link shared dirs into release
 for d in data logs tmp uploads; do
   rm -rf "${RELEASE_DIR}/${d}" 2>/dev/null || true
