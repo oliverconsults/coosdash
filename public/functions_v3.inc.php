@@ -141,7 +141,7 @@ function renderHeader(string $title='COOS'): void {
         mix-blend-mode:screen;
         opacity:0;
         pointer-events:none;
-        animation:jamesBlinkOpacity .9s steps(2,end) infinite !important;
+        animation:jamesBlinkOpacity 3.6s steps(2,end) infinite !important;
       }
       @keyframes jamesBlinkOpacity{0%,100%{opacity:0}50%{opacity:1}}
       .grid{display:grid;grid-template-columns:360px 1fr;gap:16px}
