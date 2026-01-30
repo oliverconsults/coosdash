@@ -9,6 +9,18 @@ $action = (string)($_REQUEST['action'] ?? '');
 $nodeId = (int)($_REQUEST['node_id'] ?? 0);
 $jobId = (int)($_REQUEST['job_id'] ?? 0);
 
+// Security: allow only CLI or localhost.
+// This endpoint must not be usable from the public internet.
+$isCli = (PHP_SAPI === 'cli');
+$ra = (string)($_SERVER['REMOTE_ADDR'] ?? '');
+$isLocal = in_array($ra, ['127.0.0.1','::1'], true);
+if (!$isCli && !$isLocal) {
+  http_response_code(403);
+  header('Content-Type: text/plain; charset=utf-8');
+  echo "Forbidden";
+  exit;
+}
+
 function out(bool $ok, string $msg, array $extra=[]): void {
   header('Content-Type: application/json; charset=utf-8');
   echo json_encode(array_merge(['ok'=>$ok,'msg'=>$msg], $extra), JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
