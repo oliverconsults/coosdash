@@ -149,6 +149,7 @@ function renderHeader(string $title='COOS'): void {
         <div class="row">
           <?php if (isLoggedIn()): ?>
             <a class="btn" href="/">Dashboard</a>
+            <a class="btn" href="/workerlog.php">Worker Log</a>
             <a class="btn" href="/logout.php">Logout</a>
           <?php endif; ?>
         </div>
