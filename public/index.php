@@ -670,10 +670,8 @@ renderHeader('Dashboard');
             <label>Aufgabe / Notiz:</label>
             <textarea class="task-note" name="description" required><?php echo h((string)($node['description'] ?? '')); ?></textarea>
 
-            <label>Attachment (optional)</label>
-            <input type="file" name="attachment" accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt" style="max-width:520px">
-
-            <div style="margin-top:10px">
+            <div class="row" style="margin-top:10px; align-items:center;">
+              <input type="file" name="attachment" accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt" style="width:auto; max-width:380px">
               <button class="btn btn-gold" type="submit">Speichern</button>
             </div>
           </form>
@@ -691,10 +689,8 @@ renderHeader('Dashboard');
           <label>Beschreibung</label>
           <textarea name="description" required></textarea>
 
-          <label>Attachment (optional)</label>
-          <input type="file" name="attachment" accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt" style="max-width:520px">
-
-          <div style="margin-top:10px">
+          <div class="row" style="margin-top:10px; align-items:center;">
+            <input type="file" name="attachment" accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt" style="width:auto; max-width:380px">
             <button class="btn btn-gold" type="submit">Absenden</button>
           </div>
         </form>
