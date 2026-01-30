@@ -131,6 +131,8 @@ function renderHeader(string $title='COOS'): void {
       .btn-gold:hover{border-color:rgba(255,215,128,.95);box-shadow:0 12px 34px rgba(0,0,0,.38), 0 0 0 1px rgba(255,215,128,.22) inset}
 
       /* James button: keep gold style, no animation */
+      .btn-james{padding:6px 12px; border-radius:12px;}
+      .btn-james span{line-height:1.1}
       .grid{display:grid;grid-template-columns:360px 1fr;gap:16px}
       .card{background:rgba(15,22,35,.92);border:1px solid var(--border);border-radius:16px;padding:14px}
       .card h2{margin:0 0 10px 0;font-size:15px;letter-spacing:.02em}
@@ -190,7 +192,7 @@ function renderHeader(string $title='COOS'): void {
               $iconVer = is_file($iconFile) ? (string)@filemtime($iconFile) : '1';
               $jIcon = ($jOn ? '/img/james_active.gif' : '/img/james_sleep.png') . '?v=' . rawurlencode($iconVer);
             ?>
-            <a class="btn <?php echo $jOn ? 'btn-gold' : ''; ?>" href="/james.php?toggle=1" style="display:flex; align-items:center; gap:8px;">
+            <a class="btn btn-james <?php echo $jOn ? 'btn-gold' : ''; ?>" href="/james.php?toggle=1" style="display:flex; align-items:center; gap:8px;">
               <img src="<?php echo h($jIcon); ?>" alt="James" width="30" height="30" style="display:block; flex:0 0 auto; border-radius:4px;">
               <span><?php echo $jOn ? 'James aktiv' : 'James sleeps'; ?></span>
             </a>
