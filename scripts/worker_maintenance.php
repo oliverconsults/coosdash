@@ -66,6 +66,7 @@ foreach ($rows as $r) {
   $pdo->prepare('UPDATE nodes SET blocked_by_node_id=NULL WHERE id=?')->execute([$id]);
   $line = "[auto] {$tsHuman} Unblocked: blocker #{$bid} ist done\n\n";
   $pdo->prepare('UPDATE nodes SET description=CONCAT(?, COALESCE(description,\'\')) WHERE id=?')->execute([$line, $id]);
+  @file_put_contents('/var/www/coosdash/shared/logs/worker.log', $tsLine . "  #{$id}  [auto] {$tsHuman} Unblocked: blocker #{$bid} ist done\n", FILE_APPEND);
   $did['unblocked']++;
 }
 
@@ -105,6 +106,8 @@ foreach ($all as $p) {
 
   $pdo->prepare('UPDATE nodes SET description=CONCAT(?, COALESCE(description,\'\')) WHERE id=?')
       ->execute([$sum, $pid]);
+
+  @file_put_contents('/var/www/coosdash/shared/logs/worker.log', $tsLine . "  #{$pid}  [auto] {$tsHuman} Summary: " . count($kids) . " Subtasks erledigt\n", FILE_APPEND);
 
   $did['closed']++;
 }
