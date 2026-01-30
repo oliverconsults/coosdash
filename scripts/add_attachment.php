@@ -38,7 +38,11 @@ $allowedExt = [
   // preferred
   'url','pdf','png','jpg','jpeg','webp','gif','doc','docx','xls','xlsx',
   // common business artifacts
-  'csv','ppt','pptx'
+  'csv','ppt','pptx',
+  // reports / raw artifacts (needed for validators)
+  'json','txt','log','xml','html',
+  // misc
+  'md'
 ];
 
 // sanitize filename
