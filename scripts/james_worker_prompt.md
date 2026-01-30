@@ -13,6 +13,10 @@ Pro Tick **genau eine** Arbeitseinheit im COOS‑CRM voranbringen, indem du die 
 - Arbeite **nur** im Tree unter **„Projekte“** (Root-Node mit `title="Projekte"` und `parent_id IS NULL`).
 - **Ignoriere** Ideen / Später / Gelöscht (keine Änderungen dort).
 - Nutze die **DB `cooscrm`** als Source of Truth (`nodes`).
+- **WICHTIG (CRM-Self-Changes):** Wenn ein Task Änderungen am **COOS-CRM selbst** (UI/DB/Worker/Deploy) vorschlägt oder begründet:
+  - **nicht umsetzen**.
+  - setze den Node sofort auf **`todo_oliver`**.
+  - prepende eine Warnung in `nodes.description` (z.B. „⚠️ CRM-Änderung – bitte Oliver prüfen/absegnen“).
 
 ## Blocker (gegen Zeit-/Dependency-Loops)
 Es gibt zwei Blocker-Felder in `nodes`:
