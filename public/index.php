@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/functions.inc.php';
+require_once __DIR__ . '/attachments_lib.php';
 requireLogin();
 
 $pdo = db();
@@ -92,6 +93,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $st = $pdo->prepare('UPDATE nodes SET description=?, worker_status="todo_oliver" WHERE id=?');
       $st->execute([$newDesc, $nid]);
 
+      // optional attachment upload (Oliver)
+      if (!empty($_FILES['attachment'])) {
+        try {
+          $res = attachments_store_upload($pdo, $nid, $_FILES['attachment'], 'oliver');
+          if (is_array($res) && !empty($res['err'])) {
+            flash_set('Gespeichert, aber Attachment fehlgeschlagen: ' . $res['err'], 'err');
+          }
+        } catch (Throwable $e) {
+          flash_set('Gespeichert, aber Attachment fehlgeschlagen.', 'err');
+        }
+      }
+
       flash_set('Gespeichert.', 'info');
       header('Location: /?id=' . $nid);
       exit;
@@ -122,6 +135,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $st = $pdo->prepare('INSERT INTO nodes (parent_id, title, description, priority, created_by, worker_status) VALUES (?, ?, ?, ?, ?, ?)');
       $st->execute([$parentId, $title, $desc, null, 'oliver', 'todo_oliver']);
       $newId = (int)$pdo->lastInsertId();
+
+      // optional attachment upload (Oliver)
+      if (!empty($_FILES['attachment'])) {
+        try {
+          $res = attachments_store_upload($pdo, $newId, $_FILES['attachment'], 'oliver');
+          if (is_array($res) && !empty($res['err'])) {
+            flash_set('Subtask angelegt, aber Attachment fehlgeschlagen: ' . $res['err'], 'err');
+          }
+        } catch (Throwable $e) {
+          flash_set('Subtask angelegt, aber Attachment fehlgeschlagen.', 'err');
+        }
+      }
 
       // also prepend a short line into parent description (newest first)
       $st = $pdo->prepare('UPDATE nodes SET description=CONCAT(?, COALESCE(description,\'\')) WHERE id=?');
@@ -638,12 +663,15 @@ renderHeader('Dashboard');
             </div>
           <?php endif; ?>
 
-          <form method="post" style="margin:0">
+          <form method="post" enctype="multipart/form-data" style="margin:0">
             <input type="hidden" name="action" value="save_task">
             <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
 
             <label>Aufgabe / Notiz:</label>
             <textarea class="task-note" name="description" required><?php echo h((string)($node['description'] ?? '')); ?></textarea>
+
+            <label>Attachment (optional)</label>
+            <input type="file" name="attachment" accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt" style="max-width:520px">
 
             <div style="margin-top:10px">
               <button class="btn btn-gold" type="submit">Speichern</button>
@@ -653,7 +681,7 @@ renderHeader('Dashboard');
           <div style="height:14px"></div>
         <?php endif; ?>
 
-        <form method="post" style="margin:0">
+        <form method="post" enctype="multipart/form-data" style="margin:0">
           <input type="hidden" name="action" value="add_subtask">
           <input type="hidden" name="parent_id" value="<?php echo (int)$node['id']; ?>">
 
@@ -662,6 +690,9 @@ renderHeader('Dashboard');
 
           <label>Beschreibung</label>
           <textarea name="description" required></textarea>
+
+          <label>Attachment (optional)</label>
+          <input type="file" name="attachment" accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt" style="max-width:520px">
 
           <div style="margin-top:10px">
             <button class="btn btn-gold" type="submit">Absenden</button>
