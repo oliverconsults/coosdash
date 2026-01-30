@@ -6,6 +6,19 @@ require_once __DIR__ . '/../public/functions.inc.php';
 
 $pdo = db();
 
+// Respect UI toggle (James sleeps)
+$statePath = '/var/www/coosdash/shared/data/james_state.json';
+$enabled = 0;
+if (is_file($statePath)) {
+  $raw = @file_get_contents($statePath);
+  $j = $raw ? json_decode($raw, true) : null;
+  if (is_array($j) && !empty($j['enabled'])) $enabled = 1;
+}
+if (!$enabled) {
+  echo "OK james sleeps (no enqueue)\n";
+  exit(0);
+}
+
 // Ensure table exists
 require_once __DIR__ . '/migrate_worker_queue.php';
 
