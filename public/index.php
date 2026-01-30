@@ -930,64 +930,39 @@ renderHeader('Dashboard');
           'done' => 'Done',
         ];
 
-        // Depth indicator (based on last worker.log entry) relative to max depth under Projekte
+        // Depth indicator per Kanban column: use the top card in the list.
         $projectsRootId = $projectsRootId ?: 0;
-        $depthOf = function(int $nodeId) use ($byIdAll, $projectsRootId): int {
-          if (!$projectsRootId) return 0;
+        $ideasRootId = $ideasRootId ?: 0;
+
+        $depthUnderRoot = function(int $nodeId, int $rootId) use ($byIdAll): int {
+          if ($nodeId <= 0 || $rootId <= 0) return 0;
           $d = 0;
           $cur = $nodeId;
-          for ($i=0; $i<80; $i++) {
+          for ($i=0; $i<120; $i++) {
             $row = $byIdAll[$cur] ?? null;
             if (!$row) return 0;
             $pid = $row['parent_id'];
             if ($pid === null) return 0;
             $pid = (int)$pid;
             $d++;
-            if ($pid === $projectsRootId) return $d;
+            if ($pid === $rootId) return $d;
             $cur = $pid;
           }
           return 0;
         };
 
         $maxDepthProjects = 0;
-        if ($projectsRootId) {
-          foreach ($byIdAll as $id2 => $n2) {
-            $id2 = (int)$id2;
-            // consider only nodes under Projekte
-            if (!$isUnder($id2, $projectsRootId)) continue;
-            $dd = $depthOf($id2);
+        $maxDepthIdeas = 0;
+        foreach ($byIdAll as $id2 => $n2) {
+          $id2 = (int)$id2;
+          if ($projectsRootId && $isUnder($id2, $projectsRootId)) {
+            $dd = $depthUnderRoot($id2, $projectsRootId);
             if ($dd > $maxDepthProjects) $maxDepthProjects = $dd;
           }
-        }
-
-        $lastWorkedNodeId = 0;
-        $lastWorkedDepth = 0;
-        try {
-          $logPath = '/var/www/coosdash/shared/logs/worker.log';
-          if (is_readable($logPath)) {
-            $f = new SplFileObject($logPath, 'r');
-            $f->seek(PHP_INT_MAX);
-            $line = '';
-            for ($i=0; $i<50; $i++) {
-              $idx = $f->key();
-              if ($idx <= 0) break;
-              $line = trim((string)$f->current());
-              if ($line !== '') break;
-              $f->seek(max(0, $idx-1));
-            }
-            if ($line && preg_match('/#(\d+)/', $line, $m)) {
-              $lastWorkedNodeId = (int)$m[1];
-              $lastWorkedDepth = $depthOf($lastWorkedNodeId);
-            }
+          if ($ideasRootId && $isUnder($id2, $ideasRootId)) {
+            $dd = $depthUnderRoot($id2, $ideasRootId);
+            if ($dd > $maxDepthIdeas) $maxDepthIdeas = $dd;
           }
-        } catch (Throwable $e) {
-          $lastWorkedNodeId = 0;
-          $lastWorkedDepth = 0;
-        }
-
-        $depthPct = 0;
-        if ($maxDepthProjects > 0 && $lastWorkedDepth > 0) {
-          $depthPct = max(0, min(100, (int)round(($lastWorkedDepth / $maxDepthProjects) * 100)));
         }
 
       ?>
@@ -1002,12 +977,27 @@ renderHeader('Dashboard');
                 <span class="pill dim"><?php echo count($cards[$col]); ?></span>
               </h3>
 
-              <?php if ($depthPct > 0): ?>
-                <div title="Letzter Worker-Task: Tiefe <?php echo (int)$lastWorkedDepth; ?> / <?php echo (int)$maxDepthProjects; ?> (#<?php echo (int)$lastWorkedNodeId; ?>)" style="height:8px; border-radius:999px; background:rgba(255,255,255,0.08); overflow:hidden; margin:6px 0 10px 0;">
-                  <div style="height:100%; width:<?php echo (int)$depthPct; ?>%; background:linear-gradient(90deg, rgba(120,255,170,0.9), rgba(255,200,90,0.9), rgba(255,120,120,0.95));"></div>
+              <?php
+                $top = $cards[$col][0] ?? null;
+                $topId = $top ? (int)$top['id'] : 0;
+                $topSec = $top ? (string)$top['section'] : '';
+
+                $rootId = 0;
+                $maxD = 0;
+                if ($topSec === 'Projekte') { $rootId = $projectsRootId; $maxD = $maxDepthProjects; }
+                if ($topSec === 'Ideen') { $rootId = $ideasRootId; $maxD = $maxDepthIdeas; }
+
+                $curDepth = ($rootId && $topId) ? $depthUnderRoot($topId, $rootId) : 0;
+                $pct = ($maxD > 0 && $curDepth > 0) ? max(0, min(100, (int)round(($curDepth / $maxD) * 100))) : 0;
+                $tt = $topId ? ('Top-Task: Tiefe ' . $curDepth . ' / ' . $maxD . ' (#' . $topId . ')') : '—';
+              ?>
+
+              <?php if ($pct > 0): ?>
+                <div title="<?php echo h($tt); ?>" style="height:8px; border-radius:999px; background:rgba(255,255,255,0.08); overflow:hidden; margin:6px 0 10px 0;">
+                  <div style="height:100%; width:<?php echo (int)$pct; ?>%; background:linear-gradient(90deg, rgba(120,255,170,0.9), rgba(255,200,90,0.9), rgba(255,120,120,0.95));"></div>
                 </div>
               <?php else: ?>
-                <div style="height:8px; border-radius:999px; background:rgba(255,255,255,0.05); margin:6px 0 10px 0;"></div>
+                <div title="<?php echo h($tt); ?>" style="height:8px; border-radius:999px; background:rgba(255,255,255,0.05); margin:6px 0 10px 0;"></div>
               <?php endif; ?>
 
               <?php if (empty($cards[$col])): ?>
