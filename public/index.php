@@ -121,9 +121,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $st->execute([$parentId, $title, $desc, null, 'oliver', 'todo_oliver']);
       $newId = (int)$pdo->lastInsertId();
 
-      // also append a short line into parent description
-      $st = $pdo->prepare('UPDATE nodes SET description=CONCAT(COALESCE(description,\'\'), ?) WHERE id=?');
-      $st->execute(["\n\n[oliver] {$ts} Subtask angelegt: {$title}", $parentId]);
+      // also prepend a short line into parent description (newest first)
+      $st = $pdo->prepare('UPDATE nodes SET description=CONCAT(?, COALESCE(description,\'\')) WHERE id=?');
+      $st->execute(["[oliver] {$ts} Subtask angelegt: {$title}\n\n", $parentId]);
 
       flash_set('Subtask angelegt.', 'info');
       header('Location: /?id=' . $newId);
@@ -139,17 +139,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $st = $pdo->prepare('UPDATE nodes SET worker_status=? WHERE id=?');
       $st->execute([$worker, $nid]);
 
-      // append change into description
+      // prepend change into description (newest first)
       $ts = date('d.m.Y H:i');
-      $pdo->prepare('UPDATE nodes SET description=CONCAT(COALESCE(description,\'\'), ?) WHERE id=?')
-          ->execute(["\n\n[oliver] {$ts} Statusänderung: {$worker}", $nid]);
+      $pdo->prepare('UPDATE nodes SET description=CONCAT(?, COALESCE(description,\'\')) WHERE id=?')
+          ->execute(["[oliver] {$ts} Statusänderung: {$worker}\n\n", $nid]);
 
       // delegation rule: if delegating to James, cascade todo_oliver descendants to todo_james
       if ($worker === 'todo_james') {
         $moved = propagateDelegation($pdo, $nid, 'todo_oliver', 'todo_james');
         if ($moved > 0) {
-          $pdo->prepare('UPDATE nodes SET description=CONCAT(COALESCE(description,\'\'), ?) WHERE id=?')
-              ->execute(["\n\n[oliver] {$ts} Delegation: {$moved} Subtasks zu James", $nid]);
+          $pdo->prepare('UPDATE nodes SET description=CONCAT(?, COALESCE(description,\'\')) WHERE id=?')
+              ->execute(["[oliver] {$ts} Delegation: {$moved} Subtasks zu James\n\n", $nid]);
         }
       }
 
@@ -157,8 +157,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if ($worker === 'done') {
         $nDone = propagateStatusAllDescendants($pdo, $nid, 'done');
         if ($nDone > 0) {
-          $pdo->prepare('UPDATE nodes SET description=CONCAT(COALESCE(description,\'\'), ?) WHERE id=?')
-              ->execute(["\n\n[oliver] {$ts} Done: {$nDone} Subtasks erledigt", $nid]);
+          $pdo->prepare('UPDATE nodes SET description=CONCAT(?, COALESCE(description,\'\')) WHERE id=?')
+              ->execute(["[oliver] {$ts} Done: {$nDone} Subtasks erledigt\n\n", $nid]);
         }
       }
 

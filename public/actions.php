@@ -72,8 +72,8 @@ if ($action === 'set_later') {
   $pdo->prepare('UPDATE nodes SET parent_id=?, worker_status="done" WHERE id=?')->execute([$spId ?: null, $nodeId]);
   $n = propagateDone($pdo, $nodeId);
   $ts = date('d.m.Y H:i');
-  $line = "\n\n[oliver] {$ts} Statusänderung: done (verschoben nach Später; Descendants: {$n})";
-  $pdo->prepare('UPDATE nodes SET description=CONCAT(COALESCE(description,\'\'), ?) WHERE id=?')->execute([$line, $nodeId]);
+  $line = "[oliver] {$ts} Statusänderung: done (verschoben nach Später; Descendants: {$n})\n\n";
+  $pdo->prepare('UPDATE nodes SET description=CONCAT(?, COALESCE(description,\'\')) WHERE id=?')->execute([$line, $nodeId]);
   flash_set('Auf später gesetzt (erledigt) & verschoben.', 'info');
   header('Location: /?id=' . ($spId ?: $nodeId));
   exit;
@@ -105,8 +105,8 @@ if ($action === 'set_active') {
   if ($moveToProjects && $projId) {
     $pdo->prepare('UPDATE nodes SET parent_id=?, worker_status="todo_james" WHERE id=?')->execute([$projId, $nodeId]);
     $ts = date('d.m.Y H:i');
-    $line = "\n\n[oliver] {$ts} Statusänderung: todo_james (aktiviert; nach Projekte verschoben)";
-    $pdo->prepare('UPDATE nodes SET description=CONCAT(COALESCE(description,\'\'), ?) WHERE id=?')->execute([$line, $nodeId]);
+    $line = "[oliver] {$ts} Statusänderung: todo_james (aktiviert; nach Projekte verschoben)\n\n";
+    $pdo->prepare('UPDATE nodes SET description=CONCAT(?, COALESCE(description,\'\')) WHERE id=?')->execute([$line, $nodeId]);
     flash_set('Aktiviert: nach Projekte verschoben (James).', 'info');
     header('Location: /?id=' . $nodeId);
     exit;
@@ -114,8 +114,8 @@ if ($action === 'set_active') {
 
   $pdo->prepare('UPDATE nodes SET worker_status="todo_james" WHERE id=?')->execute([$nodeId]);
   $ts = date('d.m.Y H:i');
-  $line = "\n\n[oliver] {$ts} Statusänderung: todo_james (aktiviert)";
-  $pdo->prepare('UPDATE nodes SET description=CONCAT(COALESCE(description,\'\'), ?) WHERE id=?')->execute([$line, $nodeId]);
+  $line = "[oliver] {$ts} Statusänderung: todo_james (aktiviert)\n\n";
+  $pdo->prepare('UPDATE nodes SET description=CONCAT(?, COALESCE(description,\'\')) WHERE id=?')->execute([$line, $nodeId]);
   flash_set('Aktiviert (James).', 'info');
   header('Location: /?id=' . $nodeId);
   exit;
@@ -177,8 +177,8 @@ if ($action === 'remove_recursive') {
     moveSubtreeRoot($pdo, $nodeId, $deletedRootId);
     $pdo->prepare('UPDATE nodes SET worker_status="done" WHERE id=?')->execute([$nodeId]);
     $ts = date('d.m.Y H:i');
-    $line = "\n\n[oliver] {$ts} Statusänderung: done (nach Gelöscht verschoben; Subtree behalten)";
-    $pdo->prepare('UPDATE nodes SET description=CONCAT(COALESCE(description,\'\'), ?) WHERE id=?')->execute([$line, $nodeId]);
+    $line = "[oliver] {$ts} Statusänderung: done (nach Gelöscht verschoben; Subtree behalten)\n\n";
+    $pdo->prepare('UPDATE nodes SET description=CONCAT(?, COALESCE(description,\'\')) WHERE id=?')->execute([$line, $nodeId]);
     $pdo->commit();
   } catch (Throwable $e) {
     $pdo->rollBack();
