@@ -633,6 +633,7 @@ renderHeader('Dashboard');
         $cards = [
           'todo_oliver' => [],
           'todo_james' => [],
+          'blocked' => [],
           'done' => [],
         ];
 
@@ -646,6 +647,16 @@ renderHeader('Dashboard');
           if (!($isUnder($id, $ideasRootId) || $isUnder($id, $projectsRootId))) continue;
 
           $st = (string)($n['worker_status'] ?? '');
+
+          // route blocked James tasks into a separate kanban column
+          if ($st === 'todo_james') {
+            $blockedUntil = (string)($n['blocked_until'] ?? '');
+            $blockedBy = (int)($n['blocked_by_node_id'] ?? 0);
+            $isBlockedUntil = ($blockedUntil !== '' && strtotime($blockedUntil) && strtotime($blockedUntil) > time());
+            $isBlockedBy = ($blockedBy > 0);
+            if ($isBlockedUntil || $isBlockedBy) $st = 'blocked';
+          }
+
           if (!isset($cards[$st])) continue;
 
           $sec = (string)($sectionByIdAll[$id] ?? '');
@@ -673,6 +684,7 @@ renderHeader('Dashboard');
         $colTitle = [
           'todo_oliver' => 'ToDo (Oliver)',
           'todo_james' => 'ToDo (James)',
+          'blocked' => 'BLOCKED',
           'done' => 'Done',
         ];
       ?>
@@ -680,7 +692,7 @@ renderHeader('Dashboard');
       <div class="card">
         <h2 style="margin-bottom:10px">Kanban (Leafs: Ideen + Projekte)</h2>
         <div class="kanban">
-          <?php foreach (['todo_oliver','todo_james','done'] as $col): ?>
+          <?php foreach (['todo_oliver','todo_james','blocked','done'] as $col): ?>
             <div class="kanban-col">
               <h3>
                 <span><?php echo h($colTitle[$col]); ?></span>

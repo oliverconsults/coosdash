@@ -2,7 +2,7 @@
 require_once __DIR__ . '/../public/functions.inc.php';
 
 $pdo = db();
-$rows = $pdo->query("SELECT id,parent_id,title,worker_status,description,created_at FROM nodes ORDER BY id")->fetchAll();
+$rows = $pdo->query("SELECT id,parent_id,title,worker_status,description,created_at,blocked_until,blocked_by_node_id FROM nodes ORDER BY id")->fetchAll();
 
 $byId = [];
 $children = [];
@@ -37,6 +37,14 @@ while ($stack) {
   }
 }
 
+$isBlocked = function(array $n): bool {
+  $bu = (string)($n['blocked_until'] ?? '');
+  $bb = (int)($n['blocked_by_node_id'] ?? 0);
+  if ($bb > 0) return true;
+  if ($bu !== '' && strtotime($bu) && strtotime($bu) > time()) return true;
+  return false;
+};
+
 $maxDepth = -1;
 $cands = [];
 foreach ($depthById as $id => $d) {
@@ -45,6 +53,7 @@ foreach ($depthById as $id => $d) {
   if (!$n) continue;
   if (($n['worker_status'] ?? '') !== 'todo_james') continue;
   if (!empty($children[$id] ?? [])) continue; // leaf only
+  if ($isBlocked($n)) continue; // do not pick blocked tasks
 
   $maxDepth = max($maxDepth, $d);
   $cands[] = [
@@ -64,7 +73,7 @@ if (!$cands) {
 $cands = array_values(array_filter($cands, fn($c) => $c['depth'] === $maxDepth));
 
 // Parent-internal chronological gating: candidate must be the smallest-id todo_james leaf among its siblings
-$cands = array_values(array_filter($cands, function($c) use ($children, $byId) {
+$cands = array_values(array_filter($cands, function($c) use ($children, $byId, $isBlocked) {
   $pid = (int)$c['parent_id'];
   $sibIds = $children[$pid] ?? [];
 
@@ -76,6 +85,8 @@ $cands = array_values(array_filter($cands, function($c) use ($children, $byId) {
     if (($sn['worker_status'] ?? '') !== 'todo_james') continue;
     // only leaf siblings
     if (!empty($children[$sid] ?? [])) continue;
+    // ignore blocked siblings for the "oldest-first" rule
+    if ($isBlocked($sn)) continue;
     if ($min === null || $sid < $min) $min = $sid;
   }
   return $min === null ? true : ((int)$c['id'] === (int)$min);
