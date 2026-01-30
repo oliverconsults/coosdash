@@ -13,8 +13,20 @@ function attachments_allowed_exts(): array {
 function attachments_store_upload(PDO $pdo, int $nodeId, array $file, string $createdBy): ?array {
   if ($nodeId <= 0) return null;
   if (empty($file) || !isset($file['error'])) return null;
-  if ((int)$file['error'] === UPLOAD_ERR_NO_FILE) return null;
-  if ((int)$file['error'] !== UPLOAD_ERR_OK) return null;
+  $errCode = (int)$file['error'];
+  if ($errCode === UPLOAD_ERR_NO_FILE) return null;
+  if ($errCode !== UPLOAD_ERR_OK) {
+    $map = [
+      UPLOAD_ERR_INI_SIZE => 'Datei zu groß (PHP upload_max_filesize).',
+      UPLOAD_ERR_FORM_SIZE => 'Datei zu groß (Form-Limit).',
+      UPLOAD_ERR_PARTIAL => 'Upload unvollständig.',
+      UPLOAD_ERR_NO_TMP_DIR => 'Upload fehlgeschlagen (tmp dir fehlt).',
+      UPLOAD_ERR_CANT_WRITE => 'Upload fehlgeschlagen (cannot write).',
+      UPLOAD_ERR_EXTENSION => 'Upload blockiert (PHP extension).',
+    ];
+    $msg = $map[$errCode] ?? ('Upload fehlgeschlagen (code ' . $errCode . ').');
+    return ['err' => $msg];
+  }
 
   $orig = (string)($file['name'] ?? '');
   $orig = trim($orig);
