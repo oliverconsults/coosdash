@@ -1005,9 +1005,6 @@ renderHeader('Dashboard');
               <?php if (empty($cards[$col])): ?>
                 <div class="meta" style="padding:8px 2px;">—</div>
               <?php else: ?>
-                <?php if (count($cards[$col]) > 20): ?>
-                  <div class="meta" style="margin:-4px 0 8px 0;">zeige 20 / <?php echo count($cards[$col]); ?></div>
-                <?php endif; ?>
                 <?php foreach (array_slice($cards[$col], 0, 20) as $c): ?>
                   <a class="kanban-card" href="/?id=<?php echo (int)$c['id']; ?>">
                     <div class="kanban-title"><?php echo h($c['title']); ?><?php if (!empty($c['has_att'])): ?> <span class="att-clip" title="Attachment">📁</span><?php endif; ?></div>
