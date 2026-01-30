@@ -436,7 +436,7 @@ renderHeader('Dashboard');
     <div style="height:10px"></div>
 
     <div class="tree">
-      <?php renderTree($byParent, $byId, $sectionByIdAll, $open, (int)$nodeId, $attCountById, 0, 0); ?>
+      <?php renderTree($byParent, $byId, $sectionByIdAll, $open, $attCountById, (int)$nodeId, 0, 0); ?>
     </div>
   </div>
 
