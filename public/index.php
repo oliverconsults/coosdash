@@ -167,6 +167,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $worker = (string)($_POST['worker_status'] ?? '');
     $allowed = ['todo_james','todo_oliver','done'];
     if ($nid && in_array($worker, $allowed, true)) {
+      // No-op guard: if status is unchanged, don't spam description/workerlog
+      $stCur = $pdo->prepare('SELECT worker_status FROM nodes WHERE id=?');
+      $stCur->execute([$nid]);
+      $cur = $stCur->fetch();
+      $curStatus = (string)($cur['worker_status'] ?? '');
+      if ($curStatus === $worker) {
+        flash_set('Status unverändert.', 'info');
+        header('Location: /?id=' . $nid);
+        exit;
+      }
+
       $st = $pdo->prepare('UPDATE nodes SET worker_status=? WHERE id=?');
       $st->execute([$worker, $nid]);
 
