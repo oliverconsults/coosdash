@@ -73,7 +73,11 @@ Wenn etwas fehlt: lege **1–4** neue Subtasks **unter demselben Parent‑Projek
      `[james] dd.mm.yyyy HH:MM Update: <kurz>\n\n<Details>\n\n`
    - Wenn du **Artefakte** erzeugst (PDF/CSV/Screenshot/Doc etc.):
      - lege sie als **Attachment** ab (tokenisierte URL) und verlinke sie im Node.
-     - Helper: `php /var/www/coosdash/current/scripts/add_attachment.php <node_id> /abs/path/to/file [display_name]`
+     - Erlaubte Dateitypen: **url, doc/docx, img (png/jpg/webp/gif), pdf, excel (xls/xlsx), csv, ppt/pptx, txt, zip**.
+     - Preferred: **url, doc, img, pdf, excel**.
+     - Helper:
+       - File: `php /var/www/coosdash/current/scripts/add_attachment.php <node_id> /abs/path/to/file [display_name]`
+       - URL:  `php /var/www/coosdash/current/scripts/add_attachment.php <node_id> https://example.com "result.url"`
      - Das erzeugt einen Link wie `/att/<token>/<file>` und zeigt ihn im UI unter „Attachments“.
    - Danach: done **oder** 4–6 Subtasks **oder** Blocker setzen.
 6) Wenn done: Hygiene‑Check anwenden.

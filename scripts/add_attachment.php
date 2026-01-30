@@ -15,8 +15,10 @@ $nodeId = (int)($argv[1] ?? 0);
 $src = (string)($argv[2] ?? '');
 $displayName = (string)($argv[3] ?? '');
 
-if ($nodeId <= 0 || $src === '' || !is_file($src)) {
-  fwrite(STDERR, "Usage: php add_attachment.php <node_id> /abs/path/to/file [display_name]\n");
+$isUrl = (bool)preg_match('~^https?://~i', $src);
+
+if ($nodeId <= 0 || $src === '' || (!$isUrl && !is_file($src))) {
+  fwrite(STDERR, "Usage: php add_attachment.php <node_id> /abs/path/to/file|https://url [display_name]\n");
   exit(1);
 }
 
@@ -28,11 +30,31 @@ if (!$st->fetch()) {
   exit(1);
 }
 
-$orig = ($displayName !== '' ? $displayName : basename($src));
+$orig = ($displayName !== '' ? $displayName : ($isUrl ? $src : basename($src)));
+
+// Allowed extensions (preferred: url, doc, img, pdf, excel)
+$allowedExt = [
+  'url','pdf','png','jpg','jpeg','webp','gif','doc','docx','xls','xlsx','csv','txt','ppt','pptx','zip'
+];
+
 // sanitize filename
 $stored = preg_replace('/[^A-Za-z0-9._-]+/', '_', $orig);
 $stored = trim($stored, '._');
-if ($stored === '') $stored = 'file';
+if ($stored === '') $stored = ($isUrl ? 'link.url' : 'file');
+
+$ext = strtolower(pathinfo($stored, PATHINFO_EXTENSION));
+if ($isUrl) {
+  // For URL attachments we publish a small HTML redirect under a token URL.
+  // UI label stays .url (orig_name), stored file becomes .html.
+  if ($ext !== 'url') $stored .= '.url';
+  $stored = preg_replace('/\.url$/i', '.html', $stored);
+  $ext = 'html';
+} else {
+  if ($ext !== '' && !in_array($ext, $allowedExt, true)) {
+    fwrite(STDERR, "Disallowed file type: .{$ext}\nAllowed: " . implode(',', $allowedExt) . "\n");
+    exit(1);
+  }
+}
 
 $token = bin2hex(random_bytes(16));
 $baseDir = '/var/www/coosdash/shared/att';
@@ -43,22 +65,42 @@ if (!is_dir($destDir) && !mkdir($destDir, 0775, true)) {
 }
 
 $dest = $destDir . '/' . $stored;
-if (!copy($src, $dest)) {
-  fwrite(STDERR, "Copy failed: {$src} -> {$dest}\n");
-  exit(1);
-}
-@chmod($dest, 0664);
 
-$mime = null;
-if (function_exists('mime_content_type')) {
-  $m = @mime_content_type($dest);
-  if (is_string($m) && $m !== '') $mime = $m;
+if ($isUrl) {
+  $targetUrl = $src;
+  $html = "<!doctype html><meta charset=\"utf-8\"><title>Redirect</title>\n" .
+          "<meta http-equiv=\"refresh\" content=\"0; url=" . htmlspecialchars($targetUrl, ENT_QUOTES) . "\">\n" .
+          "<p>Redirecting to <a href=\"" . htmlspecialchars($targetUrl, ENT_QUOTES) . "\">" . htmlspecialchars($targetUrl) . "</a></p>\n";
+  if (file_put_contents($dest, $html) === false) {
+    fwrite(STDERR, "Write failed: {$dest}\n");
+    exit(1);
+  }
+  @chmod($dest, 0664);
+  $mime = 'text/html';
+  $size = @filesize($dest);
+  if ($size === false) $size = null;
+} else {
+  if (!copy($src, $dest)) {
+    fwrite(STDERR, "Copy failed: {$src} -> {$dest}\n");
+    exit(1);
+  }
+  @chmod($dest, 0664);
+
+  $mime = null;
+  if (function_exists('mime_content_type')) {
+    $m = @mime_content_type($dest);
+    if (is_string($m) && $m !== '') $mime = $m;
+  }
+  $size = @filesize($dest);
+  if ($size === false) $size = null;
 }
-$size = @filesize($dest);
-if ($size === false) $size = null;
+
+// If URL attachment: display as *.url in UI
+$origForDb = $orig;
+if ($isUrl && !preg_match('/\.url$/i', $origForDb)) $origForDb = $origForDb . '.url';
 
 $pdo->prepare('INSERT INTO node_attachments (node_id, token, orig_name, stored_name, mime, size_bytes, created_by) VALUES (?,?,?,?,?,?,\'james\')')
-    ->execute([$nodeId, $token, $orig, $stored, $mime, $size]);
+    ->execute([$nodeId, $token, $origForDb, $stored, $mime, $size]);
 
 // also prepend a short line into description (optional but nice)
 $ts = date('d.m.Y H:i');

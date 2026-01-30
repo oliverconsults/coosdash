@@ -186,6 +186,15 @@ foreach ($allNodes as $n) {
 
 $sectionByIdAll = buildSectionMap($byParentAll, 0, '');
 
+// attachment counts (for tree icons)
+$attCountById = [];
+try {
+  $st = $pdo->query('SELECT node_id, COUNT(*) AS c FROM node_attachments GROUP BY node_id');
+  foreach ($st->fetchAll() as $r) $attCountById[(int)$r['node_id']] = (int)$r['c'];
+} catch (Throwable $e) {
+  $attCountById = [];
+}
+
 // optional search: filter tree to only paths that match notes/titles
 $q = trim((string)($_GET['q'] ?? ''));
 $byParent = $byParentAll;
@@ -285,7 +294,7 @@ function subtreeCounts(array $byParent, array $byId, int $id, array &$memo): arr
   return $memo[$id] = [$todo, $done];
 }
 
-function renderTree(array $byParent, array $byId, array $sectionByIdAll, array $open, int $currentId, int $parentId=0, int $depth=0, array $prefix=[], array &$countsMemo=[]): void {
+function renderTree(array $byParent, array $byId, array $sectionByIdAll, array $open, array $attCountById, int $currentId, int $parentId=0, int $depth=0, array $prefix=[], array &$countsMemo=[]): void {
   if (empty($byParent[$parentId])) return;
 
   $i = 0;
@@ -342,6 +351,9 @@ function renderTree(array $byParent, array $byId, array $sectionByIdAll, array $
     if ($sec === 'Gelöscht') $msClass = ' ms-canceled';
     if ($sec === 'Später') $msClass = ' ms-later';
 
+    $hasAtt = !empty($attCountById[$id]);
+    $attIcon = $hasAtt ? ' <span class="meta" title="Attachment" style="margin-left:4px;">📎</span>' : '';
+
     if ($hasKids) {
       $forceOpenAll = (!empty($_GET['open']) && $_GET['open'] === 'all') || !empty($_GET['q']);
       // Default: collapsed. Open only when forced (search/open-all) or when the node is active / on the open-path to the current selection.
@@ -354,11 +366,11 @@ function renderTree(array $byParent, array $byId, array $sectionByIdAll, array $
       echo '<a href="/?id=' . $id . '" style="display:flex;align-items:center;gap:0;">'
         . '<span style="color:' . $col . ';">' . h($num) . '</span>'
         . '&nbsp;'
-        . '<span style="color:' . $col . ';">' . h($title) . h($countTxt) . '</span>'
+        . '<span style="color:' . $col . ';">' . h($title) . h($countTxt) . $attIcon . '</span>'
         . '</a>';
       if ($statusText !== '') echo '<span class="tag" style="margin-left:auto">' . h($statusText) . '</span>';
       echo '</summary>';
-      renderTree($byParent, $byId, $sectionByIdAll, $open, $currentId, $id, $depth+1, $numParts, $countsMemo);
+      renderTree($byParent, $byId, $sectionByIdAll, $open, $attCountById, $currentId, $id, $depth+1, $numParts, $countsMemo);
       echo '</details>';
     } else {
       echo '<div class="tree-leaf">';
@@ -366,7 +378,7 @@ function renderTree(array $byParent, array $byId, array $sectionByIdAll, array $
       echo '<a href="/?id=' . $id . '" style="display:flex;align-items:center;gap:0;">'
         . '<span style="color:' . $col . ';">' . h($num) . '</span>'
         . '&nbsp;'
-        . '<span style="color:' . $col . ';">' . h($title) . h($countTxt) . '</span>'
+        . '<span style="color:' . $col . ';">' . h($title) . h($countTxt) . $attIcon . '</span>'
         . '</a>';
       if ($statusText !== '') echo '<span class="tag" style="margin-left:auto">' . h($statusText) . '</span>';
       echo '</div></div>';
@@ -424,7 +436,7 @@ renderHeader('Dashboard');
     <div style="height:10px"></div>
 
     <div class="tree">
-      <?php renderTree($byParent, $byId, $sectionByIdAll, $open, (int)$nodeId, 0, 0); ?>
+      <?php renderTree($byParent, $byId, $sectionByIdAll, $open, (int)$nodeId, $attCountById, 0, 0); ?>
     </div>
   </div>
 
@@ -613,6 +625,8 @@ renderHeader('Dashboard');
                     if ($szTxt !== '') $meta[] = $szTxt;
                     if ($cts) $meta[] = date('d.m.Y H:i', $cts);
                     $metaTxt = $meta ? (' • ' . implode(' • ', $meta)) : '';
+                    $uploader = (string)($a['created_by'] ?? '');
+                    if ($uploader !== '') $metaTxt .= ($metaTxt !== '' ? ' • ' : ' • ') . 'von ' . $uploader;
                   ?>
                   <li>
                     <a href="<?php echo h($url); ?>" target="_blank" rel="noopener"><?php echo h($orig); ?></a>
