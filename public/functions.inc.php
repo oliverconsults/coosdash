@@ -197,7 +197,11 @@ function renderHeader(string $title='COOS'): void {
           <?php if (isLoggedIn()): ?>
             <a class="btn" href="/">Dashboard</a>
             <?php $jOn = james_enabled(); ?>
-            <a class="btn <?php echo $jOn ? 'btn-gold' : ''; ?>" href="/james.php?toggle=1"><?php echo $jOn ? 'James aktiv' : 'James sleeps'; ?></a>
+            <?php $jIcon = $jOn ? '/img/james_active.gif' : '/img/james_sleep.png'; ?>
+            <a class="btn <?php echo $jOn ? 'btn-gold' : ''; ?>" href="/james.php?toggle=1" style="display:flex; align-items:center; gap:8px;">
+              <img src="<?php echo h($jIcon); ?>" alt="James" width="18" height="18" style="display:block; border-radius:4px;">
+              <span><?php echo $jOn ? 'James aktiv' : 'James sleeps'; ?></span>
+            </a>
             <a class="btn" href="/workerlog.php">Worker Log</a>
             <a class="btn" href="/logout.php">Logout</a>
           <?php endif; ?>
