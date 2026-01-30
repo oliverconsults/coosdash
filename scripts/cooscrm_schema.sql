@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS nodes (
   type ENUM('idea','project','task','research') NOT NULL DEFAULT 'idea',
   status ENUM('new','accepted','deferred','rejected','active','done') NOT NULL DEFAULT 'new',
 
-  title VARCHAR(255) NOT NULL,
+  title VARCHAR(40) NOT NULL,
   description TEXT NULL,
 
   priority TINYINT NULL,

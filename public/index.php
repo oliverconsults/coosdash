@@ -112,6 +112,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       flash_set('Titel für Subtask bitte eingeben.', 'err');
     } elseif ($body === '') {
       flash_set('Beschreibung für Subtask bitte eingeben.', 'err');
+    } elseif (mb_strlen($title) > 40) {
+      flash_set('Titel darf max. 40 Zeichen haben.', 'err');
     } else {
       $ts = date('d.m.Y H:i');
       // Put newest status at the top (not the bottom)
@@ -563,7 +565,7 @@ renderHeader('Dashboard');
           <input type="hidden" name="parent_id" value="<?php echo (int)$node['id']; ?>">
 
           <label>Neuen Subtask anlegen: <span class="meta">Titel</span></label>
-          <input name="title" placeholder="max. 3–4 Wörter" required>
+          <input name="title" placeholder="max. 3–4 Wörter" required maxlength="40">
 
           <label>Beschreibung</label>
           <textarea name="description" required></textarea>
