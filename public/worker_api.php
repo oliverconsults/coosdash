@@ -60,8 +60,31 @@ if ($action === 'job_done') {
 if ($action === 'job_fail') {
   if ($jobId <= 0) out(false, 'missing job_id');
   $reason = trim((string)($_REQUEST['reason'] ?? ''));
+
+  // increment fail_count
   $pdo->prepare("UPDATE worker_queue SET status='failed', fail_count=fail_count+1 WHERE id=?")->execute([$jobId]);
-  out(true, 'job failed', ['reason'=>$reason]);
+
+  $st = $pdo->prepare('SELECT node_id, fail_count FROM worker_queue WHERE id=?');
+  $st->execute([$jobId]);
+  $j = $st->fetch();
+  $nid = $j ? (int)$j['node_id'] : 0;
+  $fc = $j ? (int)$j['fail_count'] : 0;
+
+  // after 3 fails: block node (shows up in BLOCKED column)
+  if ($nid > 0 && $fc >= 3) {
+    $until = date('Y-m-d H:i:00', time() + 24*3600);
+    $pdo->prepare('UPDATE nodes SET blocked_until=? WHERE id=?')->execute([$until, $nid]);
+    $tsH = date('d.m.Y H:i');
+    $line = "[auto] {$tsH} Blocked nach {$fc} Fails";
+    if ($reason !== '') $line .= ": {$reason}";
+    $line .= "\n\n";
+    prependDesc($pdo, $nid, $line);
+    logLine(date('Y-m-d H:i:s') . "  #{$nid}  {$line}");
+
+    $pdo->prepare("UPDATE worker_queue SET status='blocked' WHERE id=?")->execute([$jobId]);
+  }
+
+  out(true, 'job failed', ['reason'=>$reason,'fail_count'=>$fc,'node_id'=>$nid]);
 }
 
 // Node ops
