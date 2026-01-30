@@ -2,7 +2,7 @@
 // Worker API (server-side writes) – to keep LLM away from raw SQL.
 // Used by the upcoming queue consumer.
 
-require_once __DIR__ . '/functions_v2.inc.php';
+require_once __DIR__ . '/functions_v3.inc.php';
 
 $pdo = db();
 $action = (string)($_REQUEST['action'] ?? '');
