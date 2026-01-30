@@ -37,11 +37,20 @@ while ($stack) {
   }
 }
 
-$isBlocked = function(array $n): bool {
+$isBlocked = function(array $n) use ($byId): bool {
   $bu = (string)($n['blocked_until'] ?? '');
   $bb = (int)($n['blocked_by_node_id'] ?? 0);
-  if ($bb > 0) return true;
+
+  // time-based block
   if ($bu !== '' && strtotime($bu) && strtotime($bu) > time()) return true;
+
+  // dependency-based block: only if blocker exists and is NOT done
+  if ($bb > 0) {
+    $bn = $byId[$bb] ?? null;
+    if (!$bn) return true;
+    return (string)($bn['worker_status'] ?? '') !== 'done';
+  }
+
   return false;
 };
 
