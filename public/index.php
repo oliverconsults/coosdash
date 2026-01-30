@@ -450,7 +450,11 @@ renderHeader('Dashboard');
           ?>
           <span class="tag gold"><?php echo h($statusLabel); ?></span>
         </div>
-        <div class="meta">#<?php echo (int)$node['id']; ?> • created_by=<?php echo h($node['created_by']); ?></div>
+        <?php $createdTs = strtotime((string)($node['created_at'] ?? '')); ?>
+        <div class="meta">
+          #<?php echo (int)$node['id']; ?> • erstellt von <?php echo h($node['created_by']); ?>
+          <?php if ($createdTs): ?> am <?php echo h(date('d.m.Y H:i', $createdTs)); ?><?php endif; ?>
+        </div>
 
         <?php
           $blockedUntil = (string)($node['blocked_until'] ?? '');
