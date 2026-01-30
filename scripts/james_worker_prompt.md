@@ -73,7 +73,7 @@ Wenn etwas fehlt: lege **1–4** neue Subtasks **unter demselben Parent‑Projek
      `[james] dd.mm.yyyy HH:MM Update: <kurz>\n\n<Details>\n\n`
    - Wenn du **Artefakte** erzeugst (PDF/CSV/Screenshot/Doc etc.):
      - lege sie als **Attachment** ab (tokenisierte URL) und verlinke sie im Node.
-     - Erlaubte Dateitypen: **url, doc/docx, img (png/jpg/webp/gif), pdf, excel (xls/xlsx), csv, ppt/pptx, txt, zip**.
+     - Erlaubte Dateitypen: **url, doc/docx, img (png/jpg/webp/gif), pdf, excel (xls/xlsx), csv, ppt/pptx, txt, zip, html, md, json, yml, sql, php**.
      - Preferred: **url, doc, img, pdf, excel**.
      - Helper:
        - File: `php /var/www/coosdash/current/scripts/add_attachment.php <node_id> /abs/path/to/file [display_name]`

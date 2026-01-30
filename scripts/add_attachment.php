@@ -33,8 +33,14 @@ if (!$st->fetch()) {
 $orig = ($displayName !== '' ? $displayName : ($isUrl ? $src : basename($src)));
 
 // Allowed extensions (preferred: url, doc, img, pdf, excel)
+// NOTE: We allow code-like types too (php/sql/json/etc.) because Oliver wants the raw artifacts.
 $allowedExt = [
-  'url','pdf','png','jpg','jpeg','webp','gif','doc','docx','xls','xlsx','csv','txt','ppt','pptx','zip'
+  // preferred
+  'url','pdf','png','jpg','jpeg','webp','gif','doc','docx','xls','xlsx',
+  // common
+  'csv','txt','ppt','pptx','zip','html','htm','md','json','xml','yml','yaml','sql',
+  // code (served via attdl.php download handler; never executed)
+  'php','js','py','sh'
 ];
 
 // sanitize filename
