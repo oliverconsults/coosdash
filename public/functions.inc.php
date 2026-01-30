@@ -113,7 +113,7 @@ function renderHeader(string $title='COOS'): void {
       .tree-branch{padding-left:0;border-left:1px dashed rgba(212,175,55,.18)}
       .tree-leaf{padding-left:0}
       .tag{display:inline-block;font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid rgba(212,175,55,.22);color:var(--muted)}
-      .kanban{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+      .kanban{display:grid;grid-template-columns:repeat(4,260px);gap:12px;overflow-x:auto;padding-bottom:6px;justify-content:start}
       .kanban-col{background:rgba(5,7,11,.22);border:1px solid rgba(212,175,55,.14);border-radius:14px;padding:10px}
       .kanban-col h3{margin:0 0 10px 0;font-size:12px;letter-spacing:.04em;color:var(--muted);text-transform:uppercase;display:flex;justify-content:space-between;align-items:center}
       .kanban-card{display:block;padding:10px 10px;border-radius:12px;border:1px solid rgba(212,175,55,.18);background:linear-gradient(180deg, rgba(212,175,55,.10) 0%, rgba(15,22,35,.62) 55%, rgba(8,12,18,.75) 100%);color:var(--text)}
