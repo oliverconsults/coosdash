@@ -671,6 +671,7 @@ renderHeader('Dashboard');
             <textarea class="task-note" name="description" required><?php echo h((string)($node['description'] ?? '')); ?></textarea>
 
             <div class="row" style="margin-top:10px; align-items:center;">
+              <span class="meta">Anhang optional:</span>
               <input type="file" name="attachment" accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt" style="width:auto; max-width:380px">
               <button class="btn btn-gold" type="submit">Speichern</button>
             </div>
@@ -690,6 +691,7 @@ renderHeader('Dashboard');
           <textarea name="description" required></textarea>
 
           <div class="row" style="margin-top:10px; align-items:center;">
+            <span class="meta">Anhang optional:</span>
             <input type="file" name="attachment" accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt" style="width:auto; max-width:380px">
             <button class="btn btn-gold" type="submit">Absenden</button>
           </div>
