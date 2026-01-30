@@ -143,6 +143,13 @@ if ($action === 'set_status') {
   $st = (string)($_REQUEST['worker_status'] ?? '');
   $allowed = ['todo_james','todo_oliver','done'];
   if (!in_array($st, $allowed, true)) out(false, 'invalid worker_status');
+
+  // No-op guard: don't spam description/log if unchanged
+  $curStatus = (string)($node['worker_status'] ?? '');
+  if ($curStatus === $st) {
+    out(true, 'status unchanged');
+  }
+
   $pdo->prepare('UPDATE nodes SET worker_status=? WHERE id=?')->execute([$st, $nodeId]);
   $line = "[james] {$ts} Statusänderung: {$st}\n\n";
   prependDesc($pdo, $nodeId, $line);
