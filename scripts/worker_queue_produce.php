@@ -110,6 +110,7 @@ $prompt .= "\nErwartetes Ergebnis (wähle genau eins):\n";
 $prompt .= "A) FERTIG: prepend_update + add_attachment(s) (falls vorhanden) + set_status done + job_done\n";
 $prompt .= "B) ZERLEGT: add_children (4–6) + prepend_update (Plan) + job_done\n";
 $prompt .= "C) BLOCKIERT: set_blocked_until ODER set_blocked_by + prepend_update (Begründung) + job_done\n";
+$prompt .= "D) FRAGE AN OLIVER (Delegation): prepend_update (konkrete Frage + was du brauchst) + set_status todo_oliver + job_done\n";
 
 $prompt .= "\nAttachment-Regel:\n";
 $prompt .= "- Wenn du irgendeine Datei erzeugst (PDF/CSV/JSON/TXT/etc.): IMMER via add_attachment anhängen und im Update nur den Attachment-Link referenzieren (keine Serverpfade).\n";
@@ -129,6 +130,8 @@ $prompt .= "- Neue Task-Titel <= 40 Zeichen.\n";
 
 $prompt .= "\nRegeln:\n";
 $prompt .= "- Vor done immer Runs/Ergebnis verifizieren.\n";
+$prompt .= "- WICHTIG: Sobald du set_status todo_oliver setzt (Delegation an Oliver), ist der Job für dich beendet: KEINE weiteren Aktionen wie add_children / set_blocked_* / attachments danach. Direkt job_done.\n";
+$prompt .= "- Wenn dir Info fehlt: nutze D) FRAGE AN OLIVER (Delegation).\n";
 $prompt .= "- Wenn du nicht weiterkommst: job_fail mit kurzem Grund. Nach 3 fails blockt das System den Task.\n";
 $prompt .= "- Tool-KB: Wenn du ein Tool erfolgreich nutzt/installierst: /home/deploy/clawd/TOOLS.md + /home/deploy/clawd/tools/<tool>.md kurz updaten.\n";
 

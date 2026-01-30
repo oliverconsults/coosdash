@@ -187,6 +187,11 @@ if ($action === 'set_blocked_until') {
 }
 
 if ($action === 'add_children') {
+  // Guardrail: once a node is delegated to Oliver, James must not keep splitting deeper
+  if (((string)($node['worker_status'] ?? '')) === 'todo_oliver') {
+    out(false, 'node delegated to oliver; add_children not allowed');
+  }
+
   $titlesRaw = (string)($_REQUEST['titles'] ?? '');
   $titles = array_values(array_filter(array_map('trim', preg_split('/\R/', $titlesRaw))));
   if (!$titles) out(false, 'missing titles');
