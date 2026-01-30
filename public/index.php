@@ -560,8 +560,10 @@ renderHeader('Dashboard');
           return $d;
         };
 
-        // time legend ticks (left/right)
+        // time legend ticks (left/mid/right)
         $tsFirst = strtotime((string)$metricsRows[0]['ts']);
+        $midIdx = (int)floor(($n-1)/2);
+        $tsMid = strtotime((string)$metricsRows[$midIdx]['ts']);
         $tsLast = strtotime((string)$metricsRows[$n-1]['ts']);
       ?>
       <div class="note" style="margin-top:12px">
@@ -578,6 +580,17 @@ renderHeader('Dashboard');
 
         <svg viewBox="0 0 <?php echo (int)$w; ?> <?php echo (int)$h; ?>" width="100%" height="<?php echo (int)$h; ?>" preserveAspectRatio="none" style="display:block; background:linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02)); border-radius:10px;">
           <?php
+            // hourly gridlines (subtle)
+            for ($i=0; $i<$n; $i++) {
+              $x = $xs[$i];
+              echo '<line x1="' . h(number_format($x,2,'.','')) . '" y1="' . (int)$y0 . '" x2="' . h(number_format($x,2,'.','')) . '" y2="' . (int)$y1 . '" stroke="rgba(255,255,255,0.06)" stroke-width="1" />';
+            }
+            // midpoint marker (dashed)
+            $xMid = $xs[$midIdx] ?? null;
+            if ($xMid !== null) {
+              echo '<line x1="' . h(number_format($xMid,2,'.','')) . '" y1="' . (int)$y0 . '" x2="' . h(number_format($xMid,2,'.','')) . '" y2="' . (int)$y1 . '" stroke="rgba(255,255,255,0.22)" stroke-width="1" stroke-dasharray="4 4" />';
+            }
+
             $stack = array_fill(0, $n, 0);
             foreach ($areas as $a) {
               $k = $a['key'];
@@ -590,6 +603,7 @@ renderHeader('Dashboard');
 
         <div class="row" style="justify-content:space-between; margin-top:6px;">
           <span class="meta"><?php echo h(date('d.m H:i', $tsFirst)); ?></span>
+          <span class="meta"><?php echo h(date('d.m H:i', $tsMid)); ?></span>
           <span class="meta"><?php echo h(date('d.m H:i', $tsLast)); ?></span>
         </div>
 
