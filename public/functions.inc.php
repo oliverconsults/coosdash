@@ -115,8 +115,8 @@ function renderHeader(string $title='COOS'): void {
       .kanban{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
       .kanban-col{background:rgba(5,7,11,.22);border:1px solid rgba(212,175,55,.14);border-radius:14px;padding:10px}
       .kanban-col h3{margin:0 0 10px 0;font-size:12px;letter-spacing:.04em;color:var(--muted);text-transform:uppercase;display:flex;justify-content:space-between;align-items:center}
-      .kanban-card{display:block;padding:10px 10px;border-radius:12px;border:1px solid rgba(212,175,55,.14);background:rgba(15,22,35,.55);color:var(--text)}
-      .kanban-card:hover{border-color:rgba(212,175,55,.5);background:rgba(15,22,35,.8);text-decoration:none}
+      .kanban-card{display:block;padding:10px 10px;border-radius:12px;border:1px solid rgba(212,175,55,.18);background:linear-gradient(180deg, rgba(212,175,55,.10) 0%, rgba(15,22,35,.62) 55%, rgba(8,12,18,.75) 100%);color:var(--text)}
+      .kanban-card:hover{border-color:rgba(212,175,55,.6);background:linear-gradient(180deg, rgba(212,175,55,.14) 0%, rgba(15,22,35,.72) 55%, rgba(8,12,18,.82) 100%);text-decoration:none}
       .kanban-card + .kanban-card{margin-top:8px}
       .kanban-title{font-size:13px;line-height:1.2;margin:0}
       .kanban-meta{margin-top:6px;display:flex;gap:8px;align-items:center;justify-content:space-between}
