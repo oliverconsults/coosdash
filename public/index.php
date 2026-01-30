@@ -522,7 +522,7 @@ renderHeader('Dashboard');
         };
 
         $areas = [
-          ['key'=>'done','label'=>'Done','color'=>'rgba(255,200,90,0.75)'],
+          ['key'=>'done','label'=>'Done','color'=>'rgba(255,215,128,0.78)'],
           ['key'=>'blocked','label'=>'Blocked','color'=>'rgba(255,120,120,0.55)'],
           ['key'=>'todo_j','label'=>'ToDo (J)','color'=>'rgba(180,140,255,0.55)'],
           ['key'=>'todo_o','label'=>'ToDo (O)','color'=>'rgba(120,200,255,0.55)'],
@@ -589,9 +589,6 @@ renderHeader('Dashboard');
           <span class="meta"><?php echo h(date('d.m H:i', $tsLast)); ?></span>
         </div>
 
-        <div class="meta" style="margin-top:6px">
-          Stand <?php echo $lastTs ? h(date('H:i', $lastTs)) : ''; ?> · Done <?php echo (int)$last['projects_done']; ?> · Blocked <?php echo (int)$last['projects_blocked']; ?> · ToDo(J) <?php echo (int)$last['projects_todo_james']; ?> · ToDo(O) <?php echo (int)$last['projects_todo_oliver']; ?>
-        </div>
       </div>
     <?php endif; ?>
   </div>
