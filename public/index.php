@@ -344,8 +344,8 @@ function renderTree(array $byParent, array $byId, array $sectionByIdAll, array $
 
     if ($hasKids) {
       $forceOpenAll = (!empty($_GET['open']) && $_GET['open'] === 'all') || !empty($_GET['q']);
-      // Default: collapsed. Open only when forced (search/open-all) or when the node is on the open-path to the current selection.
-      $isOpen = $forceOpenAll || !empty($open[$id]);
+      // Default: collapsed. Open only when forced (search/open-all) or when the node is active / on the open-path to the current selection.
+      $isOpen = $forceOpenAll || $isActive || !empty($open[$id]);
 
       // Important: apply indentation to the clickable row, not the <details> wrapper.
       // Otherwise browser default <details> layout can add extra indentation when fully expanded (search).
@@ -400,7 +400,7 @@ renderHeader('Dashboard');
     <div class="row" style="justify-content:space-between; align-items:center;">
       <h2 style="margin:0;">Projekte / Ideen (<?php echo count($roots); ?>)</h2>
       <div style="display:flex; gap:8px; align-items:center;">
-        <a class="btn" href="/">Reset</a>
+        <a class="btn" href="/" style="min-width:90px;text-align:center;display:inline-flex;align-items:center;justify-content:center;">Reset</a>
       </div>
     </div>
 
