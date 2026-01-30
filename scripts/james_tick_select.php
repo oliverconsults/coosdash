@@ -45,7 +45,22 @@ $isBlocked = function(array $n): bool {
   return false;
 };
 
-$maxDepth = -1;
+// Helper: walk up to the top-level project under Projekte (direct child of Projekte root)
+$topProjectId = function(int $nodeId) use ($byId, $projectsRoot): int {
+  $cur = $nodeId;
+  for ($i=0; $i<80; $i++) {
+    $row = $byId[$cur] ?? null;
+    if (!$row) return 0;
+    $pid = $row['parent_id'];
+    if ($pid === null) return 0;
+    $pid = (int)$pid;
+    if ($pid === $projectsRoot) return $cur;
+    $cur = $pid;
+  }
+  return 0;
+};
+
+// Build candidate leaves (unblocked todo_james) + compute their top project
 $cands = [];
 foreach ($depthById as $id => $d) {
   if ($id === $projectsRoot) continue;
@@ -55,11 +70,14 @@ foreach ($depthById as $id => $d) {
   if (!empty($children[$id] ?? [])) continue; // leaf only
   if ($isBlocked($n)) continue; // do not pick blocked tasks
 
-  $maxDepth = max($maxDepth, $d);
+  $projId = $topProjectId((int)$id);
+  if ($projId <= 0) continue;
+
   $cands[] = [
     'id' => (int)$id,
     'depth' => (int)$d,
     'parent_id' => $n['parent_id'] === null ? 0 : (int)$n['parent_id'],
+    'project_id' => (int)$projId,
     'title' => (string)$n['title'],
   ];
 }
@@ -69,8 +87,39 @@ if (!$cands) {
   exit(0);
 }
 
-// deepest only
-$cands = array_values(array_filter($cands, fn($c) => $c['depth'] === $maxDepth));
+// Pick (and stick to) one project subtree until it is done
+$statePath = '/var/www/coosdash/shared/data/james_worker_state.json';
+$activeProject = 0;
+$state = [];
+if (is_file($statePath)) {
+  $raw = @file_get_contents($statePath);
+  $j = $raw ? json_decode($raw, true) : null;
+  if (is_array($j)) {
+    $state = $j;
+    $activeProject = (int)($j['active_project_id'] ?? 0);
+  }
+}
+
+$eligibleProjects = [];
+foreach ($cands as $c) $eligibleProjects[(int)$c['project_id']] = true;
+$eligibleProjects = array_keys($eligibleProjects);
+
+if ($activeProject <= 0 || !in_array($activeProject, $eligibleProjects, true)) {
+  // choose a random project among eligible ones
+  $activeProject = (int)$eligibleProjects[array_rand($eligibleProjects)];
+  $state = [
+    'active_project_id' => $activeProject,
+    'picked_at' => date('Y-m-d H:i:s'),
+  ];
+  @file_put_contents($statePath, json_encode($state, JSON_PRETTY_PRINT|JSON_UNESCAPED_UNICODE));
+}
+
+// Filter to the active project only
+$cands = array_values(array_filter($cands, fn($c) => (int)$c['project_id'] === (int)$activeProject));
+
+// Within the chosen project: pick deepest; tie-break by smallest id
+$maxDepth = max(array_map(fn($c) => (int)$c['depth'], $cands));
+$cands = array_values(array_filter($cands, fn($c) => (int)$c['depth'] === (int)$maxDepth));
 
 // Parent-internal chronological gating: candidate must be the smallest-id todo_james leaf among its siblings
 $cands = array_values(array_filter($cands, function($c) use ($children, $byId, $isBlocked) {
