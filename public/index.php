@@ -86,8 +86,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       flash_set('Text fehlt.', 'err');
     } else {
       $ts = date('d.m.Y H:i');
-      $newDesc = rtrim($formNote);
-      $newDesc .= "\n\n[oliver] {$ts} Statusänderung: todo";
+      // Put newest status at the top (not the bottom)
+      $newDesc = "[oliver] {$ts} Statusänderung: todo\n\n" . rtrim($formNote);
 
       $st = $pdo->prepare('UPDATE nodes SET description=?, worker_status="todo_oliver" WHERE id=?');
       $st->execute([$newDesc, $nid]);
@@ -114,7 +114,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       flash_set('Beschreibung für Subtask bitte eingeben.', 'err');
     } else {
       $ts = date('d.m.Y H:i');
-      $desc = rtrim($formChildBody) . "\n\n[oliver] {$ts} Statusänderung: todo";
+      // Put newest status at the top (not the bottom)
+      $desc = "[oliver] {$ts} Statusänderung: todo\n\n" . rtrim($formChildBody);
 
       $st = $pdo->prepare('INSERT INTO nodes (parent_id, title, description, priority, created_by, worker_status) VALUES (?, ?, ?, ?, ?, ?)');
       $st->execute([$parentId, $title, $desc, null, 'oliver', 'todo_oliver']);
