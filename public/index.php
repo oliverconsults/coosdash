@@ -664,6 +664,9 @@ renderHeader('Dashboard');
                     <div class="kanban-title"><?php echo h($c['title']); ?></div>
                     <div class="kanban-meta">
                       <span class="pill section"><?php echo h($c['section']); ?></span>
+                      <?php if ($col === 'done'): ?>
+                        <span class="pill dim"><?php echo h(date('d.m.Y H:i:s', strtotime((string)$c['updated_at']))); ?></span>
+                      <?php endif; ?>
                       <span class="pill dim">#<?php echo (int)$c['id']; ?></span>
                     </div>
                   </a>
