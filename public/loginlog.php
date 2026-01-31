@@ -38,7 +38,8 @@ if (is_file($path)) {
     }
     if ($buf !== '') $lines[] = strrev($buf);
     fclose($fp);
-    $lines = array_reverse($lines);
+    // show newest first
+    // $lines is collected from file end backwards, so keep as-is
   }
 }
 
@@ -47,7 +48,7 @@ renderHeader('Login Log');
 
 <div class="card">
   <h2 style="margin:0 0 10px 0;">Login Log</h2>
-  <div class="meta" style="margin-bottom:10px;">Quelle: <?php echo h($path); ?> (letzte <?php echo (int)$max; ?> Zeilen)</div>
+  <div class="meta" style="margin-bottom:10px;">Quelle: <?php echo h($path); ?> (neueste zuerst, max <?php echo (int)$max; ?> Zeilen)</div>
 
   <?php if (!$lines): ?>
     <div class="note"><div class="head">Info</div>Keine Einträge gefunden.</div>
