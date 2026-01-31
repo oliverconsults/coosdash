@@ -24,18 +24,23 @@ function rootId(PDO $pdo, string $title): int {
 }
 
 function isUnderRoot(PDO $pdo, int $nodeId, int $rootId): bool {
+  return depthUnderRoot($pdo, $nodeId, $rootId) !== null;
+}
+
+// Returns depth below root (root child = 1). null if not under root.
+function depthUnderRoot(PDO $pdo, int $nodeId, int $rootId): ?int {
   $cur = $nodeId;
-  for ($i=0; $i<80; $i++) {
+  for ($depth=0; $depth<80; $depth++) {
     $st = $pdo->prepare('SELECT parent_id FROM nodes WHERE id=?');
     $st->execute([$cur]);
     $row = $st->fetch();
-    if (!$row) return false;
-    if ($row['parent_id'] === null) return false;
+    if (!$row) return null;
+    if ($row['parent_id'] === null) return null;
     $pid = (int)$row['parent_id'];
-    if ($pid === $rootId) return true;
+    if ($pid === $rootId) return $depth + 1;
     $cur = $pid;
   }
-  return false;
+  return null;
 }
 
 $projectsId = rootId($pdo, 'Projekte');
@@ -59,7 +64,13 @@ foreach ($parents as $p) {
   if ($enq >= $MAX) break;
   $pid = (int)$p['id'];
   if ($pid <= 0) continue;
-  if (!isUnderRoot($pdo, $pid, $projectsId)) continue;
+  $depth = depthUnderRoot($pdo, $pid, $projectsId);
+  if ($depth === null) continue;
+
+  // Only activate summary+cleanup for depth > 3 (keep Projekte > A > AA > AAA)
+  if ($depth <= 3) {
+    continue;
+  }
 
   // has children?
   $stC = $pdo->prepare('SELECT id,title,worker_status,updated_at FROM nodes WHERE parent_id=? ORDER BY id');

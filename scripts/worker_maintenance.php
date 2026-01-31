@@ -20,18 +20,23 @@ function rootId(PDO $pdo, string $title): int {
 }
 
 function isUnderRoot(PDO $pdo, int $nodeId, int $rootId): bool {
+  return depthUnderRoot($pdo, $nodeId, $rootId) !== null;
+}
+
+// Returns depth below root (root child = 1). null if not under root.
+function depthUnderRoot(PDO $pdo, int $nodeId, int $rootId): ?int {
   $cur = $nodeId;
-  for ($i=0; $i<80; $i++) {
+  for ($depth=0; $depth<80; $depth++) {
     $st = $pdo->prepare('SELECT parent_id FROM nodes WHERE id=?');
     $st->execute([$cur]);
     $row = $st->fetch();
-    if (!$row) return false;
-    if ($row['parent_id'] === null) return false;
+    if (!$row) return null;
+    if ($row['parent_id'] === null) return null;
     $pid = (int)$row['parent_id'];
-    if ($pid === $rootId) return true;
+    if ($pid === $rootId) return $depth + 1;
     $cur = $pid;
   }
-  return false;
+  return null;
 }
 
 $projectsId = rootId($pdo, 'Projekte');
@@ -95,19 +100,20 @@ foreach ($all as $p) {
   }
   if (!$allDone) continue;
 
-  // close parent + prepend short summary
-  $pdo->prepare('UPDATE nodes SET worker_status="done" WHERE id=?')->execute([$pid]);
+  // Determine depth below Projekte
+  $depth = depthUnderRoot($pdo, $pid, $projectsId);
+  if ($depth === null) continue;
 
-  $sum = "[auto] {$tsHuman} Summary: " . count($kids) . " Subtasks erledigt\n\n";
-  foreach ($kids as $k) {
-    $sum .= "- #" . (int)$k['id'] . " " . (string)$k['title'] . "\n";
+  // Depth rule:
+  // - depth <= 3: keep hierarchy (Projekte > A > AA > AAA) => just set done (no summary, no cleanup)
+  // - depth > 3: do NOT auto-close here (summary+cleanup pipeline handles it)
+  if ($depth > 3) {
+    continue;
   }
-  $sum .= "\n";
 
-  $pdo->prepare('UPDATE nodes SET description=CONCAT(?, COALESCE(description,\'\')) WHERE id=?')
-      ->execute([$sum, $pid]);
-
-  @file_put_contents('/var/www/coosdash/shared/logs/worker.log', $tsLine . "  #{$pid}  [auto] {$tsHuman} Summary: " . count($kids) . " Subtasks erledigt\n", FILE_APPEND);
+  // close parent (no summary at shallow levels)
+  $pdo->prepare('UPDATE nodes SET worker_status="done" WHERE id=?')->execute([$pid]);
+  @file_put_contents('/var/www/coosdash/shared/logs/worker.log', $tsLine . "  #{$pid}  [auto] {$tsHuman} Auto-close (depth {$depth})\n", FILE_APPEND);
 
   $did['closed']++;
 }
