@@ -120,6 +120,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $parentId = (int)($_POST['parent_id'] ?? 0);
     $formChildTitle = (string)($_POST['title'] ?? '');
     $formChildBody = (string)($_POST['description'] ?? '');
+    $taskType = (string)($_POST['task_type'] ?? 'planung');
+    if (!in_array($taskType, ['planung','umsetzung'], true)) $taskType = 'planung';
 
     $title = trim($formChildTitle);
     $body = trim($formChildBody);
@@ -135,7 +137,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
       $ts = date('d.m.Y H:i');
       // Put newest status at the top (not the bottom)
-      $desc = "[oliver] {$ts} Statusänderung: todo\n\n" . rtrim($formChildBody);
+      $marker = ($taskType === 'umsetzung') ? ' ##UMSETZUNG##' : '';
+      $desc = "[oliver] {$ts} Statusänderung: todo{$marker}\n\n" . rtrim($formChildBody);
 
       $st = $pdo->prepare('INSERT INTO nodes (parent_id, title, description, priority, created_by, worker_status) VALUES (?, ?, ?, ?, ?, ?)');
       $st->execute([$parentId, $title, $desc, null, 'oliver', 'todo_oliver']);
@@ -867,8 +870,14 @@ renderHeader('Dashboard');
           <input type="hidden" name="action" value="add_subtask">
           <input type="hidden" name="parent_id" value="<?php echo (int)$node['id']; ?>">
 
-          <label>Neuen Subtask anlegen: <span class="meta">Titel</span></label>
-          <input name="title" placeholder="max. 3–4 Wörter" required maxlength="40">
+          <div class="row" style="align-items:center; gap:10px; margin-bottom:8px;">
+            <label style="margin:0;">Neuen Subtask anlegen:</label>
+            <select name="task_type" style="width:auto; min-width:180px; margin:0;">
+              <option value="planung">Planung</option>
+              <option value="umsetzung">Umsetzung</option>
+            </select>
+            <input name="title" placeholder="Titel (max. 3–4 Wörter)" required maxlength="40" style="flex:1; min-width:220px;">
+          </div>
 
           <label>Beschreibung</label>
           <textarea name="description" required></textarea>
