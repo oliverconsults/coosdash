@@ -375,6 +375,25 @@ if ($action === 'cleanup_done_subtree') {
   $st->execute($args);
   $movedAtt = $st->rowCount();
 
+  // Roll up metrics from descendants into parent (token_in/token_out/worktime)
+  $rolled = ['token_in'=>0,'token_out'=>0,'worktime'=>0];
+  try {
+    $st = $pdo->prepare("SELECT COALESCE(SUM(token_in),0) AS token_in, COALESCE(SUM(token_out),0) AS token_out, COALESCE(SUM(worktime),0) AS worktime FROM nodes WHERE id IN ($in)");
+    $st->execute($descIds);
+    $r = $st->fetch(PDO::FETCH_ASSOC);
+    if ($r) {
+      $rolled['token_in'] = (int)($r['token_in'] ?? 0);
+      $rolled['token_out'] = (int)($r['token_out'] ?? 0);
+      $rolled['worktime'] = (int)($r['worktime'] ?? 0);
+    }
+
+    // Add to parent
+    $pdo->prepare('UPDATE nodes SET token_in=token_in+?, token_out=token_out+?, worktime=worktime+? WHERE id=?')
+        ->execute([$rolled['token_in'], $rolled['token_out'], $rolled['worktime'], $nodeId]);
+  } catch (Throwable $e) {
+    // If schema doesn't have these columns yet, or query fails, ignore (cleanup must still work)
+  }
+
   // Delete notes for descendants
   $st = $pdo->prepare("DELETE FROM node_notes WHERE node_id IN ($in)");
   $st->execute($descIds);
@@ -390,12 +409,17 @@ if ($action === 'cleanup_done_subtree') {
   // Prepend summary to parent and mark as Umsetzung + todo_james (handoff back to James)
   $ts2 = date('d.m.Y H:i');
   $txt = "[auto] {$ts2} Zusammenfassung ##UMSETZUNG##\n\n" . rtrim($summary) . "\n\n";
-  $txt .= "[auto] {$ts2} Cleanup: Attachments hochgezogen={$movedAtt}, Nodes geloescht={$deleted}\n\n";
+  $txt .= "[auto] {$ts2} Cleanup: Attachments hochgezogen={$movedAtt}, Nodes geloescht={$deleted}";
+  if (($rolled['token_in'] + $rolled['token_out'] + $rolled['worktime']) > 0) {
+    $txt .= ", Metrics gerollt (Token in/out=" . (int)$rolled['token_in'] . "/" . (int)$rolled['token_out'] . ", Worktime=" . (int)$rolled['worktime'] . "s)";
+  }
+  $txt .= "\n\n";
+
   prependDesc($pdo, $nodeId, $txt);
   $pdo->prepare('UPDATE nodes SET worker_status="todo_james" WHERE id=?')->execute([$nodeId]);
-  logLine(date('Y-m-d H:i:s') . "  #{$nodeId}  [auto] {$ts2} Cleanup+Summary: moved_att={$movedAtt} deleted_nodes={$deleted} -> todo_james");
+  logLine(date('Y-m-d H:i:s') . "  #{$nodeId}  [auto] {$ts2} Cleanup+Summary: moved_att={$movedAtt} deleted_nodes={$deleted} rolled_in={$rolled['token_in']} rolled_out={$rolled['token_out']} rolled_worktime={$rolled['worktime']}s -> todo_james");
 
-  out(true, 'cleaned', ['moved_attachments'=>$movedAtt, 'deleted_nodes'=>$deleted]);
+  out(true, 'cleaned', ['moved_attachments'=>$movedAtt, 'deleted_nodes'=>$deleted, 'rolled_metrics'=>$rolled]);
 }
 
 out(false, 'unknown action');
