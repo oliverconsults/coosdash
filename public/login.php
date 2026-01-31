@@ -39,7 +39,7 @@ renderHeader('Login');
     <input type="password" name="password" autocomplete="current-password" required>
 
     <div style="margin-top:12px;">
-      <button class="btn btn-gold" type="submit">Login</button>
+      <button class="btn" type="submit">Login</button>
     </div>
   </form>
 </div>

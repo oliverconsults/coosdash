@@ -720,7 +720,7 @@ renderHeader('Dashboard');
             <form method="post" action="/actions.php" style="margin:0">
               <input type="hidden" name="action" value="set_active">
               <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
-              <button class="btn btn-gold" type="submit">aktivieren</button>
+              <button class="btn" type="submit">aktivieren</button>
             </form>
 
             <?php if ($sec === 'Ideen'): ?>
@@ -759,7 +759,7 @@ renderHeader('Dashboard');
               <form method="post" style="margin:0">
                 <input type="hidden" name="action" value="set_worker">
                 <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
-                <button class="btn btn-gold" name="worker_status" value="todo_oliver" type="submit">an Oliver</button>
+                <button class="btn" name="worker_status" value="todo_oliver" type="submit">an Oliver</button>
               </form>
               <form method="post" style="margin:0">
                 <input type="hidden" name="action" value="set_worker">
@@ -844,7 +844,7 @@ renderHeader('Dashboard');
             <div class="row" style="margin-top:10px; align-items:center;">
               <span class="meta">Anhang optional:</span>
               <input type="file" name="attachment" accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt" style="width:auto; max-width:380px">
-              <button class="btn btn-gold" type="submit">Speichern</button>
+              <button class="btn" type="submit">Speichern</button>
             </div>
           </form>
 
@@ -864,7 +864,7 @@ renderHeader('Dashboard');
           <div class="row" style="margin-top:10px; align-items:center;">
             <span class="meta">Anhang optional:</span>
             <input type="file" name="attachment" accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt" style="width:auto; max-width:380px">
-            <button class="btn btn-gold" type="submit">Absenden</button>
+            <button class="btn" type="submit">Absenden</button>
           </div>
         </form>
       </div>
