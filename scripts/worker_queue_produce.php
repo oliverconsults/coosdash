@@ -115,9 +115,9 @@ $prompt .= "- set_blocked_by (blocked_by_node_id)\n";
 $prompt .= "- set_blocked_until (blocked_until=YYYY-MM-DD HH:MM)\n";
 $prompt .= "- add_children (titles = newline separated, max 6)\n";
 $prompt .= "- add_attachment (path, display_name optional)\n";
-$prompt .= "- job_done / job_fail (job_id, reason optional)\n";
+$prompt .= "- job_done / job_fail (job_id, reason optional; token_in/token_out/worktime optional)\n";
 $prompt .= "\nErwartetes Ergebnis (wähle genau eins):\n";
-$prompt .= "A) FERTIG: prepend_update + add_attachment(s) (falls vorhanden) + set_status done + job_done\n";
+$prompt .= "A) FERTIG: prepend_update + add_attachment(s) (falls vorhanden) + set_status done + job_done (inkl. token/worktime)\n";
 $prompt .= "B) ZERLEGT: add_children (4–6) + prepend_update (Plan) + job_done\n";
 $prompt .= "C) BLOCKIERT: set_blocked_until ODER set_blocked_by + prepend_update (Begründung) + job_done\n";
 $prompt .= "D) FRAGE AN OLIVER (Delegation): prepend_update (konkrete Frage + was du brauchst) + set_status todo_oliver + job_done\n";
@@ -138,6 +138,9 @@ $prompt .= "- Wenn etwas fehlt: 1–4 Subtasks unter demselben Parent (max 4) + 
 $prompt .= "\nConstraints:\n";
 $prompt .= "- Neue Task-Titel <= 40 Zeichen.\n";
 
+$prompt .= "\nToken/Worktime (PFLICHT, wenn möglich):\n";
+$prompt .= "- Bei job_done/job_fail bitte token_in/token_out mitsenden (Tokens aus dem aktuellen Run) und worktime (Sekunden).\n";
+$prompt .= "- worktime: wenn du es nicht sauber misst, lass es weg (Server addiert dann automatisch claimed_at→now).\n";
 $prompt .= "\nRegeln:\n";
 $prompt .= "- Vor done immer Runs/Ergebnis verifizieren.\n";
 $prompt .= "- Wichtig (Encoding): wenn du Umlaute/Sonderzeichen oder mehrere Zeilen schreibst, nutze *_b64 Parameter (headline_b64/body_b64).\n";
