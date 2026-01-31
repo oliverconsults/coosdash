@@ -15,14 +15,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $st->execute([$u]);
   $user = $st->fetch();
 
+  $ok = false;
   if ($user && password_verify($p, $user['password_hash'])) {
+    $ok = true;
     $_SESSION['user_id'] = $user['id'];
     $_SESSION['username'] = $user['username'];
+    loginlog_append('login', $user['username'], true);
     flash_set('Welcome back, ' . $user['username'] . '.', 'info');
     header('Location: /');
     exit;
   }
 
+  // failed attempt
+  loginlog_append('login_fail', $u, false);
+  // small delay to slow down brute force a bit
+  usleep(250000);
   flash_set('Login fehlgeschlagen.', 'err');
 }
 

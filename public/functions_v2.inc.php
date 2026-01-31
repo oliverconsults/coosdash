@@ -97,6 +97,30 @@ function workerlog_append(int $nodeId, string $line): void {
   @file_put_contents($p, $ts . '  #' . (int)$nodeId . '  ' . $line . "\n", FILE_APPEND);
 }
 
+function client_ip(): string {
+  return (string)($_SERVER['REMOTE_ADDR'] ?? '');
+}
+
+function client_ua(): string {
+  return (string)($_SERVER['HTTP_USER_AGENT'] ?? '');
+}
+
+function loginlog_append(string $event, string $username='', bool $ok=false): void {
+  $ts = date('Y-m-d H:i:s');
+  $p = '/var/www/coosdash/shared/logs/login.log';
+  @mkdir(dirname($p), 0775, true);
+  $ip = client_ip();
+  $ua = client_ua();
+  $user = trim($username);
+  $line = $ts
+    . '  ip=' . ($ip !== '' ? $ip : '-')
+    . '  user=' . ($user !== '' ? $user : '-')
+    . '  ok=' . ($ok ? '1' : '0')
+    . '  event=' . $event
+    . '  ua=' . str_replace(["\n","\r","\t"], ' ', $ua);
+  @file_put_contents($p, $line . "\n", FILE_APPEND);
+}
+
 function renderHeader(string $title='COOS'): void {
   $f = flash_get();
   ?>
@@ -209,6 +233,7 @@ function renderHeader(string $title='COOS'): void {
               <span><?php echo $jOn ? 'James aktiv' : 'James sleeps'; ?></span>
             </a>
             <a class="btn" href="/workerlog.php">Worker Log</a>
+            <a class="btn" href="/loginlog.php">Login Log</a>
             <a class="btn" href="/logout.php">Logout</a>
           <?php endif; ?>
         </div>
