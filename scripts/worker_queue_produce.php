@@ -99,7 +99,7 @@ $prompt .= "Wie du Änderungen machst (PFLICHT):\n";
 $prompt .= "- KEINE direkten SQL-Writes. Nutze ausschließlich den CLI-Wrapper: php /home/deploy/projects/coos/scripts/worker_api_cli.php ...\n";
 $prompt .= "- Beispiel: php /home/deploy/projects/coos/scripts/worker_api_cli.php action=ping\n";
 $prompt .= "\nErlaubte Aktionen:\n";
-$prompt .= "- prepend_update (headline, body)\n";
+$prompt .= "- prepend_update (headline, body) [oder headline_b64/body_b64]\n";
 $prompt .= "- set_status (worker_status=todo_james|todo_oliver|done)\n";
 $prompt .= "- set_blocked_by (blocked_by_node_id)\n";
 $prompt .= "- set_blocked_until (blocked_until=YYYY-MM-DD HH:MM)\n";
@@ -130,6 +130,7 @@ $prompt .= "- Neue Task-Titel <= 40 Zeichen.\n";
 
 $prompt .= "\nRegeln:\n";
 $prompt .= "- Vor done immer Runs/Ergebnis verifizieren.\n";
+$prompt .= "- Wichtig (Encoding): wenn du Umlaute/Sonderzeichen oder mehrere Zeilen schreibst, nutze *_b64 Parameter (headline_b64/body_b64), um kaputte Zeichen zu vermeiden.\n";
 $prompt .= "- WICHTIG: Sobald du set_status todo_oliver setzt (Delegation an Oliver), ist der Job für dich beendet: KEINE weiteren Aktionen wie add_children / set_blocked_* / attachments danach. Direkt job_done.\n";
 $prompt .= "- Delegation ist NUR im Notfall erlaubt: Stelle GENAU 1 präzise Frage an Oliver (max. 2 Zeilen), dann set_status todo_oliver, dann job_done.\n";
 $prompt .= "- Bevor du delegierst: führe mindestens 2 konkrete Recon-Schritte durch (z.B. grep nach Entrypoint, runtime-tree check, cron/scripts check, Attachments/ENV check) und erwähne kurz was du geprüft hast.\n";

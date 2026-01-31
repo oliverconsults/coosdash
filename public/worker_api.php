@@ -46,6 +46,25 @@ function logLine(string $line): void {
   file_put_contents($p, $line . "\n", FILE_APPEND);
 }
 
+// Safely fetch text params from CLI/HTTP.
+// Supports <key>_b64 (base64) to avoid shell/encoding issues.
+function getTextParam(string $key, string $default=''): string {
+  $b64Key = $key . '_b64';
+  $raw = null;
+  if (isset($_REQUEST[$b64Key]) && (string)$_REQUEST[$b64Key] !== '') {
+    $dec = base64_decode((string)$_REQUEST[$b64Key], true);
+    if ($dec !== false) $raw = $dec;
+  }
+  if ($raw === null && isset($_REQUEST[$key])) {
+    $raw = (string)$_REQUEST[$key];
+  }
+  if ($raw === null) $raw = $default;
+
+  // Strip problematic ASCII control chars (keep \n, \r, \t)
+  $raw = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F]/u', '', $raw);
+  return (string)$raw;
+}
+
 if ($action === 'ping') out(true, 'pong');
 
 // Job helpers
@@ -130,8 +149,8 @@ $ts = date('d.m.Y H:i');
 $tsLog = date('Y-m-d H:i:s');
 
 if ($action === 'prepend_update') {
-  $headline = trim((string)($_REQUEST['headline'] ?? 'Update'));
-  $body = trim((string)($_REQUEST['body'] ?? ''));
+  $headline = trim(getTextParam('headline', 'Update'));
+  $body = trim(getTextParam('body', ''));
   $txt = "[james] {$ts} Update: {$headline}\n\n";
   if ($body !== '') $txt .= $body . "\n\n";
   prependDesc($pdo, $nodeId, $txt);
@@ -225,7 +244,7 @@ if ($action === 'add_attachment') {
 }
 
 if ($action === 'cleanup_done_subtree') {
-  $summary = trim((string)($_REQUEST['summary'] ?? ''));
+  $summary = trim(getTextParam('summary', ''));
   if ($summary === '') out(false, 'missing summary');
 
   // Re-load fresh node (avoid stale)
