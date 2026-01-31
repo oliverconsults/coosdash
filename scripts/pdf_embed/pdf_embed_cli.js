@@ -97,8 +97,19 @@ async function main() {
   const creatorTool = req.creator_tool || req.creatorTool || req.COOS_PDF_CREATOR_TOOL;
   if (creatorTool) env.COOS_PDF_CREATOR_TOOL = String(creatorTool);
 
-  const mapHelvetica = (req.map_helvetica === true || req.mapHelvetica === true || req.COOS_PDF_MAP_HELVETICA === '1');
-  if (mapHelvetica) env.COOS_PDF_MAP_HELVETICA = '1';
+  // Helvetica-Mapping ist grundsätzlich UNSAFE (siehe embed.js). Wir setzen das ENV nur,
+  // wenn der Call explizit bestätigt, dass er dieses Risiko akzeptiert.
+  const mapHelveticaRequested = (req.map_helvetica === true || req.mapHelvetica === true || req.COOS_PDF_MAP_HELVETICA === '1');
+  const mapHelveticaUnsafeOk = (req.map_helvetica_unsafe_ok === true || req.mapHelveticaUnsafeOk === true || req.COOS_PDF_MAP_HELVETICA_UNSAFE_OK === '1');
+  if (mapHelveticaRequested && mapHelveticaUnsafeOk) {
+    env.COOS_PDF_MAP_HELVETICA = '1';
+    env.COOS_PDF_MAP_HELVETICA_UNSAFE_OK = '1';
+  } else if (mapHelveticaRequested && !mapHelveticaUnsafeOk) {
+    // bewusst nur Warnung: wir wollen das Embed nicht hart failen, aber den Wunsch dokumentieren.
+    // (php/worker kann stdout/stderr loggen)
+    // eslint-disable-next-line no-console
+    console.warn('WARN: map_helvetica angefragt, aber UNSAFE-OK fehlt -> Mapping wird übersprungen.');
+  }
 
   // Zusätzlich: direkte env-Overrides aus JSON erlauben
   if (req.env && typeof req.env === 'object') {

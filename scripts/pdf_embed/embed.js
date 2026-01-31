@@ -73,10 +73,22 @@ async function main() {
   pdfDoc.registerFontkit(fontkit);
 
   // Optional (off by default): best-effort mapping of standard Helvetica fonts to an embedded TTF.
-  // NOTE: This is risky because Type1 Helvetica uses single-byte WinAnsi encoding, while embedded
-  // TrueType fonts are typically Type0/CID fonts (Identity-H). Swapping the resource without
-  // rewriting the content stream can cause invalid glyph mapping + width mismatches in veraPDF.
-  const mapHelvetica = process.env.COOS_PDF_MAP_HELVETICA === '1';
+  //
+  // WICHTIG (veraPDF / PDF/A-3):
+  // Type1-Helvetica verwendet i.d.R. WinAnsi (Single-Byte). Eingebettete TrueType-Fonts landen in
+  // pdf-lib typischerweise als Type0/CID (Identity-H). Wenn man nur den Font-Resource-Ref tauscht,
+  // ohne den Content-Stream (Strings/Encodings/ToUnicode) umzuschreiben, entstehen:
+  // - falsche Glyph-Mappings
+  // - Width-Mismatches (veraPDF schlägt dann hart an)
+  //
+  // Daher ist das Mapping standardmäßig *deaktiviert*, selbst wenn COOS_PDF_MAP_HELVETICA=1 gesetzt
+  // wird. Zum expliziten Aktivieren muss zusätzlich COOS_PDF_MAP_HELVETICA_UNSAFE_OK=1 gesetzt sein.
+  const mapHelveticaRequested = process.env.COOS_PDF_MAP_HELVETICA === '1';
+  const mapHelveticaUnsafeOk = process.env.COOS_PDF_MAP_HELVETICA_UNSAFE_OK === '1';
+  const mapHelvetica = mapHelveticaRequested && mapHelveticaUnsafeOk;
+  if (mapHelveticaRequested && !mapHelveticaUnsafeOk) {
+    console.warn('WARN: COOS_PDF_MAP_HELVETICA=1 ignoriert (unsafe). Setze zusätzlich COOS_PDF_MAP_HELVETICA_UNSAFE_OK=1, wenn du das wirklich willst.');
+  }
 
   let noto = null;
   if (mapHelvetica) try {
