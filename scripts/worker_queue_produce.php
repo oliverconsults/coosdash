@@ -57,7 +57,7 @@ if (!is_array($meta) || empty($meta['id'])) {
 $nodeId = (int)$meta['id'];
 
 // Build a compact prompt (final worker prompt, persisted)
-$st = $pdo->prepare('SELECT id,parent_id,title,worker_status,blocked_until,blocked_by_node_id,created_at,updated_at FROM nodes WHERE id=?');
+$st = $pdo->prepare('SELECT id,parent_id,title,description,worker_status,blocked_until,blocked_by_node_id,created_at,updated_at FROM nodes WHERE id=?');
 $st->execute([$nodeId]);
 $node = $st->fetch();
 if (!$node) {
@@ -86,6 +86,16 @@ $prompt = "# COOS Worker Job (aus Queue)\n\n";
 $prompt .= "JOB_ID={JOB_ID}\n";
 $prompt .= "TARGET_NODE_ID={$nodeId}\n";
 $prompt .= "TITLE=" . (string)$node['title'] . "\n\n";
+
+// Task type marker (Umsetzung)
+$desc = (string)($node['description'] ?? '');
+$isUmsetzung = (strpos($desc, '##UMSETZUNG##') !== false);
+if ($isUmsetzung) {
+  $prompt .= "AUFGABENTYP=UMSETZUNG (hart)\n";
+  $prompt .= "- Erwartung: Endergebnis liefern und abschließen (nicht nur planen).\n";
+  $prompt .= "- add_children nur im echten Notfall und nur wenn depth < 8 (kurz begründen).\n\n";
+}
+
 $prompt .= "Sprache / Ton (hart):\n";
 $prompt .= "- Schreibe komplett auf Deutsch (keine englischen Labels wie SPLIT/DONE/etc.).\n";
 $prompt .= "- Sprich Oliver mit 'du' an (kurz, klar, technisch).\n\n";

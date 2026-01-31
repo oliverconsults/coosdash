@@ -72,6 +72,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   if ($action === 'save_task') {
     $nid = (int)($_POST['node_id'] ?? 0);
     $formNote = (string)($_POST['description'] ?? '');
+    $taskType = (string)($_POST['task_type'] ?? 'planung');
+    if (!in_array($taskType, ['planung','umsetzung'], true)) $taskType = 'planung';
 
     // block editing of container roots
     $st = $pdo->prepare('SELECT parent_id, title FROM nodes WHERE id=?');
@@ -88,7 +90,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
       $ts = date('d.m.Y H:i');
       // Put newest status at the top (not the bottom)
-      $newDesc = "[oliver] {$ts} Statusänderung: todo\n\n" . rtrim($formNote);
+      $marker = ($taskType === 'umsetzung') ? ' ##UMSETZUNG##' : '';
+      $newDesc = "[oliver] {$ts} Statusänderung: todo{$marker}\n\n" . rtrim($formNote);
 
       $st = $pdo->prepare('UPDATE nodes SET description=?, worker_status="todo_oliver" WHERE id=?');
       $st->execute([$newDesc, $nid]);
@@ -838,7 +841,14 @@ renderHeader('Dashboard');
             <input type="hidden" name="action" value="save_task">
             <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
 
-            <label>Aufgabe / Notiz:</label>
+            <?php $isUmsetzung = (strpos((string)($node['description'] ?? ''), '##UMSETZUNG##') !== false); ?>
+            <label>Aufgabentyp: <span class="meta">default: Planung</span></label>
+            <select name="task_type" style="width:auto; min-width:220px;">
+              <option value="planung" <?php echo $isUmsetzung ? '' : 'selected'; ?>>Planung</option>
+              <option value="umsetzung" <?php echo $isUmsetzung ? 'selected' : ''; ?>>Umsetzung</option>
+            </select>
+
+            <label style="margin-top:10px;">Aufgabe / Notiz:</label>
             <textarea class="task-note" name="description" required><?php echo h((string)($node['description'] ?? '')); ?></textarea>
 
             <div class="row" style="margin-top:10px; align-items:center;">
