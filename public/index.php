@@ -673,10 +673,34 @@ renderHeader('Dashboard');
           ?>
           <span class="tag gold"><?php echo h($statusLabel); ?></span>
         </div>
-        <?php $createdTs = strtotime((string)($node['created_at'] ?? '')); ?>
-        <div class="meta">
-          #<?php echo (int)$node['id']; ?> • erstellt von <?php echo h($node['created_by']); ?>
-          <?php if ($createdTs): ?> am <?php echo h(date('d.m.Y H:i', $createdTs)); ?><?php endif; ?>
+        <?php
+          $createdTs = strtotime((string)($node['created_at'] ?? ''));
+
+          // metrics (optional columns)
+          $tokIn = isset($node['token_in']) ? (int)$node['token_in'] : null;
+          $tokOut = isset($node['token_out']) ? (int)$node['token_out'] : null;
+          $wt = isset($node['worktime']) ? (int)$node['worktime'] : null;
+          $tokAll = ($tokIn !== null && $tokOut !== null) ? ($tokIn + $tokOut) : null;
+          $wtTxt = null;
+          if ($wt !== null) {
+            $h = intdiv($wt, 3600);
+            $m = intdiv($wt % 3600, 60);
+            $s = $wt % 60;
+            $wtTxt = sprintf('%d:%02d:%02d', $h, $m, $s);
+          }
+        ?>
+        <div class="meta" style="display:flex; justify-content:space-between; gap:12px; align-items:center;">
+          <span>
+            #<?php echo (int)$node['id']; ?> • erstellt von <?php echo h($node['created_by']); ?>
+            <?php if ($createdTs): ?> am <?php echo h(date('d.m.Y H:i', $createdTs)); ?><?php endif; ?>
+          </span>
+
+          <?php if ($isInProjekte && $tokIn !== null && $tokOut !== null && $wtTxt !== null): ?>
+            <span style="opacity:.65; white-space:nowrap;">
+              Token in/out/all: <?php echo (int)$tokIn; ?>/<?php echo (int)$tokOut; ?>/<?php echo (int)$tokAll; ?>
+              &nbsp; Worktime: <?php echo htmlspecialchars($wtTxt, ENT_QUOTES, 'UTF-8'); ?>
+            </span>
+          <?php endif; ?>
         </div>
 
         <?php
@@ -745,21 +769,6 @@ renderHeader('Dashboard');
           <?php endif; ?>
 
           <?php if ($sec === 'Projekte'): ?>
-            <?php
-              // metrics (optional columns)
-              $tokIn = isset($node['token_in']) ? (int)$node['token_in'] : null;
-              $tokOut = isset($node['token_out']) ? (int)$node['token_out'] : null;
-              $wt = isset($node['worktime']) ? (int)$node['worktime'] : null;
-              $tokAll = ($tokIn !== null && $tokOut !== null) ? ($tokIn + $tokOut) : null;
-              $wtTxt = null;
-              if ($wt !== null) {
-                $h = intdiv($wt, 3600);
-                $m = intdiv($wt % 3600, 60);
-                $s = $wt % 60;
-                $wtTxt = sprintf('%d:%02d:%02d', $h, $m, $s);
-              }
-            ?>
-
             <?php if ($ws === 'done'): ?>
               <form method="post" style="margin:0">
                 <input type="hidden" name="action" value="set_worker">
@@ -820,12 +829,6 @@ renderHeader('Dashboard');
             </form>
           <?php endif; ?>
 
-          <?php if ($sec === 'Projekte' && $tokIn !== null && $tokOut !== null && $wtTxt !== null): ?>
-            <div style="margin-left:auto; font-size:12px; opacity:.8; white-space:nowrap;">
-              Token in/out/all: <?php echo (int)$tokIn; ?>/<?php echo (int)$tokOut; ?>/<?php echo (int)$tokAll; ?>
-              &nbsp; Worktime: <?php echo htmlspecialchars($wtTxt, ENT_QUOTES, 'UTF-8'); ?>
-            </div>
-          <?php endif; ?>
         </div>
         <?php endif; ?>
       </div>
