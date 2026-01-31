@@ -174,15 +174,22 @@ if ($action === 'set_active') {
   $spRow = $st->fetch();
   $laterRootId = $spRow ? (int)$spRow['id'] : 0;
 
+  $st = $pdo->prepare('SELECT id FROM nodes WHERE parent_id IS NULL AND title="Gelöscht" LIMIT 1');
+  $st->execute();
+  $delRow = $st->fetch();
+  $deletedRootId = $delRow ? (int)$delRow['id'] : 0;
+
   $moveToProjects = false;
   if ($ideasId && isUnderRoot($pdo, $nodeId, $ideasId)) $moveToProjects = true;
   if ($laterRootId && isUnderRoot($pdo, $nodeId, $laterRootId)) $moveToProjects = true;
+  if ($deletedRootId && isUnderRoot($pdo, $nodeId, $deletedRootId)) $moveToProjects = true;
 
   if ($moveToProjects && $projId) {
     $pdo->prepare('UPDATE nodes SET parent_id=?, worker_status="todo_james" WHERE id=?')->execute([$projId, $nodeId]);
     $ts = date('d.m.Y H:i');
     $line = "[oliver] {$ts} Statusänderung: todo_james (aktiviert; nach Projekte verschoben)\n\n";
     $pdo->prepare('UPDATE nodes SET description=CONCAT(?, COALESCE(description,\'\')) WHERE id=?')->execute([$line, $nodeId]);
+    workerlog_append($nodeId, "[oliver] {$ts} UI: set_active -> todo_james (moved to Projekte)");
     flash_set('Aktiviert: nach Projekte verschoben (James).', 'info');
     header('Location: /?id=' . $nodeId);
     exit;
