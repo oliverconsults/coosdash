@@ -115,11 +115,24 @@ foreach ($parents as $p) {
   $prompt .= "JOB_ID={JOB_ID}\n";
   $prompt .= "TARGET_NODE_ID={$pid}\n";
   $prompt .= "TITLE=" . (string)$p['title'] . "\n\n";
-  $prompt .= "Aufgabe: Erstelle eine kurze, praegnante Zusammenfassung (3-6 Bullets) aus den Notizen der Kinder/Unterkinder.\n";
+
+  $prompt .= "Kinder (direkt):\n";
+  foreach ($kids as $k) {
+    $prompt .= "- #" . (int)$k['id'] . " " . (string)$k['title'] . "\n";
+  }
+  $prompt .= "\n";
+
+  if ($desc) {
+    $prompt .= "Unterkinder gesamt: " . count($desc) . " (rekursiv)\n\n";
+  }
+
+  $prompt .= "Aufgabe: Erstelle eine kurze, praegnante Zusammenfassung (3-6 Bullets) aus den Notizen/Notes/Attachments der obigen Kinder/Unterkinder.\n";
   $prompt .= "- Schreibe komplett auf Deutsch, du-Ansprache ist ok.\n";
-  $prompt .= "- Keine langen Logs, keine Wiederholungen. Fokus: Ergebnis + Links/Artefakte (nur referenzieren).\n\n";
+  $prompt .= "- Keine langen Logs, keine Wiederholungen. Fokus: Ergebnis + Links/Artefakte (nur referenzieren).\n";
+  $prompt .= "- Referenziere IDs in Klammern, wenn hilfreich (z.B. \"(aus #362)\").\n\n";
+
   $prompt .= "Vorgehen (PFLICHT):\n";
-  $prompt .= "1) Lies Parent + alle Descendants (Description/Notes/Attachments).\n";
+  $prompt .= "1) Lies Parent (#{$pid}) + alle Descendants (description + node_notes + node_attachments).\n";
   $prompt .= "2) Erzeuge SUMMARY Text (ohne Markdown-Overkill).\n";
   $prompt .= "3) Rufe dann genau EINEN API Call auf:\n";
   $prompt .= "   php /home/deploy/projects/coos/scripts/worker_api_cli.php action=cleanup_done_subtree node_id={$pid} job_id={JOB_ID} summary=\"<DEINE_ZUSAMMENFASSUNG>\"\n\n";

@@ -267,10 +267,17 @@ if ($action === 'cleanup_done_subtree') {
   if ($tooFresh > 0) out(false, 'subtree recently updated');
 
   // Guard: no open/claimed queue job for any node in subtree (or the parent)
+  // (ignore the current job_id if provided)
   $idsForJobs = array_merge([$nodeId], $descIds);
   $in2 = implode(',', array_fill(0, count($idsForJobs), '?'));
-  $st = $pdo->prepare("SELECT COUNT(*) FROM worker_queue WHERE node_id IN ($in2) AND status IN ('open','claimed')");
-  $st->execute($idsForJobs);
+  $q = "SELECT COUNT(*) FROM worker_queue WHERE node_id IN ($in2) AND status IN ('open','claimed')";
+  $args = $idsForJobs;
+  if ($jobId > 0) {
+    $q .= " AND id <> ?";
+    $args[] = $jobId;
+  }
+  $st = $pdo->prepare($q);
+  $st->execute($args);
   $jobOpen = (int)$st->fetchColumn();
   if ($jobOpen > 0) out(false, 'queue job open/claimed for subtree');
 
