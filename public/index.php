@@ -673,7 +673,12 @@ renderHeader('Dashboard');
           ?>
           <span class="tag gold"><?php echo h($statusLabel); ?></span>
         </div>
+
         <?php
+          // Determine section early (needed for metrics in meta line)
+          $sec = (string)($sectionByIdAll[(int)$node['id']] ?? '');
+          $isInProjekte = ($sec === 'Projekte');
+
           $createdTs = strtotime((string)($node['created_at'] ?? ''));
 
           // metrics (optional columns)
