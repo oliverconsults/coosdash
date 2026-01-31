@@ -72,39 +72,201 @@ async function main() {
   // Enable TTF/OTF font embedding via fontkit.
   pdfDoc.registerFontkit(fontkit);
 
-  // Optional (off by default): best-effort mapping of standard Helvetica fonts to an embedded TTF.
+  // Optional (off by default): "safe" remap of standard Type1 Helvetica fonts to an embedded
+  // TrueType font with WinAnsiEncoding.
   //
-  // WICHTIG (veraPDF / PDF/A-3):
-  // Type1-Helvetica verwendet i.d.R. WinAnsi (Single-Byte). Eingebettete TrueType-Fonts landen in
-  // pdf-lib typischerweise als Type0/CID (Identity-H). Wenn man nur den Font-Resource-Ref tauscht,
-  // ohne den Content-Stream (Strings/Encodings/ToUnicode) umzuschreiben, entstehen:
-  // - falsche Glyph-Mappings
-  // - Width-Mismatches (veraPDF schlägt dann hart an)
+  // Motivation (veraPDF / PDF/A-3):
+  // - Standard 14 fonts (Helvetica etc.) are NOT embedded. PDF/A typically requires embedding.
+  // - pdf-lib's embedFont() for TTF creates a Type0/CID font (Identity-H). If you only swap the
+  //   Font resource ref, existing single-byte strings (WinAnsi) no longer map 1:1 -> veraPDF fails.
   //
-  // Daher ist das Mapping standardmäßig *deaktiviert*, selbst wenn COOS_PDF_MAP_HELVETICA=1 gesetzt
-  // wird. Zum expliziten Aktivieren muss zusätzlich COOS_PDF_MAP_HELVETICA_UNSAFE_OK=1 gesetzt sein.
-  const mapHelveticaRequested = process.env.COOS_PDF_MAP_HELVETICA === '1';
-  const mapHelveticaUnsafeOk = process.env.COOS_PDF_MAP_HELVETICA_UNSAFE_OK === '1';
-  const mapHelvetica = mapHelveticaRequested && mapHelveticaUnsafeOk;
-  if (mapHelveticaRequested && !mapHelveticaUnsafeOk) {
-    console.warn('WARN: COOS_PDF_MAP_HELVETICA=1 ignoriert (unsafe). Setze zusätzlich COOS_PDF_MAP_HELVETICA_UNSAFE_OK=1, wenn du das wirklich willst.');
-  }
+  // "Safe" strategy:
+  // - create our own Simple TrueType font dictionary (/Subtype /TrueType)
+  // - /Encoding /WinAnsiEncoding
+  // - /FirstChar.. /LastChar + /Widths computed from the embedded TTF program
+  // - optional /ToUnicode CMap for common bytes
+  // - only replace Helvetica Type1 resources that (a) are Type1 Helvetica and (b) use WinAnsi
+  //   (or have no explicit encoding)
+  const mapHelvetica = process.env.COOS_PDF_MAP_HELVETICA === '1';
 
-  let noto = null;
+  const WIN_ANSI_0x80_0x9F = {
+    0x80: 0x20AC,
+    0x82: 0x201A,
+    0x83: 0x0192,
+    0x84: 0x201E,
+    0x85: 0x2026,
+    0x86: 0x2020,
+    0x87: 0x2021,
+    0x88: 0x02C6,
+    0x89: 0x2030,
+    0x8A: 0x0160,
+    0x8B: 0x2039,
+    0x8C: 0x0152,
+    0x8E: 0x017D,
+    0x91: 0x2018,
+    0x92: 0x2019,
+    0x93: 0x201C,
+    0x94: 0x201D,
+    0x95: 0x2022,
+    0x96: 0x2013,
+    0x97: 0x2014,
+    0x98: 0x02DC,
+    0x99: 0x2122,
+    0x9A: 0x0161,
+    0x9B: 0x203A,
+    0x9C: 0x0153,
+    0x9E: 0x017E,
+    0x9F: 0x0178,
+  };
+
+  const winAnsiCodeToUnicode = (code) => {
+    if (code >= 0x20 && code <= 0x7E) return code;
+    if (code >= 0xA0 && code <= 0xFF) return code;
+    if (WIN_ANSI_0x80_0x9F[code]) return WIN_ANSI_0x80_0x9F[code];
+    return null;
+  };
+
+  const asDict = (o) => {
+    if (!o) return null;
+    try {
+      return (o instanceof PDFDict) ? o : pdfDoc.context.lookup(o, PDFDict);
+    } catch (_) {
+      return null;
+    }
+  };
+
+  const createToUnicodeCMap = (mappings) => {
+    // mappings: [{ srcCode: <byte>, unicode: <codepoint> }]
+    const hex4 = (n) => n.toString(16).padStart(4, '0').toUpperCase();
+    const hex2 = (n) => n.toString(16).padStart(2, '0').toUpperCase();
+
+    const lines = [];
+    lines.push('/CIDInit /ProcSet findresource begin');
+    lines.push('12 dict begin');
+    lines.push('begincmap');
+    lines.push('/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def');
+    lines.push('/CMapName /Adobe-Identity-UCS def');
+    lines.push('/CMapType 2 def');
+    lines.push('1 begincodespacerange');
+    lines.push('<00><FF>');
+    lines.push('endcodespacerange');
+
+    // PDF expects chunks.
+    const CHUNK = 100;
+    for (let i = 0; i < mappings.length; i += CHUNK) {
+      const chunk = mappings.slice(i, i + CHUNK);
+      lines.push(`${chunk.length} beginbfchar`);
+      for (const m of chunk) {
+        lines.push(`<${hex2(m.srcCode)}><${hex4(m.unicode)}>`);
+      }
+      lines.push('endbfchar');
+    }
+
+    lines.push('endcmap');
+    lines.push('CMapName currentdict /CMap defineresource pop');
+    lines.push('end');
+    lines.push('end');
+    lines.push('%%EOF');
+
+    return Buffer.from(lines.join('\n'), 'ascii');
+  };
+
+  const embedWinAnsiTrueTypeFont = (ttfBytes, { fontName = 'CoosHelveticaRemap' } = {}) => {
+    const ttFont = fontkit.create(ttfBytes);
+    const scale = 1000 / (ttFont.unitsPerEm || 1000);
+
+    const firstChar = 32;
+    const lastChar = 255;
+
+    const widths = PDFArray.withContext(pdfDoc.context);
+    const toUnicode = [];
+
+    for (let code = firstChar; code <= lastChar; code++) {
+      const uni = winAnsiCodeToUnicode(code);
+      let w = 0;
+      if (uni != null) {
+        try {
+          const g = ttFont.glyphForCodePoint(uni);
+          // glyphForCodePoint always returns a glyph object; missing glyph can still have 0 width.
+          w = Math.round((g.advanceWidth || 0) * scale);
+          toUnicode.push({ srcCode: code, unicode: uni });
+        } catch (_) {
+          w = 0;
+        }
+      }
+      widths.push(PDFNumber.of(w));
+    }
+
+    const bbox = ttFont.bbox || { minX: 0, minY: 0, maxX: 0, maxY: 0 };
+    const fontBBox = PDFArray.withContext(pdfDoc.context);
+    fontBBox.push(PDFNumber.of(Math.round((bbox.minX || 0) * scale)));
+    fontBBox.push(PDFNumber.of(Math.round((bbox.minY || 0) * scale)));
+    fontBBox.push(PDFNumber.of(Math.round((bbox.maxX || 0) * scale)));
+    fontBBox.push(PDFNumber.of(Math.round((bbox.maxY || 0) * scale)));
+
+    const fontFile2 = pdfDoc.context.stream(ttfBytes);
+    const fontFile2Ref = pdfDoc.context.register(fontFile2);
+
+    const italicAngle = Math.round(ttFont.italicAngle || 0);
+    const ascent = Math.round((ttFont.ascent || 0) * scale);
+    const descent = Math.round((ttFont.descent || 0) * scale);
+    const capHeight = Math.round(((ttFont.capHeight ?? ttFont.ascent) || 0) * scale);
+
+    // Flags: 32 = Nonsymbolic, 64 = Italic
+    let flags = 32;
+    if (italicAngle !== 0) flags |= 64;
+
+    // Very rough StemV value (PDF/A validators are typically lenient here).
+    const stemV = PDFNumber.of(80);
+
+    const fontDescriptor = pdfDoc.context.obj({
+      Type: 'FontDescriptor',
+      FontName: PDFName.of(fontName),
+      Flags: PDFNumber.of(flags),
+      FontBBox: fontBBox,
+      ItalicAngle: PDFNumber.of(italicAngle),
+      Ascent: PDFNumber.of(ascent),
+      Descent: PDFNumber.of(descent),
+      CapHeight: PDFNumber.of(capHeight),
+      StemV: stemV,
+      FontFile2: fontFile2Ref,
+    });
+    const fontDescriptorRef = pdfDoc.context.register(fontDescriptor);
+
+    const fontDict = pdfDoc.context.obj({
+      Type: 'Font',
+      Subtype: 'TrueType',
+      BaseFont: PDFName.of(fontName),
+      Encoding: PDFName.of('WinAnsiEncoding'),
+      FirstChar: PDFNumber.of(firstChar),
+      LastChar: PDFNumber.of(lastChar),
+      Widths: widths,
+      FontDescriptor: fontDescriptorRef,
+    });
+
+    // Optional ToUnicode
+    try {
+      const cmapBytes = createToUnicodeCMap(toUnicode);
+      const cmapStream = pdfDoc.context.stream(cmapBytes);
+      const cmapRef = pdfDoc.context.register(cmapStream);
+      fontDict.set(PDFName.of('ToUnicode'), cmapRef);
+    } catch (_) {
+      // best-effort
+    }
+
+    return pdfDoc.context.register(fontDict);
+  };
+
   if (mapHelvetica) try {
     const ttfPath = path.join(__dirname, 'assets', 'NotoSans-Regular.ttf');
-    if (fs.existsSync(ttfPath)) {
+    if (!fs.existsSync(ttfPath)) {
+      console.warn('WARN: missing TTF asset (skip Helvetica remap):', ttfPath);
+    } else {
       const ttfBytes = fs.readFileSync(ttfPath);
-      // IMPORTANT: veraPDF flagged width mismatches when we subsetted the font.
-      // Using the full font program keeps Widths/W entries consistent with the embedded program.
-      noto = await pdfDoc.embedFont(ttfBytes, { subset: false });
+      const safeTtfRef = embedWinAnsiTrueTypeFont(ttfBytes, { fontName: 'CoosHelveticaRemap' });
 
-      // Draw a tiny marker to ensure the embedded font is referenced even if mapping finds nothing.
-      const page0 = pdfDoc.getPages()[0];
-      if (page0) page0.drawText(' ', { x: 1, y: 1, size: 1, font: noto });
-
-      // Map strategy: on each page, replace any Font resource whose BaseFont starts with Helvetica
-      // (Type1 standard font) with our embedded Noto font.
+      // Map strategy: on each page, replace any Font resource whose BaseFont is Helvetica
+      // (Type1 standard font) with our WinAnsi TrueType font.
       const helvNames = new Set([
         'Helvetica',
         'Helvetica-Bold',
@@ -112,14 +274,7 @@ async function main() {
         'Helvetica-BoldOblique',
       ]);
 
-      const asDict = (o) => {
-        if (!o) return null;
-        try {
-          return (o instanceof PDFDict) ? o : pdfDoc.context.lookup(o, PDFDict);
-        } catch (_) {
-          return null;
-        }
-      };
+      let skippedNonWinAnsi = 0;
 
       for (const page of pdfDoc.getPages()) {
         const resObj = page.node.get(PDFName.of('Resources'));
@@ -139,20 +294,42 @@ async function main() {
           const baseFont = fd.get(PDFName.of('BaseFont'));
           const baseFontName = baseFont ? baseFont.toString().replace(/^\//, '') : '';
 
-          // Only touch Type1 standard Helvetica fonts.
-          if (
-            subtype && subtype.toString() === '/Type1' &&
-            helvNames.has(baseFontName)
-          ) {
-            fontDict.set(k, noto.ref);
+          if (!(subtype && subtype.toString() === '/Type1' && helvNames.has(baseFontName))) continue;
+
+          // Only remap if Encoding is WinAnsi (or absent). If it uses Differences or a different base
+          // encoding, swapping would be unsafe (content strings would decode differently).
+          const enc = fd.get(PDFName.of('Encoding'));
+          let encodingOk = false;
+          if (!enc) {
+            encodingOk = true;
+          } else if (enc.toString && enc.toString() === '/WinAnsiEncoding') {
+            encodingOk = true;
+          } else {
+            const encDict = asDict(enc);
+            if (encDict) {
+              const baseEnc = encDict.get(PDFName.of('BaseEncoding'));
+              const diffs = encDict.get(PDFName.of('Differences'));
+              if (baseEnc && baseEnc.toString && baseEnc.toString() === '/WinAnsiEncoding' && !diffs) {
+                encodingOk = true;
+              }
+            }
           }
+
+          if (!encodingOk) {
+            skippedNonWinAnsi++;
+            continue;
+          }
+
+          fontDict.set(k, safeTtfRef);
         }
       }
-    } else {
-      console.warn('WARN: missing TTF asset (skip font embed+map):', ttfPath);
+
+      if (skippedNonWinAnsi > 0) {
+        console.warn(`WARN: Helvetica remap: ${skippedNonWinAnsi} Font-Refs übersprungen (Encoding != WinAnsi oder mit Differences).`);
+      }
     }
   } catch (e) {
-    console.warn('WARN: failed to embed/map TTF font (best-effort):', e?.message || e);
+    console.warn('WARN: failed to embed/remap Helvetica (safe, best-effort):', e?.message || e);
   }
 
   // --- PDF/A-ish baseline: add OutputIntent with ICC profile (required for PDF/A).
