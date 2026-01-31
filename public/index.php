@@ -694,15 +694,12 @@ renderHeader('Dashboard');
             $wtTxt = sprintf('%d:%02d:%02d', $h, $m, $s);
           }
         ?>
-        <div class="meta" style="display:flex; justify-content:space-between; gap:12px; align-items:center;">
-          <span>
-            #<?php echo (int)$node['id']; ?> • erstellt von <?php echo h($node['created_by']); ?>
-            <?php if ($createdTs): ?> am <?php echo h(date('d.m.Y H:i', $createdTs)); ?><?php endif; ?>
-          </span>
+        <div class="meta">
+          #<?php echo (int)$node['id']; ?> • erstellt von <?php echo h($node['created_by']); ?>
+          <?php if ($createdTs): ?> am <?php echo h(date('d.m.Y H:i', $createdTs)); ?><?php endif; ?>
 
           <?php if ($isInProjekte && $tokIn !== null && $tokOut !== null && $wtTxt !== null): ?>
-            <span style="opacity:.65; white-space:nowrap;">
-              Token in/out/all: <?php echo (int)$tokIn; ?>/<?php echo (int)$tokOut; ?>/<?php echo (int)$tokAll; ?>
+            <span style="opacity:.65; white-space:nowrap;"> | Token in/out/all: <?php echo (int)$tokIn; ?>/<?php echo (int)$tokOut; ?>/<?php echo (int)$tokAll; ?>
               &nbsp; Worktime: <?php echo htmlspecialchars($wtTxt, ENT_QUOTES, 'UTF-8'); ?>
             </span>
           <?php endif; ?>
