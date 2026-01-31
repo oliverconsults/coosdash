@@ -224,4 +224,84 @@ if ($action === 'add_attachment') {
   out(true, 'attached', ['output'=>implode("\n", $outLines)]);
 }
 
+if ($action === 'cleanup_done_subtree') {
+  $summary = trim((string)($_REQUEST['summary'] ?? ''));
+  if ($summary === '') out(false, 'missing summary');
+
+  // Re-load fresh node (avoid stale)
+  $node = mustNode($pdo, $nodeId);
+
+  // Collect descendants with depth (BFS)
+  $desc = []; // [id=>depth]
+  $queue = [[$nodeId, 0]];
+  while ($queue) {
+    [$cur,$depth] = array_shift($queue);
+    $st = $pdo->prepare('SELECT id, worker_status, updated_at FROM nodes WHERE parent_id=?');
+    $st->execute([(int)$cur]);
+    foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $k) {
+      $kid = (int)$k['id'];
+      $d = $depth + 1;
+      if (!isset($desc[$kid]) || $desc[$kid] < $d) $desc[$kid] = $d;
+      $queue[] = [$kid, $d];
+    }
+  }
+
+  if (!$desc) out(false, 'no descendants');
+
+  $descIds = array_keys($desc);
+
+  // Guard: all descendants must be done
+  $in = implode(',', array_fill(0, count($descIds), '?'));
+  $st = $pdo->prepare("SELECT COUNT(*) FROM nodes WHERE id IN ($in) AND worker_status <> 'done'");
+  $st->execute($descIds);
+  $notDone = (int)$st->fetchColumn();
+  if ($notDone > 0) out(false, 'descendants not all done');
+
+  // Guard: stability window (all nodes in subtree older than 10 minutes)
+  $minTs = date('Y-m-d H:i:s', time() - 10*60);
+  $st = $pdo->prepare("SELECT COUNT(*) FROM nodes WHERE id IN ($in) AND updated_at >= ?");
+  $args = $descIds;
+  $args[] = $minTs;
+  $st->execute($args);
+  $tooFresh = (int)$st->fetchColumn();
+  if ($tooFresh > 0) out(false, 'subtree recently updated');
+
+  // Guard: no open/claimed queue job for any node in subtree (or the parent)
+  $idsForJobs = array_merge([$nodeId], $descIds);
+  $in2 = implode(',', array_fill(0, count($idsForJobs), '?'));
+  $st = $pdo->prepare("SELECT COUNT(*) FROM worker_queue WHERE node_id IN ($in2) AND status IN ('open','claimed')");
+  $st->execute($idsForJobs);
+  $jobOpen = (int)$st->fetchColumn();
+  if ($jobOpen > 0) out(false, 'queue job open/claimed for subtree');
+
+  // Move attachments up to parent
+  $st = $pdo->prepare("UPDATE node_attachments SET node_id=? WHERE node_id IN ($in)");
+  $args = [$nodeId];
+  foreach ($descIds as $id) $args[] = $id;
+  $st->execute($args);
+  $movedAtt = $st->rowCount();
+
+  // Delete notes for descendants
+  $st = $pdo->prepare("DELETE FROM node_notes WHERE node_id IN ($in)");
+  $st->execute($descIds);
+
+  // Delete descendants deepest-first
+  arsort($desc); // depth desc
+  $deleted = 0;
+  foreach (array_keys($desc) as $did) {
+    $pdo->prepare('DELETE FROM nodes WHERE id=?')->execute([(int)$did]);
+    $deleted += 1;
+  }
+
+  // Prepend summary to parent and mark done
+  $ts2 = date('d.m.Y H:i');
+  $txt = "[auto] {$ts2} Zusammenfassung\n\n" . rtrim($summary) . "\n\n";
+  $txt .= "[auto] {$ts2} Cleanup: Attachments hochgezogen={$movedAtt}, Nodes geloescht={$deleted}\n\n";
+  prependDesc($pdo, $nodeId, $txt);
+  $pdo->prepare('UPDATE nodes SET worker_status="done" WHERE id=?')->execute([$nodeId]);
+  logLine(date('Y-m-d H:i:s') . "  #{$nodeId}  [auto] {$ts2} Cleanup+Summary: moved_att={$movedAtt} deleted_nodes={$deleted}");
+
+  out(true, 'cleaned', ['moved_attachments'=>$movedAtt, 'deleted_nodes'=>$deleted]);
+}
+
 out(false, 'unknown action');
