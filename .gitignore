@@ -4,3 +4,6 @@
 
 # local
 .DS_Store
+
+# deps
+**/node_modules/
