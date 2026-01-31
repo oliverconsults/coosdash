@@ -12,7 +12,7 @@
 //   echo '{"in_pdf":"/tmp/in.pdf","xml_path":"/tmp/in.xml","out_pdf":"/tmp/out.pdf","lang":"de"}' | node pdf_embed_cli.js
 //
 // Output (stdout):
-//   { ok, exit_code, out_pdf, out_pdf_bytes, stdout, stderr, markers }
+//   { ok, exit_code, out_pdf, out_pdf_bytes, stdout, stderr, markers, verify }
 
 const fs = require('fs');
 const path = require('path');
@@ -39,6 +39,18 @@ function parseMarkersFromEmbedStdout(stdout) {
   return markers;
 }
 
+function normalizeVerify(v) {
+  if (!v) return null;
+  if (v === true) return 'verapdf';
+  const s = String(v).trim().toLowerCase();
+  if (s === '1' || s === 'true' || s === 'verapdf') return 'verapdf';
+  return null;
+}
+
+function safeJsonParse(s) {
+  try { return JSON.parse(s); } catch (_) { return null; }
+}
+
 async function main() {
   let raw = null;
 
@@ -53,7 +65,7 @@ async function main() {
   try {
     req = JSON.parse(raw);
   } catch (e) {
-    const out = { ok: false, exit_code: 2, reason: 'JSON konnte nicht geparst werden', error: String(e && e.message || e) };
+    const out = { ok: false, exit_code: 2, reason: 'JSON konnte nicht geparst werden', error: String((e && e.message) || e) };
     process.stdout.write(JSON.stringify(out, null, 2) + '\n');
     process.exit(2);
   }
@@ -104,7 +116,7 @@ async function main() {
     maxBuffer: 50 * 1024 * 1024,
   });
 
-  const ok = (r.status === 0);
+  const embedOk = (r.status === 0);
 
   let outBytes = null;
   try {
@@ -114,22 +126,73 @@ async function main() {
     outBytes = null;
   }
 
+  const markers = parseMarkersFromEmbedStdout(r.stdout || '');
+
+  // Optional: veraPDF-Verification nach erfolgreichem Embed
+  const verifyMode = normalizeVerify(req.verify || req.verify_mode || req.verification);
+  let verify = null;
+  let finalExitCode = (typeof r.status === 'number') ? r.status : null;
+
+  if (embedOk && outBytes !== null && verifyMode === 'verapdf') {
+    const validateCliPath = path.join(__dirname, 'verapdf_validate_cli.js');
+
+    // Defaults (wenn PHP nichts setzt): PDF/A-3B + ein paar Extrakte, die bei Debug helfen.
+    const validateReq = {
+      pdf_path: outPdf,
+      flavour: req.verapdf_flavour || req.flavour || '3b',
+      extract: req.verapdf_extract || req.extract || ['embeddedFile', 'metadata', 'outputIntent'],
+      verapdf_cli: req.verapdf_cli,
+    };
+
+    const vr = childProcess.spawnSync(process.execPath, [validateCliPath], {
+      input: JSON.stringify(validateReq),
+      encoding: 'utf8',
+      maxBuffer: 50 * 1024 * 1024,
+    });
+
+    const vJson = safeJsonParse(vr.stdout || '');
+    verify = {
+      mode: 'verapdf',
+      ok_run: Boolean(vJson && vJson.ok_run),
+      compliant: (vJson && typeof vJson.compliant === 'boolean') ? vJson.compliant : null,
+      exit_code: (vJson && typeof vJson.exit_code === 'number') ? vJson.exit_code : null,
+      report_parse_ok: Boolean(vJson && vJson.report_parse_ok),
+      // stdout/stderr sind hier nur für Debugging gedacht; PHP kann das bei Bedarf loggen.
+      stdout: (vJson && typeof vJson.stdout === 'string') ? vJson.stdout : (vr.stdout || ''),
+      stderr: (vJson && typeof vJson.stderr === 'string') ? vJson.stderr : (vr.stderr || ''),
+    };
+
+    // Wenn veraPDF nicht sauber lief oder nicht compliant ist: harter Fail (Exit-Code 5 = VERIFY_FAILED).
+    const vOkRun = (vJson && vJson.ok_run === true);
+    const vCompliant = (vJson && vJson.compliant === true);
+
+    if (!vOkRun || !vCompliant) {
+      finalExitCode = 5;
+    }
+  }
+
+  const ok = (embedOk && outBytes !== null && (verifyMode ? (verify && verify.ok_run && verify.compliant) : true));
+
   const out = {
-    ok: ok && outBytes !== null,
-    exit_code: (typeof r.status === 'number') ? r.status : null,
+    ok,
+    exit_code: finalExitCode,
     out_pdf: outPdf,
     out_pdf_bytes: outBytes,
     stdout: r.stdout || '',
     stderr: r.stderr || '',
-    markers: parseMarkersFromEmbedStdout(r.stdout || ''),
+    markers,
+    verify,
   };
 
   process.stdout.write(JSON.stringify(out, null, 2) + '\n');
-  process.exit(ok ? 0 : (typeof r.status === 'number' ? r.status : 1));
+
+  if (ok) process.exit(0);
+  if (finalExitCode === 5) process.exit(5);
+  process.exit(embedOk ? 1 : (typeof r.status === 'number' ? r.status : 1));
 }
 
 main().catch((e) => {
-  const out = { ok: false, exit_code: 2, reason: 'Unerwarteter Fehler im Wrapper', error: String(e && e.message || e) };
+  const out = { ok: false, exit_code: 2, reason: 'Unerwarteter Fehler im Wrapper', error: String((e && e.message) || e) };
   process.stdout.write(JSON.stringify(out, null, 2) + '\n');
   process.exit(2);
 });

@@ -95,24 +95,29 @@ async function main() {
       report = JSON.parse(r.stdout);
       reportParseOk = true;
 
-      // Heuristik: veraPDF JSON enthält typischerweise ein isCompliant Feld.
+      // Heuristik: veraPDF JSON enthält typischerweise ein isCompliant Feld,
+      // in manchen Outputs aber auch nur "compliant".
       // Wir machen es robust, ohne uns auf exakte Struktur festzunageln.
-      function findIsCompliant(obj, depth = 0) {
-        if (!obj || depth > 6) return null;
+      function findCompliant(obj, depth = 0) {
+        if (!obj || depth > 8) return null;
         if (typeof obj === 'object') {
           if (Object.prototype.hasOwnProperty.call(obj, 'isCompliant')) {
             const v = obj.isCompliant;
             if (typeof v === 'boolean') return v;
           }
+          if (Object.prototype.hasOwnProperty.call(obj, 'compliant')) {
+            const v = obj.compliant;
+            if (typeof v === 'boolean') return v;
+          }
           for (const k of Object.keys(obj)) {
-            const v = findIsCompliant(obj[k], depth + 1);
+            const v = findCompliant(obj[k], depth + 1);
             if (typeof v === 'boolean') return v;
           }
         }
         return null;
       }
 
-      compliant = findIsCompliant(report);
+      compliant = findCompliant(report);
     } catch (_) {
       report = null;
       reportParseOk = false;
