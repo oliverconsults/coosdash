@@ -169,11 +169,80 @@ async function main() {
       return null;
     };
 
+    // Try the /Names -> /EmbeddedFiles name tree first. This is the most direct mapping
+    // from filename -> Filespec and avoids relying on /Type or /EF heuristics.
+    const findFilespecRefInEmbeddedFilesNameTree = (wantedFilename) => {
+      const lookupDict = (doc, o) => {
+        if (!o) return null;
+        try {
+          return (o instanceof PDFDict) ? o : doc.context.lookup(o, PDFDict);
+        } catch (_) {
+          return null;
+        }
+      };
+
+      const walkNameTree = (doc, nodeDict) => {
+        if (!nodeDict) return null;
+
+        const namesArr = nodeDict.get(PDFName.of('Names'));
+        const kidsArr = nodeDict.get(PDFName.of('Kids'));
+
+        // Case A: leaf with /Names [ (k1) v1 (k2) v2 ... ]
+        let names = null;
+        try {
+          names = (namesArr instanceof PDFArray) ? namesArr : (namesArr ? doc.context.lookup(namesArr, PDFArray) : null);
+        } catch (_) {
+          names = null;
+        }
+
+        if (names) {
+          const flat = names.asArray();
+          for (let i = 0; i + 1 < flat.length; i += 2) {
+            const k = flat[i];
+            const v = flat[i + 1];
+            const keyStr = decodePdfString(k);
+            if (keyStr === wantedFilename) return v;
+          }
+        }
+
+        // Case B: internal node with /Kids
+        let kids = null;
+        try {
+          kids = (kidsArr instanceof PDFArray) ? kidsArr : (kidsArr ? doc.context.lookup(kidsArr, PDFArray) : null);
+        } catch (_) {
+          kids = null;
+        }
+
+        if (kids) {
+          for (const kid of kids.asArray()) {
+            const kidDict = lookupDict(doc, kid);
+            const found = walkNameTree(doc, kidDict);
+            if (found) return found;
+          }
+        }
+
+        return null;
+      };
+
+      try {
+        const namesRoot = lookupDict(pdfDoc, pdfDoc.catalog.get(PDFName.of('Names')));
+        const embeddedFiles = namesRoot ? lookupDict(pdfDoc, namesRoot.get(PDFName.of('EmbeddedFiles'))) : null;
+        if (!embeddedFiles) return null;
+
+        const value = walkNameTree(pdfDoc, embeddedFiles);
+        // We strongly prefer an indirect ref (stable for /AF). If pdf-lib gives a direct dict,
+        // register it so we can reference it.
+        if (value && value instanceof PDFDict) return pdfDoc.context.register(value);
+        return value || null;
+      } catch (_) {
+        return null;
+      }
+    };
+
     // 1) Find all Filespec refs (filename -> preferred ref).
     // If the same filename appears multiple times, prefer the LAST one we see (usually newest).
-    const preferredRefByFilename = new Map();
     const filenameByRefStr = new Map();
-    let xmlFilespecRef = null; // prefer the last one we see (usually newest)
+    let xmlFilespecRef = findFilespecRefInEmbeddedFilesNameTree(embeddedXmlName) || null;
 
     for (const [ref, obj] of pdfDoc.context.enumerateIndirectObjects()) {
       if (!(obj instanceof PDFDict)) continue;
@@ -189,10 +258,10 @@ async function main() {
       const filename = ufStr || fStr;
       if (!filename) continue;
 
-      preferredRefByFilename.set(filename, ref);
       filenameByRefStr.set(ref.toString(), filename);
 
-      if (filename === embeddedXmlName) xmlFilespecRef = ref;
+      // Only overwrite if we didn't already find it via the EmbeddedFiles name tree.
+      if (!xmlFilespecRef && filename === embeddedXmlName) xmlFilespecRef = ref;
     }
 
     // 2) Read existing Catalog /AF (if any) and keep all entries except duplicates of our XML.
@@ -353,7 +422,71 @@ async function main() {
       return null;
     };
 
-    let xmlFilespecRef = null;
+    const findFilespecRefInEmbeddedFilesNameTree = (wantedFilename) => {
+      const lookupDict = (doc, o) => {
+        if (!o) return null;
+        try {
+          return (o instanceof PDFDict) ? o : doc.context.lookup(o, PDFDict);
+        } catch (_) {
+          return null;
+        }
+      };
+
+      const walkNameTree = (doc, nodeDict) => {
+        if (!nodeDict) return null;
+
+        const namesArr = nodeDict.get(PDFName.of('Names'));
+        const kidsArr = nodeDict.get(PDFName.of('Kids'));
+
+        let names = null;
+        try {
+          names = (namesArr instanceof PDFArray) ? namesArr : (namesArr ? doc.context.lookup(namesArr, PDFArray) : null);
+        } catch (_) {
+          names = null;
+        }
+
+        if (names) {
+          const flat = names.asArray();
+          for (let i = 0; i + 1 < flat.length; i += 2) {
+            const k = flat[i];
+            const v = flat[i + 1];
+            const keyStr = decodePdfString(k);
+            if (keyStr === wantedFilename) return v;
+          }
+        }
+
+        let kids = null;
+        try {
+          kids = (kidsArr instanceof PDFArray) ? kidsArr : (kidsArr ? doc.context.lookup(kidsArr, PDFArray) : null);
+        } catch (_) {
+          kids = null;
+        }
+
+        if (kids) {
+          for (const kid of kids.asArray()) {
+            const kidDict = lookupDict(doc, kid);
+            const found = walkNameTree(doc, kidDict);
+            if (found) return found;
+          }
+        }
+
+        return null;
+      };
+
+      try {
+        const namesRoot = lookupDict(pdfDoc2, pdfDoc2.catalog.get(PDFName.of('Names')));
+        const embeddedFiles = namesRoot ? lookupDict(pdfDoc2, namesRoot.get(PDFName.of('EmbeddedFiles'))) : null;
+        if (!embeddedFiles) return null;
+
+        const value = walkNameTree(pdfDoc2, embeddedFiles);
+        if (value && value instanceof PDFDict) return pdfDoc2.context.register(value);
+        return value || null;
+      } catch (_) {
+        return null;
+      }
+    };
+
+    let xmlFilespecRef = findFilespecRefInEmbeddedFilesNameTree(embeddedXmlName) || null;
     const filenameByRefStr = new Map();
 
     for (const [ref, obj] of pdfDoc2.context.enumerateIndirectObjects()) {
@@ -370,7 +503,7 @@ async function main() {
       if (!filename) continue;
 
       filenameByRefStr.set(ref.toString(), filename);
-      if (filename === embeddedXmlName) xmlFilespecRef = ref;
+      if (!xmlFilespecRef && filename === embeddedXmlName) xmlFilespecRef = ref;
     }
 
     const existingAF = pdfDoc2.catalog.get(PDFName.of('AF'));
