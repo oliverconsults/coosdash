@@ -842,13 +842,15 @@ renderHeader('Dashboard');
             <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
 
             <?php $isUmsetzung = (strpos((string)($node['description'] ?? ''), '##UMSETZUNG##') !== false); ?>
-            <label>Aufgabentyp: <span class="meta">default: Planung</span></label>
-            <select name="task_type" style="width:auto; min-width:220px;">
-              <option value="planung" <?php echo $isUmsetzung ? '' : 'selected'; ?>>Planung</option>
-              <option value="umsetzung" <?php echo $isUmsetzung ? 'selected' : ''; ?>>Umsetzung</option>
-            </select>
+            <div class="row" style="align-items:center; gap:10px; margin-bottom:8px;">
+              <label style="margin:0;">Aufgabentyp:</label>
+              <select name="task_type" style="width:auto; min-width:180px; margin:0;">
+                <option value="planung" <?php echo $isUmsetzung ? '' : 'selected'; ?>>Planung</option>
+                <option value="umsetzung" <?php echo $isUmsetzung ? 'selected' : ''; ?>>Umsetzung</option>
+              </select>
+            </div>
 
-            <label style="margin-top:10px;">Aufgabe / Notiz:</label>
+            <label>Aufgabe / Notiz:</label>
             <textarea class="task-note" name="description" required><?php echo h((string)($node['description'] ?? '')); ?></textarea>
 
             <div class="row" style="margin-top:10px; align-items:center;">
