@@ -181,7 +181,7 @@ function renderHeader(string $title='COOS'): void {
       <div class="top">
         <div>
           <div class="brand">COOS<span>.eu</span></div>
-          <div class="meta">Idea-to-Cash OS • dark mode • <?php echo h(nowIso()); ?></div>
+          <div class="meta">AI Project Manager OS • dark mode • <?php echo h(nowIso()); ?></div>
         </div>
         <div class="row">
           <?php if (isLoggedIn()): ?>
