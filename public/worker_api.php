@@ -3,6 +3,7 @@
 // Used by the upcoming queue consumer.
 
 require_once __DIR__ . '/functions_v3.inc.php';
+require_once __DIR__ . '/../scripts/_clawdbot_usage_lookup.php';
 
 $pdo = db();
 $action = (string)($_REQUEST['action'] ?? '');
@@ -113,6 +114,15 @@ if ($action === 'job_done') {
   $tokOut = (int)($_REQUEST['token_out'] ?? 0);
   $wt = $_REQUEST['worktime'] ?? null; // seconds; if omitted -> compute from claimed_at
 
+  // If worker didn't pass tokens, try to infer from Clawdbot session logs (best effort).
+  if ($tokIn <= 0 && $tokOut <= 0) {
+    $u = clawdbot_find_usage_for_job($jobId, 'job_done');
+    if ($u) {
+      $tokIn = (int)($u['input'] ?? 0);
+      $tokOut = (int)($u['output'] ?? 0);
+    }
+  }
+
   $pdo->prepare("UPDATE worker_queue SET status='done', done_at=NOW() WHERE id=? AND status IN ('open','claimed')")->execute([$jobId]);
 
   // Add to node metrics (if columns exist)
@@ -145,6 +155,15 @@ if ($action === 'job_fail') {
   $tokIn = (int)($_REQUEST['token_in'] ?? 0);
   $tokOut = (int)($_REQUEST['token_out'] ?? 0);
   $wt = $_REQUEST['worktime'] ?? null;
+
+  // If worker didn't pass tokens, try to infer from Clawdbot session logs (best effort).
+  if ($tokIn <= 0 && $tokOut <= 0) {
+    $u = clawdbot_find_usage_for_job($jobId, 'job_fail');
+    if ($u) {
+      $tokIn = (int)($u['input'] ?? 0);
+      $tokOut = (int)($u['output'] ?? 0);
+    }
+  }
 
   // increment fail_count
   $pdo->prepare("UPDATE worker_queue SET status='failed', fail_count=fail_count+1 WHERE id=?")->execute([$jobId]);
