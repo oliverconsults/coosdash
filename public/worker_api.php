@@ -107,7 +107,33 @@ if ($action === 'job_claim_next') {
 
 if ($action === 'job_done') {
   if ($jobId <= 0) out(false, 'missing job_id');
+
+  // optional metrics (accumulated on nodes)
+  $tokIn = (int)($_REQUEST['token_in'] ?? 0);
+  $tokOut = (int)($_REQUEST['token_out'] ?? 0);
+  $wt = $_REQUEST['worktime'] ?? null; // seconds; if omitted -> compute from claimed_at
+
   $pdo->prepare("UPDATE worker_queue SET status='done', done_at=NOW() WHERE id=? AND status IN ('open','claimed')")->execute([$jobId]);
+
+  // Add to node metrics (if columns exist)
+  try {
+    if ($wt === null || $wt === '') {
+      // compute elapsed seconds since claim
+      $sql = "UPDATE nodes n JOIN worker_queue q ON q.node_id=n.id " .
+             "SET n.token_in=n.token_in+?, n.token_out=n.token_out+?, n.worktime=n.worktime+GREATEST(0, TIMESTAMPDIFF(SECOND, q.claimed_at, NOW())) " .
+             "WHERE q.id=?";
+      $pdo->prepare($sql)->execute([$tokIn, $tokOut, $jobId]);
+    } else {
+      $wtI = max(0, (int)$wt);
+      $sql = "UPDATE nodes n JOIN worker_queue q ON q.node_id=n.id " .
+             "SET n.token_in=n.token_in+?, n.token_out=n.token_out+?, n.worktime=n.worktime+? " .
+             "WHERE q.id=?";
+      $pdo->prepare($sql)->execute([$tokIn, $tokOut, $wtI, $jobId]);
+    }
+  } catch (Throwable $e) {
+    // keep API robust if schema isn't migrated yet
+  }
+
   out(true, 'job done');
 }
 
@@ -115,8 +141,31 @@ if ($action === 'job_fail') {
   if ($jobId <= 0) out(false, 'missing job_id');
   $reason = trim((string)($_REQUEST['reason'] ?? ''));
 
+  // optional metrics (accumulated on nodes)
+  $tokIn = (int)($_REQUEST['token_in'] ?? 0);
+  $tokOut = (int)($_REQUEST['token_out'] ?? 0);
+  $wt = $_REQUEST['worktime'] ?? null;
+
   // increment fail_count
   $pdo->prepare("UPDATE worker_queue SET status='failed', fail_count=fail_count+1 WHERE id=?")->execute([$jobId]);
+
+  // Add to node metrics (if columns exist)
+  try {
+    if ($wt === null || $wt === '') {
+      $sql = "UPDATE nodes n JOIN worker_queue q ON q.node_id=n.id " .
+             "SET n.token_in=n.token_in+?, n.token_out=n.token_out+?, n.worktime=n.worktime+GREATEST(0, TIMESTAMPDIFF(SECOND, q.claimed_at, NOW())) " .
+             "WHERE q.id=?";
+      $pdo->prepare($sql)->execute([$tokIn, $tokOut, $jobId]);
+    } else {
+      $wtI = max(0, (int)$wt);
+      $sql = "UPDATE nodes n JOIN worker_queue q ON q.node_id=n.id " .
+             "SET n.token_in=n.token_in+?, n.token_out=n.token_out+?, n.worktime=n.worktime+? " .
+             "WHERE q.id=?";
+      $pdo->prepare($sql)->execute([$tokIn, $tokOut, $wtI, $jobId]);
+    }
+  } catch (Throwable $e) {
+    // keep API robust if schema isn't migrated yet
+  }
 
   $st = $pdo->prepare('SELECT node_id, fail_count FROM worker_queue WHERE id=?');
   $st->execute([$jobId]);
