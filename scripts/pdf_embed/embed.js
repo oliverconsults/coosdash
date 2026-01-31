@@ -370,6 +370,29 @@ async function main() {
   try { pdfDoc.setCreator(creatorTool); } catch (_) {}
 
   const nowIso = new Date().toISOString();
+
+  // Best-effort: infer Factur-X/ZUGFeRD profile from the XML.
+  // (This is intentionally heuristic; we mainly want deterministic XMP values.)
+  const xmlText = (() => {
+    try { return Buffer.from(xmlBytes).toString('utf8'); } catch (_) { return ''; }
+  })();
+
+  const inferConformanceLevel = (s) => {
+    const t = String(s || '').toLowerCase();
+
+    // Common Factur-X guideline URNs (1p0)
+    if (t.includes(':en16931')) return 'EN16931';
+    if (t.includes(':comfort')) return 'COMFORT';
+    if (t.includes(':basicwl') || t.includes(':basic-wl')) return 'BASIC-WL';
+    if (t.includes(':basic')) return 'BASIC';
+
+    // Fallback
+    return 'BASIC';
+  };
+
+  const xmpDocumentType = 'INVOICE';
+  const xmpConformanceLevel = inferConformanceLevel(xmlText);
+
   const xmp = `<?xpacket begin="\uFEFF" id="W5M0MpCehiHzreSzNTczkc9d"?>
 <x:xmpmeta xmlns:x="adobe:ns:meta/">
  <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
@@ -416,6 +439,12 @@ async function main() {
          <pdfaProperty:description>ZUGFeRD version</pdfaProperty:description>
         </rdf:li>
         <rdf:li rdf:parseType="Resource">
+         <pdfaProperty:name>DocumentType</pdfaProperty:name>
+         <pdfaProperty:valueType>Text</pdfaProperty:valueType>
+         <pdfaProperty:category>external</pdfaProperty:category>
+         <pdfaProperty:description>ZUGFeRD document type (e.g. INVOICE)</pdfaProperty:description>
+        </rdf:li>
+        <rdf:li rdf:parseType="Resource">
          <pdfaProperty:name>ConformanceLevel</pdfaProperty:name>
          <pdfaProperty:valueType>Text</pdfaProperty:valueType>
          <pdfaProperty:category>external</pdfaProperty:category>
@@ -430,7 +459,8 @@ async function main() {
    <!-- ZUGFeRD / Factur-X hints (best-effort) -->
    <zf:DocumentFileName>${embeddedXmlName}</zf:DocumentFileName>
    <zf:Version>1.0</zf:Version>
-   <zf:ConformanceLevel>BASIC</zf:ConformanceLevel>
+   <zf:DocumentType>${xmpDocumentType}</zf:DocumentType>
+   <zf:ConformanceLevel>${xmpConformanceLevel}</zf:ConformanceLevel>
   </rdf:Description>
  </rdf:RDF>
 </x:xmpmeta>
@@ -610,6 +640,7 @@ async function main() {
     'pdfaid:part',
     'pdfaid:conformance',
     'DocumentFileName',
+    'DocumentType',
     'ConformanceLevel',
   ].map(m => ({ m, ok: s.includes(m) }));
 
