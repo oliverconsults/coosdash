@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const fontkit = require('@pdf-lib/fontkit');
 const {
   PDFDocument,
@@ -11,6 +12,42 @@ const {
   PDFHexString,
   PDFNumber,
 } = require('pdf-lib');
+
+function ensureTrailerId(pdfDoc, { rotateSecond = true } = {}) {
+  try {
+    const ctx = pdfDoc.context;
+
+    const existing = ctx.trailerInfo?.ID;
+    let firstHex = null;
+
+    // existing can be a PDFArray, or an indirect ref, depending on parser.
+    try {
+      const arr = (existing instanceof PDFArray)
+        ? existing
+        : (existing ? ctx.lookup(existing, PDFArray) : null);
+      if (arr) {
+        const a = arr.asArray();
+        const first = a[0];
+        // Accept <...> hex or (...) literal.
+        const s = first?.toString?.() || '';
+        const m = s.match(/^[<(]([0-9A-Fa-f]+)[>)]$/);
+        if (m) firstHex = m[1].toLowerCase();
+      }
+    } catch (_) {
+      // ignore
+    }
+
+    if (!firstHex) firstHex = crypto.randomBytes(16).toString('hex');
+    const secondHex = rotateSecond ? crypto.randomBytes(16).toString('hex') : firstHex;
+
+    const idArr = PDFArray.withContext(ctx);
+    idArr.push(PDFHexString.of(firstHex));
+    idArr.push(PDFHexString.of(secondHex));
+    ctx.trailerInfo.ID = idArr;
+  } catch (_) {
+    // best-effort
+  }
+}
 
 async function main() {
   const inPdf = process.argv[2];
@@ -25,6 +62,12 @@ async function main() {
   const xmlBytes = fs.readFileSync(xmlPath);
 
   const pdfDoc = await PDFDocument.load(pdfBytes, { updateMetadata: false });
+
+  // Trailer /ID: some validators/tools expect it to be present.
+  // Strategy:
+  // - keep existing first entry if present
+  // - always rotate second entry for a modified output
+  ensureTrailerId(pdfDoc, { rotateSecond: true });
 
   // Enable TTF/OTF font embedding via fontkit.
   pdfDoc.registerFontkit(fontkit);
@@ -411,6 +454,7 @@ async function main() {
   const pass1 = await pdfDoc.save({ useObjectStreams: false });
 
   const pdfDoc2 = await PDFDocument.load(pass1, { updateMetadata: false });
+  ensureTrailerId(pdfDoc2, { rotateSecond: true });
 
   try {
     const isPdfName = (v, s) => v && v.toString && v.toString() === `/${s}`;
