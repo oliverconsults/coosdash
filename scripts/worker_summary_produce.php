@@ -146,7 +146,8 @@ foreach ($parents as $p) {
   $prompt .= "1) Lies Parent (#{$pid}) + alle Descendants (description + node_notes + node_attachments).\n";
   $prompt .= "2) Erzeuge SUMMARY Text (ohne Markdown-Overkill).\n";
   $prompt .= "3) Rufe dann genau EINEN API Call auf (nutze base64, um Encoding/Shell-Probleme zu vermeiden):\n";
-  $prompt .= "   php /home/deploy/projects/coos/scripts/worker_api_cli.php action=cleanup_done_subtree node_id={$pid} job_id={JOB_ID} summary_b64=\"<BASE64(ZUSAMMENFASSUNG_UTF8)>\"\n\n";
+  $prompt .= "   Tipp: printf '%s' \"<ZUSAMMENFASSUNG>\" | php /home/deploy/projects/coos/scripts/b64_stdin.php\n";
+  $prompt .= "   dann: php /home/deploy/projects/coos/scripts/worker_api_cli.php action=cleanup_done_subtree node_id={$pid} job_id={JOB_ID} summary_b64=\"<BASE64>\"\n\n";
   $prompt .= "Wichtig: Wenn der API Call fehlschlaegt: NICHTS loeschen/veraendern, sondern job_fail.\n";
 
   $pdo->prepare("INSERT INTO worker_queue (status, node_id, prompt_text, selector_meta) VALUES ('open', ?, ?, ?)")
