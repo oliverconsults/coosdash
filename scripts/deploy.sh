@@ -63,13 +63,18 @@ if [[ "${KEEP_RELEASES}" != "0" ]]; then
 fi
 
 # Reload php-fpm (opcache)
+# Note: this environment may not allow passwordless sudo.
+# Deploy should still succeed (new release is active via symlink); opcache reload is best-effort.
 if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet php8.3-fpm; then
-  echo "Reloading php8.3-fpm..."
-  if sudo -n systemctl reload php8.3-fpm; then
-    echo "php8.3-fpm reload: OK (sudo -n)"
+  echo "Reloading php8.3-fpm (best effort)..."
+  if command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
+    if sudo -n systemctl reload php8.3-fpm; then
+      echo "php8.3-fpm reload: OK"
+    else
+      echo "php8.3-fpm reload: FAILED (continuing)" >&2
+    fi
   else
-    echo "php8.3-fpm reload: FAILED" >&2
-    exit 1
+    echo "php8.3-fpm reload: skipped (no passwordless sudo)" >&2
   fi
 fi
 
