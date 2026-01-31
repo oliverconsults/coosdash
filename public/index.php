@@ -74,6 +74,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $formNote = (string)($_POST['description'] ?? '');
     $taskType = (string)($_POST['task_type'] ?? 'planung');
     if (!in_array($taskType, ['planung','umsetzung'], true)) $taskType = 'planung';
+    $submitTo = (string)($_POST['submit_to'] ?? '');
+    $toJames = ($submitTo === 'james');
 
     // block editing of container roots
     $st = $pdo->prepare('SELECT parent_id, title FROM nodes WHERE id=?');
@@ -91,10 +93,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $ts = date('d.m.Y H:i');
       // Put newest status at the top (not the bottom)
       $marker = ($taskType === 'umsetzung') ? ' ##UMSETZUNG##' : '';
-      $newDesc = "[oliver] {$ts} Statusänderung: todo{$marker}\n\n" . rtrim($formNote);
+      $stTxt = $toJames ? 'todo_james' : 'todo_oliver';
+      $newDesc = "[oliver] {$ts} Statusänderung: {$stTxt}{$marker}\n\n" . rtrim($formNote);
 
-      $st = $pdo->prepare('UPDATE nodes SET description=?, worker_status="todo_oliver" WHERE id=?');
-      $st->execute([$newDesc, $nid]);
+      $st = $pdo->prepare('UPDATE nodes SET description=?, worker_status=? WHERE id=?');
+      $st->execute([$newDesc, $stTxt, $nid]);
 
       // optional attachment upload (Oliver)
       if (!empty($_FILES['attachment'])) {
@@ -108,9 +111,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
       }
 
-      workerlog_append($nid, "[oliver] {$ts} Statusänderung: todo{$marker}");
+      workerlog_append($nid, "[oliver] {$ts} Statusänderung: {$stTxt}{$marker}");
 
-      flash_set('Gespeichert.', 'info');
+      flash_set($toJames ? 'Gespeichert & an James.' : 'Gespeichert.', 'info');
       header('Location: /?id=' . $nid);
       exit;
     }
@@ -122,6 +125,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $formChildBody = (string)($_POST['description'] ?? '');
     $taskType = (string)($_POST['task_type'] ?? 'planung');
     if (!in_array($taskType, ['planung','umsetzung'], true)) $taskType = 'planung';
+    $submitTo = (string)($_POST['submit_to'] ?? '');
+    $toJames = ($submitTo === 'james');
 
     $title = trim($formChildTitle);
     $body = trim($formChildBody);
@@ -138,10 +143,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $ts = date('d.m.Y H:i');
       // Put newest status at the top (not the bottom)
       $marker = ($taskType === 'umsetzung') ? ' ##UMSETZUNG##' : '';
-      $desc = "[oliver] {$ts} Statusänderung: todo{$marker}\n\n" . rtrim($formChildBody);
+      $stTxt = $toJames ? 'todo_james' : 'todo_oliver';
+      $desc = "[oliver] {$ts} Statusänderung: {$stTxt}{$marker}\n\n" . rtrim($formChildBody);
 
       $st = $pdo->prepare('INSERT INTO nodes (parent_id, title, description, priority, created_by, worker_status) VALUES (?, ?, ?, ?, ?, ?)');
-      $st->execute([$parentId, $title, $desc, null, 'oliver', 'todo_oliver']);
+      $st->execute([$parentId, $title, $desc, null, 'oliver', $stTxt]);
       $newId = (int)$pdo->lastInsertId();
 
       // optional attachment upload (Oliver)
@@ -160,9 +166,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $st = $pdo->prepare('UPDATE nodes SET description=CONCAT(?, COALESCE(description,\'\')) WHERE id=?');
       $st->execute(["[oliver] {$ts} Subtask angelegt: {$title}\n\n", $parentId]);
 
-      workerlog_append($newId, "[oliver] {$ts} Statusänderung: todo{$marker}");
+      workerlog_append($newId, "[oliver] {$ts} Statusänderung: {$stTxt}{$marker}");
 
-      flash_set('Subtask angelegt.', 'info');
+      flash_set($toJames ? 'Subtask angelegt & an James.' : 'Subtask angelegt.', 'info');
       header('Location: /?id=' . $newId);
       exit;
     }
@@ -859,7 +865,8 @@ renderHeader('Dashboard');
             <div class="row" style="margin-top:10px; align-items:center;">
               <span class="meta">Anhang optional:</span>
               <input type="file" name="attachment" accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt" style="width:auto; max-width:380px">
-              <button class="btn" type="submit">Speichern</button>
+              <button class="btn" name="submit_to" value="oliver" type="submit">Speichern</button>
+              <button class="btn" name="submit_to" value="james" type="submit">Speichern &gt; James</button>
             </div>
           </form>
 
@@ -885,7 +892,8 @@ renderHeader('Dashboard');
           <div class="row" style="margin-top:10px; align-items:center;">
             <span class="meta">Anhang optional:</span>
             <input type="file" name="attachment" accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt" style="width:auto; max-width:380px">
-            <button class="btn" type="submit">Absenden</button>
+            <button class="btn" name="submit_to" value="oliver" type="submit">Absenden</button>
+            <button class="btn" name="submit_to" value="james" type="submit">Absenden &gt; James</button>
           </div>
         </form>
       </div>
