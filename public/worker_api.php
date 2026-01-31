@@ -319,13 +319,13 @@ if ($action === 'cleanup_done_subtree') {
     $deleted += 1;
   }
 
-  // Prepend summary to parent and mark done
+  // Prepend summary to parent and mark as Umsetzung + todo_james (handoff back to James)
   $ts2 = date('d.m.Y H:i');
   $txt = "[auto] {$ts2} Zusammenfassung ##UMSETZUNG##\n\n" . rtrim($summary) . "\n\n";
   $txt .= "[auto] {$ts2} Cleanup: Attachments hochgezogen={$movedAtt}, Nodes geloescht={$deleted}\n\n";
   prependDesc($pdo, $nodeId, $txt);
-  $pdo->prepare('UPDATE nodes SET worker_status="done" WHERE id=?')->execute([$nodeId]);
-  logLine(date('Y-m-d H:i:s') . "  #{$nodeId}  [auto] {$ts2} Cleanup+Summary: moved_att={$movedAtt} deleted_nodes={$deleted}");
+  $pdo->prepare('UPDATE nodes SET worker_status="todo_james" WHERE id=?')->execute([$nodeId]);
+  logLine(date('Y-m-d H:i:s') . "  #{$nodeId}  [auto] {$ts2} Cleanup+Summary: moved_att={$movedAtt} deleted_nodes={$deleted} -> todo_james");
 
   out(true, 'cleaned', ['moved_attachments'=>$movedAtt, 'deleted_nodes'=>$deleted]);
 }
