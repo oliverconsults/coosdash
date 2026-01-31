@@ -321,7 +321,7 @@ if ($action === 'cleanup_done_subtree') {
 
   // Prepend summary to parent and mark done
   $ts2 = date('d.m.Y H:i');
-  $txt = "[auto] {$ts2} Zusammenfassung\n\n" . rtrim($summary) . "\n\n";
+  $txt = "[auto] {$ts2} Zusammenfassung ##UMSETZUNG##\n\n" . rtrim($summary) . "\n\n";
   $txt .= "[auto] {$ts2} Cleanup: Attachments hochgezogen={$movedAtt}, Nodes geloescht={$deleted}\n\n";
   prependDesc($pdo, $nodeId, $txt);
   $pdo->prepare('UPDATE nodes SET worker_status="done" WHERE id=?')->execute([$nodeId]);
