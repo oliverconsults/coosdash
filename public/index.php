@@ -699,7 +699,7 @@ renderHeader('Dashboard');
           <?php if ($createdTs): ?> am <?php echo h(date('d.m.Y H:i', $createdTs)); ?><?php endif; ?>
 
           <?php if ($isInProjekte && $tokIn !== null && $tokOut !== null && $wtTxt !== null): ?>
-            <span style="opacity:.65; white-space:nowrap;"> | Token in/out/all: <?php echo (int)$tokIn; ?>/<?php echo (int)$tokOut; ?>/<?php echo (int)$tokAll; ?>
+            <span style="white-space:nowrap;"> | Token in/out/all: <?php echo (int)$tokIn; ?>/<?php echo (int)$tokOut; ?>/<?php echo (int)$tokAll; ?>
               &nbsp; Worktime: <?php echo htmlspecialchars($wtTxt, ENT_QUOTES, 'UTF-8'); ?>
             </span>
           <?php endif; ?>
