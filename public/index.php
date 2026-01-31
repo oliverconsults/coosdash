@@ -416,7 +416,7 @@ function renderTree(array $byParent, array $byId, array $sectionByIdAll, array $
     $parts = [];
     if ($todoJames > 0) $parts[] = 'James: ' . $todoJames;
     if ($todoOliver > 0) $parts[] = 'Oliver: ' . $todoOliver;
-    if ($done > 0) $parts[] = 'Done: ' . $done;
+    // Intentionally hide Done-count in tree tags (reduces noise)
     $statusText = $parts ? implode(' | ', $parts) : '';
 
     $shade = max(0, min(4, $depth));
