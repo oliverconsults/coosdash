@@ -299,33 +299,104 @@ renderHeader('Setup');
 
 <?php if ($sel === 'worker_rules_block'): ?>
   <?php
-    // Preview: pick a *real* past job under "Projekte" that has at least one .md attachment.
-    // Then render the exact wrapped prompt that was sent.
+    // Preview: pick a random node under "Projekte" that has at least one .md attachment.
+    // Then build the *current* worker prompt (same logic as worker_queue_produce), wrap it,
+    // and use the most recent real job_id for that node if available.
     $wrapperPreview = '';
     $sample = null;
+
     try {
       $pdo = db();
-      $projectsId = projects_root_id($pdo);
-      if ($projectsId > 0) {
-        $sql = "SELECT w.id AS job_id, w.node_id, w.prompt_text
-                FROM worker_queue w
-                JOIN node_attachments a ON a.node_id = w.node_id
-                WHERE a.stored_name LIKE '%.md'
-                  AND w.prompt_text IS NOT NULL AND w.prompt_text <> ''
-                ORDER BY RAND()
-                LIMIT 1";
-        $stS = $pdo->query($sql);
-        $sample = $stS ? $stS->fetch(PDO::FETCH_ASSOC) : null;
+      $candidates = [];
+      $stC = $pdo->query("SELECT DISTINCT node_id FROM node_attachments WHERE stored_name LIKE '%.md' ORDER BY RAND() LIMIT 200");
+      $candidates = $stC ? $stC->fetchAll(PDO::FETCH_COLUMN) : [];
+
+      foreach ($candidates as $cid) {
+        $nid = (int)$cid;
+        if ($nid <= 0) continue;
+        if (project_root_for_node($pdo, $nid) <= 0) continue; // ensure under Projekte
+
+        // Find last real job_id for this node (if any)
+        $stJ = $pdo->prepare('SELECT id FROM worker_queue WHERE node_id=? ORDER BY id DESC LIMIT 1');
+        $stJ->execute([$nid]);
+        $jobId = (int)($stJ->fetchColumn() ?: 0);
+        if ($jobId <= 0) $jobId = 99999; // preview placeholder if none
+
+        // Load node
+        $stN = $pdo->prepare('SELECT id,title,description,blocked_until,blocked_by_node_id FROM nodes WHERE id=?');
+        $stN->execute([$nid]);
+        $node = $stN->fetch(PDO::FETCH_ASSOC);
+        if (!$node) continue;
+
+        // Build parent chain
+        $chain = [];
+        $cur = $nid;
+        for ($i=0; $i<40; $i++) {
+          $stP = $pdo->prepare('SELECT id,parent_id,title FROM nodes WHERE id=?');
+          $stP->execute([$cur]);
+          $r = $stP->fetch(PDO::FETCH_ASSOC);
+          if (!$r) break;
+          $chain[] = '#' . (int)$r['id'] . ' ' . (string)$r['title'];
+          if ($r['parent_id'] === null) break;
+          $cur = (int)$r['parent_id'];
+        }
+        $chain = array_reverse($chain);
+
+        $blockedUntil = (string)($node['blocked_until'] ?? '');
+        $blockedBy = (int)($node['blocked_by_node_id'] ?? 0);
+
+        // Build worker prompt (mirrors scripts/worker_queue_produce.php)
+        $jp = "# COOS Worker Job (aus Queue)\n\n";
+        $jp .= "JOB_ID={$jobId}\n";
+        $jp .= "TARGET_NODE_ID={$nid}\n";
+        $jp .= "TITLE=" . (string)$node['title'] . "\n\n";
+
+        $desc = (string)($node['description'] ?? '');
+        $isUmsetzung = (strpos($desc, '##UMSETZUNG##') !== false);
+        if ($isUmsetzung) {
+          $jp .= "AUFGABENTYP=UMSETZUNG (hart)\n";
+          $jp .= "- Erwartung: Endergebnis liefern und abschließen (nicht nur planen).\n";
+          $jp .= "- add_children nur im echten Notfall und nur wenn depth < 8 (kurz begründen).\n\n";
+        }
+
+        $jp .= "Sprache / Ton (hart):\n";
+        $jp .= "- Schreibe komplett auf Deutsch (keine englischen Labels wie SPLIT/DONE/etc.).\n";
+        $jp .= "- Sprich Oliver mit 'du' an (kurz, klar, technisch).\n\n";
+        $jp .= "Kette (Parent-Chain):\n- " . implode("\n- ", $chain) . "\n\n";
+        $jp .= "Kontext:\n";
+        if ($blockedBy > 0) $jp .= "- BLOCKED_BY_NODE_ID={$blockedBy}\n";
+        if ($blockedUntil !== '' && strtotime($blockedUntil)) $jp .= "- BLOCKED_UNTIL={$blockedUntil}\n";
+        $jp .= "\n";
+
+        $env = project_env_text_for_node($pdo, $nid);
+        if ($env !== '') {
+          $jp .= "PROJEKT_UMGEBUNG (immer beachten):\n";
+          $jp .= $env . "\n\n";
+        }
+
+        $jp .= $workerRulesCur . "\n";
+        $jp .= "\nOperational (English):\n";
+        $jp .= "- Quick healthcheck: php /home/deploy/projects/coos/scripts/worker_api_cli.php action=ping\n";
+
+        $jp .= "\nRegeln:\n";
+        $jp .= "- Vor done immer Runs/Ergebnis verifizieren.\n";
+        $jp .= "- Wichtig (Encoding): wenn du Umlaute/Sonderzeichen oder mehrere Zeilen schreibst, nutze *_b64 Parameter (headline_b64/body_b64).\n";
+        $jp .= "  Base64-Helfer (keine node -e Hacks): printf '%s' \"TEXT\" | php /home/deploy/projects/coos/scripts/b64_stdin.php\n";
+        $jp .= "- WICHTIG: Sobald du set_status todo_oliver setzt (Delegation an Oliver), ist der Job für dich beendet: KEINE weiteren Aktionen wie add_children / set_blocked_* / attachments danach. Direkt job_done.\n";
+        $jp .= "- Delegation ist NUR im Notfall erlaubt: Stelle GENAU 1 präzise Frage an Oliver (max. 2 Zeilen), dann set_status todo_oliver, dann job_done.\n";
+        $jp .= "- Bevor du delegierst: führe mindestens 2 konkrete Recon-Schritte durch (z.B. grep nach Entrypoint, runtime-tree check, cron/scripts check, Attachments/ENV check) und erwähne kurz was du geprüft hast.\n";
+        $jp .= "- Wenn dir Info fehlt: nutze D) FRAGE AN OLIVER (Delegation).\n";
+        $jp .= "- Wenn du nicht weiterkommst: job_fail mit kurzem Grund. Nach 3 fails blockt das System den Task.\n";
+        $jp .= "- Tool-KB: Wenn du ein Tool erfolgreich nutzt/installierst: /home/deploy/clawd/TOOLS.md + /home/deploy/clawd/tools/<tool>.md kurz updaten.\n";
+
+        // Wrap
+        $wrapperPreview = ($wrapperTplCur !== '') ? str_replace(['{JOB_ID}','{NODE_ID}','{JOB_PROMPT}'], [(string)$jobId, (string)$nid, $jp], $wrapperTplCur) : '';
+        $sample = ['job_id'=>$jobId, 'node_id'=>$nid];
+        break;
       }
     } catch (Throwable $e) {
       $sample = null;
-    }
-
-    if ($sample && $wrapperTplCur !== '') {
-      $jid = (string)((int)($sample['job_id'] ?? 0));
-      $nid = (string)((int)($sample['node_id'] ?? 0));
-      $jp = (string)($sample['prompt_text'] ?? '');
-      $wrapperPreview = str_replace(['{JOB_ID}','{NODE_ID}','{JOB_PROMPT}'], [$jid, $nid, $jp], $wrapperTplCur);
+      $wrapperPreview = '';
     }
   ?>
 
