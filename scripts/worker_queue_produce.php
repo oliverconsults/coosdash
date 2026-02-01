@@ -2,7 +2,7 @@
 // Produce a worker_queue job (open) if none is currently open/claimed.
 // Intended to run via Linux cron.
 
-require_once __DIR__ . '/../public/functions.inc.php';
+require_once __DIR__ . '/../public/functions_v3.inc.php';
 
 $pdo = db();
 
