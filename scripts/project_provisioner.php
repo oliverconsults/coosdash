@@ -107,36 +107,19 @@ foreach ($lines as $line) {
   @mkdir($sharedLogs, 0775, true);
   @mkdir($sharedArtifactsAtt, 0775, true);
 
-  // If docroot is only the placeholder we created earlier, switch it to symlink to repo/public
+  // Deploy note:
+  // Do NOT symlink docroot to /home/deploy/... because nginx (www-data) cannot traverse /home/deploy (750).
+  // Instead keep docroot as real dir under /var/www/t/... and copy starter files from repo/public if needed.
   $repoPublic = $repoPath . '/public';
-  if (is_dir($repoPublic)) {
-    $canLink = true;
-    if (is_link($docroot)) {
-      $canLink = false;
-    } elseif (is_dir($docroot)) {
-      $files = array_values(array_diff(@scandir($docroot) ?: [], ['.','..']));
-      if (count($files) === 1 && $files[0] === 'index.html') {
-        $html = @file_get_contents($docroot . '/index.html');
-        if (!is_string($html) || strpos($html, "OK {$slug}") === false) {
-          $canLink = false;
-        }
-      } elseif (count($files) === 0) {
-        // ok
-      } else {
-        $canLink = false;
-      }
-    } else {
-      // not a dir? ok to link
-    }
-
-    if ($canLink) {
-      // remove empty/placeholder dir
-      if (is_dir($docroot) && !is_link($docroot)) {
-        $files = array_values(array_diff(@scandir($docroot) ?: [], ['.','..']));
-        foreach ($files as $fn) { @unlink($docroot . '/' . $fn); }
-        @rmdir($docroot);
-      }
-      @symlink($repoPublic, $docroot);
+  if (is_dir($repoPublic) && is_dir($docroot)) {
+    $files = array_values(array_diff(@scandir($docroot) ?: [], ['.','..']));
+    $isPlaceholder = (count($files) === 1 && $files[0] === 'index.html');
+    if ($isPlaceholder) {
+      // Replace placeholder content with repo/public content
+      foreach ($files as $fn) { @unlink($docroot . '/' . $fn); }
+      // copy repo/public -> docroot
+      $outCp=[]; $rcCp=0;
+      exec('cp -a ' . escapeshellarg($repoPublic . '/.') . ' ' . escapeshellarg($docroot . '/') . ' 2>&1', $outCp, $rcCp);
     }
   }
 
