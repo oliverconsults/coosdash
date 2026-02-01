@@ -30,6 +30,35 @@ if ($job && !empty($job['prompt_text'])) {
   }
 }
 
+// Last delivered prompt (from /shared/llm job_*_prompt.txt)
+$lastDelivered = null;
+try {
+  $llmDir = '/var/www/coosdash/shared/llm';
+  $files = glob($llmDir . '/job_*_node_*_prompt.txt');
+  if (is_array($files) && $files) {
+    usort($files, fn($a,$b) => @filemtime($b) <=> @filemtime($a));
+    $f = $files[0];
+    $base = basename($f);
+    $raw = @file_get_contents($f);
+    if (!is_string($raw)) $raw = '';
+
+    $jobId = 0; $nodeId = 0;
+    if (preg_match('/^job_(\d+)_node_(\d+)_prompt\.txt$/', $base, $m)) {
+      $jobId = (int)$m[1];
+      $nodeId = (int)$m[2];
+    }
+    $lastDelivered = [
+      'file' => $base,
+      'job_id' => $jobId,
+      'node_id' => $nodeId,
+      'ts' => @date('Y-m-d H:i:s', (int)@filemtime($f)),
+      'text' => $raw,
+    ];
+  }
+} catch (Throwable $e) {
+  $lastDelivered = null;
+}
+
 renderHeader('Check next effective Prompt');
 ?>
 
@@ -59,6 +88,23 @@ renderHeader('Check next effective Prompt');
     <label>Raw job.prompt_text (as stored)</label>
     <textarea readonly style="min-height:260px; opacity:0.9; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:12px;"><?php echo h((string)$job['prompt_text']); ?></textarea>
 
+  <?php endif; ?>
+
+  <div style="height:18px"></div>
+
+  <h3>Last delivered prompt (aus LLM-Log)</h3>
+  <div class="meta">Zeigt den zuletzt an die Agent-Session gesendeten Effective Prompt (auch wenn die Queue schon wieder leer ist).</div>
+
+  <?php if (!$lastDelivered): ?>
+    <div class="meta">Kein job_*_prompt.txt gefunden.</div>
+  <?php else: ?>
+    <div class="meta">
+      <?php echo h((string)($lastDelivered['ts'] ?? '')); ?>
+      · job_id=<?php echo (int)($lastDelivered['job_id'] ?? 0); ?>
+      · node_id=<a href="/?id=<?php echo (int)($lastDelivered['node_id'] ?? 0); ?>">#<?php echo (int)($lastDelivered['node_id'] ?? 0); ?></a>
+      · file=<a href="/llm_file.php?f=<?php echo urlencode((string)$lastDelivered['file']); ?>"><?php echo h((string)$lastDelivered['file']); ?></a>
+    </div>
+    <textarea readonly style="min-height:360px; opacity:0.95; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:12px;"><?php echo h((string)$lastDelivered['text']); ?></textarea>
   <?php endif; ?>
 
   <div class="row" style="margin-top:12px;">
