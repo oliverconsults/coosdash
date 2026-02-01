@@ -165,6 +165,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if (is_link($linkPath)) {
         @unlink($linkPath);
       }
+
+      // Drop project DB + user (guard: NEVER touch coosdash/cooscrm db)
+      if ($err === '') {
+        $dbName = 'coos_' . str_replace('-', '_', $slug);
+        $dbUser = $dbName . '_app';
+
+        $cfg = @require '/var/www/coosdash/shared/config.local.php';
+        $coosDashDb = '';
+        if (is_array($cfg) && isset($cfg['db']['name'])) $coosDashDb = (string)$cfg['db']['name'];
+
+        if ($dbName === '' || $dbName === $coosDashDb || $dbName === 'cooscrm') {
+          $err = 'Safety: Refusing to drop protected DB.';
+        } else {
+          // best-effort mysql drop
+          $mysql = '/usr/bin/mysql';
+          $cmds = "DROP DATABASE IF EXISTS `{$dbName}`; DROP USER IF EXISTS `{$dbUser}`@`localhost`; FLUSH PRIVILEGES;";
+          @exec($mysql . ' -e ' . escapeshellarg($cmds) . ' 2>/dev/null');
+        }
+      }
     }
 
     if ($err !== '') {
