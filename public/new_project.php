@@ -2,6 +2,100 @@
 require_once __DIR__ . '/functions_v3.inc.php';
 requireLogin();
 
+// --- Load tree (same left navigation as dashboard) ---
+$pdo = db();
+$allNodes = $pdo->query("SELECT id, parent_id, title, worker_status, priority FROM nodes ORDER BY COALESCE(priority,999), id")->fetchAll(PDO::FETCH_ASSOC);
+$byParentAll = [];
+$byIdAll = [];
+foreach ($allNodes as $n) {
+  $pid = $n['parent_id'] === null ? 0 : (int)$n['parent_id'];
+  $byParentAll[$pid][] = $n;
+  $byIdAll[(int)$n['id']] = $n;
+}
+
+function buildSectionMap_np(array $byParentAll, int $parentId=0, string $section=''): array {
+  $out = [];
+  if (empty($byParentAll[$parentId])) return $out;
+  foreach ($byParentAll[$parentId] as $n) {
+    $id = (int)$n['id'];
+    $sec = $section;
+    if ($parentId === 0) $sec = (string)$n['title'];
+    $out[$id] = $sec;
+    $out += buildSectionMap_np($byParentAll, $id, $sec);
+  }
+  return $out;
+}
+
+function renderTree_np(array $byParent, array $byId, array $sectionById, int $currentId, int $parentId=0, int $depth=0, array $prefix=[]): void {
+  if (empty($byParent[$parentId])) return;
+
+  $i = 0;
+  foreach ($byParent[$parentId] as $n) {
+    $i++;
+    $id = (int)$n['id'];
+    $title = (string)($n['title'] ?? '');
+    $hasKids = !empty($byParent[$id]);
+    $isActive = ($id === (int)$currentId);
+
+    $indent = $depth * 5;
+    $numParts = array_merge($prefix, [$i]);
+    $num = implode('.', $numParts) . '.';
+
+    $shade = max(0, min(4, $depth));
+    $col = ['#d4af37','#f2d98a','#f6e7b9','#fbf3dc','#e8eefc'][$shade];
+
+    $sec = (string)($sectionById[$id] ?? '');
+    $msClass = '';
+    if ($sec === 'Gelöscht') $msClass = ' ms-canceled';
+    if ($sec === 'Später') $msClass = ' ms-later';
+
+    $href = '/?id=' . $id;
+    // Under "Ideen": clicking should jump here (prefilled)
+    if ($sec === 'Ideen' && (($byId[$id]['parent_id'] ?? null) !== null)) {
+      $href = '/new_project.php?from_node=' . $id;
+    }
+
+    if ($hasKids) {
+      // open if active or on path to active
+      $isOpen = $isActive;
+      if (!$isOpen && $currentId > 0) {
+        $cur = $currentId;
+        for ($j=0; $j<80; $j++) {
+          $row = $byId[$cur] ?? null;
+          if (!$row) break;
+          $pid = $row['parent_id'];
+          if ($pid === null) break;
+          $pid = (int)$pid;
+          if ($pid === $id) { $isOpen = true; break; }
+          $cur = $pid;
+        }
+      }
+
+      echo '<details class="tree-branch" ' . ($isOpen ? 'open' : '') . '>';
+      echo '<summary class="tree-item ' . ($isActive ? 'active' : '') . $msClass . '" style="margin-left:' . $indent . 'px">';
+      echo '<a href="' . h($href) . '" style="display:flex;align-items:center;gap:0;">'
+        . '<span style="color:' . $col . ';">' . h($num) . '</span>'
+        . '&nbsp;'
+        . '<span style="color:' . $col . ';">' . h($title) . '</span>'
+        . '</a>';
+      echo '</summary>';
+      renderTree_np($byParent, $byId, $sectionById, $currentId, $id, $depth+1, $numParts);
+      echo '</details>';
+    } else {
+      echo '<div class="tree-leaf">';
+      echo '<div class="tree-item ' . ($isActive ? 'active' : '') . $msClass . '" style="margin-left:' . $indent . 'px">';
+      echo '<a href="' . h($href) . '" style="display:flex;align-items:center;gap:0;">'
+        . '<span style="color:' . $col . ';">' . h($num) . '</span>'
+        . '&nbsp;'
+        . '<span style="color:' . $col . ';">' . h($title) . '</span>'
+        . '</a>';
+      echo '</div></div>';
+    }
+  }
+}
+
+$sectionByIdAll = buildSectionMap_np($byParentAll, 0, '');
+
 // Prompt key for the setup LLM (stored in prompts.json)
 $defaultSetupPrompt = "# COOS Project Setup (LLM)\n\n"
   . "Input:\n"
@@ -307,9 +401,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 renderHeader('Neues Projekt');
 ?>
 
-<div class="card">
-  <h2>Neues Projekt</h2>
-  <div class="meta">Erstellt einen Projekt-Node unter "Projekte" + Standard-Subtasks + queued Provisioning (t.coos.eu + DB + env.md) via Cron.</div>
+<div class="grid">
+  <div class="card">
+    <div class="row" style="justify-content:space-between; align-items:center;">
+      <h2 style="margin:0;">Projektansicht</h2>
+      <a class="btn btn-md" href="/">Zurück</a>
+    </div>
+    <div style="height:10px"></div>
+    <div class="tree">
+      <?php renderTree_np($byParentAll, $byIdAll, $sectionByIdAll, (int)$fromNodeId, 0, 0); ?>
+    </div>
+  </div>
+
+  <div>
+    <div class="card">
+      <h2>Neues Projekt</h2>
+      <div class="meta">Erstellt einen Projekt-Node unter "Projekte" + Standard-Subtasks + queued Provisioning (t.coos.eu + DB + env.md) via Cron.</div>
 
   <?php if ($err !== ''): ?>
     <div class="flash err"><?php echo h($err); ?></div>
@@ -342,6 +449,8 @@ renderHeader('Neues Projekt');
       <a class="btn" href="/setup.php">Setup</a>
     </div>
   </form>
+    </div>
+  </div>
 </div>
 
 <?php renderFooter();
