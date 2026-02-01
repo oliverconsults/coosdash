@@ -57,13 +57,21 @@ $MAX = 10;
 $enq = 0;
 
 // Candidate parents: any node under Projekte that is not done and has children.
-$st = $pdo->query('SELECT id,title,worker_status FROM nodes WHERE worker_status <> "done"');
+// Skip blocked nodes (blocked_until in the future) to avoid premature auto-close.
+$st = $pdo->query('SELECT id,title,worker_status,blocked_until FROM nodes WHERE worker_status <> "done"');
 $parents = $st->fetchAll(PDO::FETCH_ASSOC);
 
 foreach ($parents as $p) {
   if ($enq >= $MAX) break;
   $pid = (int)$p['id'];
   if ($pid <= 0) continue;
+
+  // Guard: do not auto-summarize/close blocked tasks
+  $bu = (string)($p['blocked_until'] ?? '');
+  if ($bu !== '' && strtotime($bu) > time()) {
+    continue;
+  }
+
   $depth = depthUnderRoot($pdo, $pid, $projectsId);
   if ($depth === null) continue;
 
@@ -103,6 +111,14 @@ foreach ($parents as $p) {
     }
   }
   $desc = array_values(array_unique($desc));
+
+  // Guard: if any descendant is blocked, skip (manual verification pending)
+  if ($desc) {
+    $inB = implode(',', array_fill(0, count($desc), '?'));
+    $stB = $pdo->prepare("SELECT COUNT(*) FROM nodes WHERE id IN ($inB) AND blocked_until IS NOT NULL AND blocked_until > NOW()");
+    $stB->execute($desc);
+    if ((int)$stB->fetchColumn() > 0) continue;
+  }
 
   // stability: all descendants must be older than minTs
   if ($desc) {

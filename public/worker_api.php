@@ -391,6 +391,12 @@ if ($action === 'cleanup_done_subtree') {
 
   $descIds = array_keys($desc);
 
+  // Guard: do not clean up blocked tasks
+  $bu = (string)($node['blocked_until'] ?? '');
+  if ($bu !== '' && strtotime($bu) > time()) {
+    out(false, 'node is blocked (blocked_until in future)');
+  }
+
   // Guard: all descendants must be done
   $in = implode(',', array_fill(0, count($descIds), '?'));
   $st = $pdo->prepare("SELECT COUNT(*) FROM nodes WHERE id IN ($in) AND worker_status <> 'done'");
