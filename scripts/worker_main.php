@@ -27,7 +27,7 @@ $statePath = '/var/www/coosdash/shared/data/james_state.json';
 $cfgPath = '/var/www/coosdash/shared/config.local.php';
 $consumerLockPath = '/var/www/coosdash/shared/tmp/worker_consumer.lock';
 $consumerLastRunPath = '/var/www/coosdash/shared/tmp/worker_consumer_last_run.txt';
-$consumerMinIntervalSec = 600; // throttle LLM usage (10 min)
+$consumerMinIntervalSec = 0; // no throttle (Oliver requested). Locking still prevents parallel LLM runs.
 
 function logline(string $msg) : void {
   global $logPath;
