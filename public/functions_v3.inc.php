@@ -370,11 +370,12 @@ function prompt_history_append(string $key, string $oldValue, string $newValue):
   ];
   @file_put_contents($p, json_encode($entry, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES) . "\n", FILE_APPEND);
 
-  // Keep only the last 100 entries (simple truncate)
+  // Keep only the last 5000 entries (simple truncate).
+  // (History is filtered per key in the UI; small global limits can evict other keys too quickly.)
   try {
     $lines = @file($p, FILE_IGNORE_NEW_LINES);
-    if (is_array($lines) && count($lines) > 100) {
-      $tail = array_slice($lines, -100);
+    if (is_array($lines) && count($lines) > 5000) {
+      $tail = array_slice($lines, -5000);
       @file_put_contents($p, implode("\n", $tail) . "\n");
     }
   } catch (Throwable $e) {
