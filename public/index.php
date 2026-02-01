@@ -222,6 +222,25 @@ try {
   $metricsRows = [];
 }
 
+// Done Projekte (direct children of root "Projekte") -> link to t.coos.eu/<slug>/
+$doneProjects = [];
+try {
+  projects_migrate($pdo);
+  $projectsId = projects_root_id($pdo);
+  if ($projectsId > 0) {
+    $st = $pdo->prepare("SELECT n.id, n.title, p.slug
+                         FROM nodes n
+                         JOIN projects p ON p.node_id = n.id
+                         WHERE n.parent_id = ? AND n.worker_status = 'done'
+                         ORDER BY n.updated_at DESC, n.id DESC
+                         LIMIT 60");
+    $st->execute([$projectsId]);
+    $doneProjects = $st->fetchAll(PDO::FETCH_ASSOC);
+  }
+} catch (Throwable $e) {
+  $doneProjects = [];
+}
+
 function svg_polyline_points(array $vals, float $w, float $h, int $pad=6): string {
   $n = count($vals);
   if ($n <= 0) return '';
@@ -605,6 +624,23 @@ renderHeader('Dashboard');
           <span class="meta"><?php echo h(date('d.m H:i', $tsLast)); ?></span>
         </div>
 
+      </div>
+    <?php endif; ?>
+
+    <?php if (!empty($doneProjects)): ?>
+      <div class="note" style="margin-top:12px">
+        <div class="head">Done Projekte</div>
+        <ul style="margin:0; padding-left:18px;">
+          <?php foreach ($doneProjects as $dp): ?>
+            <?php
+              $slug = (string)($dp['slug'] ?? '');
+              $title = (string)($dp['title'] ?? '');
+              if ($slug === '') continue;
+              $url = 'https://t.coos.eu/' . rawurlencode($slug) . '/';
+            ?>
+            <li><a href="<?php echo h($url); ?>" target="_blank" rel="noopener"><?php echo h($title); ?></a></li>
+          <?php endforeach; ?>
+        </ul>
       </div>
     <?php endif; ?>
   </div>
