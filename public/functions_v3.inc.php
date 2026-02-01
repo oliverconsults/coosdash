@@ -181,7 +181,7 @@ function renderHeader(string $title='COOS'): void {
       .kanban-card{display:block;padding:10px 10px;border-radius:12px;border:1px solid rgba(212,175,55,.18);background:linear-gradient(180deg, rgba(212,175,55,.10) 0%, rgba(15,22,35,.62) 55%, rgba(8,12,18,.75) 100%);color:var(--text)}
       .kanban-card:hover{border-color:rgba(212,175,55,.6);background:linear-gradient(180deg, rgba(212,175,55,.14) 0%, rgba(15,22,35,.72) 55%, rgba(8,12,18,.82) 100%);text-decoration:none}
       .kanban-card + .kanban-card{margin-top:8px}
-      .kanban-title{font-size:13px;line-height:1.2;margin:0}
+      .kanban-title{font-size:14px;line-height:1.25;margin:0}
       .kanban-meta{margin-top:6px;display:flex;gap:8px;align-items:center;justify-content:space-between}
       .pill{display:inline-block;font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid rgba(212,175,55,.22);color:var(--muted);white-space:nowrap}
       .pill.section{color:rgba(242,217,138,.95)}
