@@ -103,6 +103,39 @@ if ($blockedBy > 0) $prompt .= "- BLOCKED_BY_NODE_ID={$blockedBy}\n";
 if ($blockedUntil !== '' && strtotime($blockedUntil)) $prompt .= "- BLOCKED_UNTIL={$blockedUntil}\n";
 $prompt .= "\n";
 
+// Node text (description) – required to actually do the job
+$nodeText = trim((string)($node['description'] ?? ''));
+if ($nodeText !== '') {
+  // keep prompt compact
+  if (mb_strlen($nodeText) > 3500) $nodeText = mb_substr($nodeText, 0, 3500) . "\n…(truncated)";
+  $prompt .= "NODE_TEXT (description):\n";
+  $prompt .= $nodeText . "\n\n";
+}
+
+// Attachments (list only, keep small)
+try {
+  $stA = $pdo->prepare('SELECT token, stored_name, orig_name, created_at FROM node_attachments WHERE node_id=? ORDER BY id');
+  $stA->execute([$nodeId]);
+  $atts = $stA->fetchAll(PDO::FETCH_ASSOC);
+  if ($atts) {
+    $prompt .= "ATTACHMENTS (read via /att/...):\n";
+    $n = 0;
+    foreach ($atts as $a) {
+      if ($n >= 10) { $prompt .= "- …(more)\n"; break; }
+      $tok = (string)($a['token'] ?? '');
+      $fn = (string)($a['stored_name'] ?? '');
+      if ($tok === '' || $fn === '') continue;
+      $orig = (string)($a['orig_name'] ?? $fn);
+      $url = '/att/' . $tok . '/' . $fn;
+      $prompt .= "- {$orig} ({$url})\n";
+      $n++;
+    }
+    $prompt .= "\n";
+  }
+} catch (Throwable $e) {
+  // ignore
+}
+
 // Project env (always include if node is under Projekte)
 $env = project_env_text_for_node($pdo, $nodeId);
 if ($env !== '') {
