@@ -80,12 +80,20 @@ foreach ($lines as $line) {
   $sharedArtifactsAtt = $sharedArtifacts . '/att';
 
   // Project repo checkout (separate repo per project)
-  $repoBase = '/home/deploy/projects/t';
-  $repoPath = $repoBase . '/' . $slug;
+  // IMPORTANT: Repo must live under /var/www so nginx/php-fpm (www-data) can traverse it.
+  // /home/deploy is 750, so symlinking docroot -> /home/deploy/... causes 404.
+  $repoPath = $shared . '/repo';
 
-  @mkdir($repoBase, 0775, true);
   if (!is_dir($repoPath)) {
     @mkdir($repoPath, 0775, true);
+  }
+
+  // Convenience symlink for editing: /home/deploy/projects/t/<slug> -> /var/www/t/<slug>/shared/repo
+  $repoLinkBase = '/home/deploy/projects/t';
+  $repoLinkPath = $repoLinkBase . '/' . $slug;
+  @mkdir($repoLinkBase, 0775, true);
+  if (!is_link($repoLinkPath) && !is_dir($repoLinkPath)) {
+    @symlink($repoPath, $repoLinkPath);
   }
 
   // Initialize git repo if missing (empty starter)
@@ -107,19 +115,21 @@ foreach ($lines as $line) {
   @mkdir($sharedLogs, 0775, true);
   @mkdir($sharedArtifactsAtt, 0775, true);
 
-  // Deploy note:
-  // Do NOT symlink docroot to /home/deploy/... because nginx (www-data) cannot traverse /home/deploy (750).
-  // Instead keep docroot as real dir under /var/www/t/... and copy starter files from repo/public if needed.
+  // Live docroot should point to repo/public (both under /var/www), so edits are immediately visible.
   $repoPublic = $repoPath . '/public';
-  if (is_dir($repoPublic) && is_dir($docroot)) {
-    $files = array_values(array_diff(@scandir($docroot) ?: [], ['.','..']));
-    $isPlaceholder = (count($files) === 1 && $files[0] === 'index.html');
-    if ($isPlaceholder) {
-      // Replace placeholder content with repo/public content
-      foreach ($files as $fn) { @unlink($docroot . '/' . $fn); }
-      // copy repo/public -> docroot
-      $outCp=[]; $rcCp=0;
-      exec('cp -a ' . escapeshellarg($repoPublic . '/.') . ' ' . escapeshellarg($docroot . '/') . ' 2>&1', $outCp, $rcCp);
+  if (is_dir($repoPublic)) {
+    // Remove placeholder dir if present
+    if (is_dir($docroot) && !is_link($docroot)) {
+      $files = array_values(array_diff(@scandir($docroot) ?: [], ['.','..']));
+      // Only delete if it's empty or placeholder-only
+      $safe = (count($files) === 0) || (count($files) === 1 && $files[0] === 'index.html');
+      if ($safe) {
+        foreach ($files as $fn) { @unlink($docroot . '/' . $fn); }
+        @rmdir($docroot);
+      }
+    }
+    if (!is_link($docroot)) {
+      @symlink($repoPublic, $docroot);
     }
   }
 
