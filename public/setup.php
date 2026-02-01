@@ -276,7 +276,41 @@ renderHeader('Setup');
       }
 
       $preview .= $workerRulesCur . "\n";
-      $preview .= "\n… (restliche statische Teile: erwartetes Ergebnis / attachments / tools / hygiene / constraints / regeln)\n";
+
+      // Mirror the rest of worker_queue_produce.php so the preview shows the effective prompt.
+      $preview .= "\nErlaubte Aktionen:\n";
+      $preview .= "- prepend_update (headline, body) [oder headline_b64/body_b64]\n";
+      $preview .= "- set_status (worker_status=todo_james|todo_oliver|done)\n";
+      $preview .= "- set_blocked_by (blocked_by_node_id)\n";
+      $preview .= "- set_blocked_until (blocked_until=YYYY-MM-DD HH:MM)\n";
+      $preview .= "- add_children (titles = newline separated, max 6)\n";
+      $preview .= "- add_attachment (path, display_name optional)\n";
+      $preview .= "- job_done / job_fail (job_id, reason optional)\n";
+
+      $preview .= "\nErwartetes Ergebnis (wähle genau eins):\n";
+      $preview .= "A) FERTIG: prepend_update + add_attachment(s) (falls vorhanden) + set_status done + job_done\n";
+      $preview .= "B) ZERLEGT: add_children (4–6) + prepend_update (Plan) + job_done\n";
+      $preview .= "C) BLOCKIERT: set_blocked_until ODER set_blocked_by + prepend_update (Begründung) + job_done\n";
+      $preview .= "D) FRAGE AN OLIVER (Delegation): prepend_update (konkrete Frage + was du brauchst) + set_status todo_oliver + job_done\n";
+
+      $preview .= "\nAttachment-Regel:\n";
+      $preview .= "- Wenn du irgendeine Datei erzeugst (PDF/CSV/JSON/TXT/etc.): IMMER via add_attachment anhängen und im Update nur den Attachment-Link referenzieren (keine Serverpfade).\n";
+      $preview .= "- Wenn der Node schon relevante Attachments hat: kurz als Input erwähnen.\n";
+
+      $preview .= "\nTools:\n";
+      $preview .= "- Du darfst Shell/Files/Browser/Tools nutzen (Scope klein halten).\n";
+      $preview .= "- Du darfst kleine Helper-Skripte schreiben (PHP/Python/SQL) für repetitive Arbeit.\n";
+      $preview .= "- Keine externen/public Aktionen (Postings/E-Mail/neue Integrationen) ohne OK von Oliver.\n";
+
+      $preview .= "\nHygiene (wenn FERTIG):\n";
+      $preview .= "- Check: Verifikation/Run? QA/Edge Cases? Integration/Deploy/Monitoring? Docs/How-to?\n";
+      $preview .= "- Wenn etwas fehlt: 1–4 Subtasks unter demselben Parent (max 4) + kurzer Grund.\n";
+
+      $preview .= "\nConstraints:\n";
+      $preview .= "- Neue Task-Titel <= 40 Zeichen.\n";
+
+      $preview .= "\nOperational (English):\n";
+      $preview .= "- Quick healthcheck: php /home/deploy/projects/coos/scripts/worker_api_cli.php action=ping\n";
     }
   } catch (Throwable $e) {
     $preview = '';
