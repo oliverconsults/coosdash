@@ -51,6 +51,7 @@ $tsLine = date('Y-m-d H:i:s');
 $did = [
   'unblocked' => 0,
   'closed' => 0,
+  'reactivated' => 0,
 ];
 
 // 1) auto-unblock
@@ -80,10 +81,40 @@ foreach ($rows as $r) {
 // Summary+cleanup pipeline stays enabled separately.
 // (If you want this back later, re-enable this block.)
 
+// 3) Reactivate canceled queue jobs (older than 30 minutes)
+// Goal: canceled jobs should not permanently block progress. After cooldown, put them back to 'open'
+// so worker_main can pick them up again.
+$st = $pdo->prepare(
+  "SELECT id,node_id,created_at,updated_at FROM worker_queue " .
+  "WHERE status='canceled' AND updated_at < DATE_SUB(NOW(), INTERVAL 30 MINUTE) " .
+  "ORDER BY updated_at ASC LIMIT 50"
+);
+$st->execute();
+$canceled = $st->fetchAll(PDO::FETCH_ASSOC);
+foreach ($canceled as $r) {
+  $jid = (int)$r['id'];
+  $nid = (int)$r['node_id'];
+  if ($jid <= 0 || $nid <= 0) continue;
+  // only under Projekte
+  if (!isUnderRoot($pdo, $nid, $projectsId)) continue;
+
+  // If there is already an open/claimed job for that node, keep this one canceled.
+  $st2 = $pdo->prepare("SELECT COUNT(*) FROM worker_queue WHERE node_id=? AND status IN ('open','claimed')");
+  $st2->execute([$nid]);
+  if ((int)$st2->fetchColumn() > 0) continue;
+
+  // Reactivate the job
+  $pdo->prepare("UPDATE worker_queue SET status='open', claimed_by=NULL, claimed_at=NULL, done_at=NULL WHERE id=? AND status='canceled'")
+      ->execute([$jid]);
+
+  @file_put_contents('/var/www/coosdash/shared/logs/worker.log', $tsLine . "  #{$nid}  [auto] {$tsHuman} Queue reactivated: canceled job #{$jid} -> open\n", FILE_APPEND);
+  $did['reactivated']++;
+}
+
 // log
 $logDir = '/var/www/coosdash/shared/logs';
 @mkdir($logDir, 0775, true);
 $log = $logDir . '/worker_maintenance.log';
-file_put_contents($log, $tsLine . " autoclose={$did['closed']} unblock={$did['unblocked']}\n", FILE_APPEND);
+file_put_contents($log, $tsLine . " autoclose={$did['closed']} unblock={$did['unblocked']} reactivated={$did['reactivated']}\n", FILE_APPEND);
 
-echo date('Y-m-d H:i:s') . "  OK autoclose={$did['closed']} unblock={$did['unblocked']}\n";
+echo date('Y-m-d H:i:s') . "  OK autoclose={$did['closed']} unblock={$did['unblocked']} reactivated={$did['reactivated']}\n";
