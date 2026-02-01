@@ -299,23 +299,48 @@ renderHeader('Setup');
 
 <?php if ($sel === 'worker_rules_block'): ?>
   <?php
-    // Build wrapped (effective) prompt preview here (must be computed before output)
+    // Preview: pick a *real* past job under "Projekte" that has at least one .md attachment.
+    // Then render the exact wrapped prompt that was sent.
     $wrapperPreview = '';
-    if ($wrapperTplCur !== '') {
-      $wrapperPreview = str_replace(
-        ['{JOB_ID}','{NODE_ID}','{JOB_PROMPT}'],
-        ['12345', ($nodeId ?? 0) ? (string)$nodeId : '0', ($preview !== '' ? $preview : '[no worker prompt preview available]')],
-        $wrapperTplCur
-      );
+    $sample = null;
+    try {
+      $pdo = db();
+      $projectsId = projects_root_id($pdo);
+      if ($projectsId > 0) {
+        $sql = "SELECT w.id AS job_id, w.node_id, w.prompt_text
+                FROM worker_queue w
+                JOIN node_attachments a ON a.node_id = w.node_id
+                WHERE a.stored_name LIKE '%.md'
+                  AND w.prompt_text IS NOT NULL AND w.prompt_text <> ''
+                ORDER BY RAND()
+                LIMIT 1";
+        $stS = $pdo->query($sql);
+        $sample = $stS ? $stS->fetch(PDO::FETCH_ASSOC) : null;
+      }
+    } catch (Throwable $e) {
+      $sample = null;
+    }
+
+    if ($sample && $wrapperTplCur !== '') {
+      $jid = (string)((int)($sample['job_id'] ?? 0));
+      $nid = (string)((int)($sample['node_id'] ?? 0));
+      $jp = (string)($sample['prompt_text'] ?? '');
+      $wrapperPreview = str_replace(['{JOB_ID}','{NODE_ID}','{JOB_PROMPT}'], [$jid, $nid, $jp], $wrapperTplCur);
     }
   ?>
+
   <div class="card" style="margin-top:14px;">
-    <h2>Preview: Effektiver LLM Prompt (Wrapper + env.md + Worker)</h2>
-    <div class="meta">Das ist der effektiv gesendete Prompt: <code>wrapper_prompt_template</code> mit <code>{JOB_PROMPT}</code> (= Worker Prompt inkl. env.md) gefüllt. (JOB_ID ist Dummy)</div>
+    <h2>Preview: Effektiver LLM Prompt (Wrapper + Worker)</h2>
+    <div class="meta">
+      Realer Beispiel-Call aus <code>worker_queue</code> (random Job mit .md Attachment).<?php if ($sample): ?>
+        &nbsp;job_id=<?php echo (int)$sample['job_id']; ?> · node_id=<a href="/?id=<?php echo (int)$sample['node_id']; ?>">#<?php echo (int)$sample['node_id']; ?></a>
+      <?php endif; ?>
+    </div>
+
     <?php if ($wrapperPreview !== ''): ?>
-      <textarea readonly style="min-height:260px; opacity:0.95;"><?php echo h($wrapperPreview); ?></textarea>
+      <textarea readonly style="min-height:300px; opacity:0.95;"><?php echo h($wrapperPreview); ?></textarea>
     <?php else: ?>
-      <div class="meta">Kein Wrapper-Template gesetzt oder kein Worker-Prompt Preview verfügbar.</div>
+      <div class="meta">Kein geeignetes Beispiel gefunden (benötigt mindestens einen Job mit .md Attachment) oder Wrapper-Template fehlt.</div>
     <?php endif; ?>
   </div>
 <?php endif; ?>
