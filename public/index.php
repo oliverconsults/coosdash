@@ -994,7 +994,7 @@ renderHeader('Dashboard');
 
     <?php elseif ($view === 'kanban'): ?>
       <?php
-        // Simple Kanban view (leafs under Projekte)
+        // Kanban view (leafs under Projekte) – restore richer cards (project name + time since done)
         $projectsRootIdK = 0;
         foreach ($roots as $r) { if (((string)($r['title'] ?? '')) === 'Projekte') $projectsRootIdK = (int)$r['id']; }
 
@@ -1011,6 +1011,21 @@ renderHeader('Dashboard');
             $cur = $pid;
           }
           return false;
+        };
+
+        $topProjectTitleK = function(int $nodeId) use ($byIdAll, $projectsRootIdK): string {
+          if ($nodeId <= 0 || !$projectsRootIdK) return '';
+          $cur = $nodeId;
+          for ($i=0; $i<140; $i++) {
+            $row = $byIdAll[$cur] ?? null;
+            if (!$row) return '';
+            $pid = $row['parent_id'];
+            if ($pid === null) return '';
+            $pid = (int)$pid;
+            if ($pid === $projectsRootIdK) return (string)($row['title'] ?? '');
+            $cur = $pid;
+          }
+          return '';
         };
 
         $isBlockedK = function(int $id) use ($byIdAll): bool {
@@ -1041,11 +1056,18 @@ renderHeader('Dashboard');
           $cols[$key][] = [
             'id' => $id,
             'title' => (string)($n['title'] ?? ''),
+            'project' => $topProjectTitleK($id),
             'updated_at' => (string)($n['updated_at'] ?? ''),
+            'has_att' => !empty($attCountById[$id] ?? 0),
           ];
         }
         foreach ($cols as $k => $arr) {
-          usort($arr, fn($a,$b) => strcmp((string)($b['updated_at'] ?? ''), (string)($a['updated_at'] ?? '')) ?: (($b['id']??0) <=> ($a['id']??0)));
+          usort($arr, function($a,$b){
+            $ta = (string)($a['updated_at'] ?? '');
+            $tb = (string)($b['updated_at'] ?? '');
+            if ($ta === $tb) return ((int)($b['id']??0) <=> (int)($a['id']??0));
+            return strcmp($tb, $ta);
+          });
           $cols[$k] = $arr;
         }
         $colTitle = ['todo_oliver'=>'ToDo (Oliver)','todo_james'=>'ToDo (James)','blocked'=>'BLOCKED','done'=>'Done'];
@@ -1065,9 +1087,33 @@ renderHeader('Dashboard');
               <?php else: ?>
                 <?php foreach (array_slice($cols[$col], 0, 40) as $c): ?>
                   <a class="kanban-card" href="/?id=<?php echo (int)$c['id']; ?>">
-                    <div class="kanban-title"><?php echo h($c['title']); ?></div>
+                    <div class="kanban-title"><?php echo h($c['title']); ?><?php if (!empty($c['has_att'])): ?> <span class="att-clip" title="Attachment">📁</span><?php endif; ?></div>
                     <div class="kanban-meta">
-                      <span class="pill dim"><?php echo h('#' . (int)$c['id']); ?></span>
+                      <span class="pill section"><?php echo h((string)($c['project'] ?? '')); ?></span>
+                      <?php
+                        $right = '#' . (int)$c['id'];
+                        if ($col === 'done') {
+                          $ts = strtotime((string)($c['updated_at'] ?? ''));
+                          if ($ts) {
+                            $delta = time() - $ts;
+                            if ($delta < 0) $delta = 0;
+                            if ($delta < 60) {
+                              $right = 'vor ' . $delta . 's · ' . $right;
+                            } elseif ($delta < 90*60) {
+                              $mins = (int)round($delta / 60);
+                              $right = 'vor ' . $mins . ' Min. · ' . $right;
+                            } elseif ($delta < 48*3600) {
+                              $hrs = $delta / 3600;
+                              $hrsTxt = ($hrs < 10) ? number_format($hrs, 1, ',', '') : (string)round($hrs);
+                              $right = 'vor ' . $hrsTxt . 'h · ' . $right;
+                            } else {
+                              $days = (int)round($delta / 86400);
+                              $right = 'vor ' . $days . 'd · ' . $right;
+                            }
+                          }
+                        }
+                      ?>
+                      <span class="pill dim"><?php echo h($right); ?></span>
                     </div>
                   </a>
                 <?php endforeach; ?>
