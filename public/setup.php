@@ -153,6 +153,7 @@ renderHeader('Setup');
       'summary_cleanup_instructions' => 'Summary+Cleanup Prompt – Instructions Block',
       'wrapper_prompt_template' => 'Wrapper Prompt Template (worker_main)',
       'project_setup_prompt' => 'Neues Projekt – Setup LLM Script',
+      'check_next_effective_prompt' => 'Check next effective Prompt (Queue)',
     ];
     if (!isset($options[$sel])) $sel = 'worker_rules_block';
   ?>
@@ -179,6 +180,39 @@ renderHeader('Setup');
       <label><?php echo h($options[$sel]); ?></label>
       <div class="meta">Placeholders: {TITLE}, {SLUG}, {DESCRIPTION}</div>
       <textarea name="project_setup_prompt" style="min-height:260px;"><?php echo h($projectSetupCur); ?></textarea>
+    <?php elseif ($sel === 'check_next_effective_prompt'): ?>
+      <?php
+        $job = null;
+        $effective = '';
+        try {
+          $pdo = db();
+          $st = $pdo->query("SELECT id,node_id,status,prompt_text,created_at FROM worker_queue WHERE status IN ('open','claimed') ORDER BY id ASC LIMIT 1");
+          $job = $st ? $st->fetch(PDO::FETCH_ASSOC) : null;
+        } catch (Throwable $e) {
+          $job = null;
+        }
+        if ($job) {
+          $effective = str_replace(
+            ['{JOB_ID}','{NODE_ID}','{JOB_PROMPT}'],
+            [(string)(int)$job['id'], (string)(int)$job['node_id'], (string)($job['prompt_text'] ?? '')],
+            $wrapperTplCur
+          );
+        }
+      ?>
+
+      <label><?php echo h($options[$sel]); ?></label>
+      <div class="meta">Read-only. Zeigt den nächsten Job aus <code>worker_queue</code> (open/claimed) als effektiven LLM-Prompt (Wrapper + Job Prompt).</div>
+
+      <?php if (!$job): ?>
+        <div class="meta">Kein nächster Job gefunden.</div>
+      <?php else: ?>
+        <div class="meta">job_id=<?php echo (int)$job['id']; ?> · node_id=<a href="/?id=<?php echo (int)$job['node_id']; ?>">#<?php echo (int)$job['node_id']; ?></a> · status=<?php echo h((string)$job['status']); ?> · created_at=<?php echo h((string)$job['created_at']); ?></div>
+        <textarea readonly style="min-height:320px; opacity:0.95; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:12px;"><?php echo h($effective); ?></textarea>
+        <div style="height:12px"></div>
+        <label>Raw job.prompt_text</label>
+        <textarea readonly style="min-height:220px; opacity:0.9; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:12px;"><?php echo h((string)($job['prompt_text'] ?? '')); ?></textarea>
+      <?php endif; ?>
+
     <?php else: ?>
       <label><?php echo h($options[$sel]); ?></label>
       <div class="meta">Placeholders: {JOB_ID}, {NODE_ID}, {JOB_PROMPT}</div>
@@ -186,7 +220,9 @@ renderHeader('Setup');
     <?php endif; ?>
 
     <div class="row" style="margin-top:10px">
-      <button class="btn btn-gold" type="submit">Speichern</button>
+      <?php if ($sel !== 'check_next_effective_prompt'): ?>
+        <button class="btn btn-gold" type="submit">Speichern</button>
+      <?php endif; ?>
       <a class="btn" href="/">Zurück</a>
     </div>
   </form>

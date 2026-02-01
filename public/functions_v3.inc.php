@@ -223,7 +223,6 @@ function renderHeader(string $title='COOS'): void {
             </a>
             <a class="btn" href="/workerlog.php">Worker Log</a>
             <a class="btn" href="/setup.php">Setup</a>
-            <a class="btn" href="/worker_next.php">Check next effective Prompt</a>
             <a class="btn" href="/new_project.php">Neues Projekt</a>
             <!-- Login Log removed -->
             <a class="btn" href="/logout.php">Logout</a>
