@@ -1,0 +1,9 @@
+{
+  "in_pdf": "/tmp/repro-in.pdf",
+  "xml_path": "/tmp/repro-in.xml",
+  "out_pdf": "/tmp/repro-out.pdf",
+  "map_helvetica": true,
+  "map_helvetica_unsafe_ok": true,
+  "verify": "verapdf",
+  "verapdf_flavour": "3b"
+}

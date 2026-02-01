@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node ci_verapdf_test.js",
+    "test:verapdf": "node ci_verapdf_test.js",
     "embed:json": "node pdf_embed_cli.js"
   },
   "keywords": [],
