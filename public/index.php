@@ -409,22 +409,22 @@ function renderTree(array $byParent, array $byId, array $sectionByIdAll, array $
     $stack = [$id];
     while ($stack) {
       $curId = array_pop($stack);
+
+      // Count self (non-container)
+      $isRootNode = (($byId[$curId]['parent_id'] ?? null) === null);
+      $tTitle = (string)($byId[$curId]['title'] ?? '');
+      $isContainerRootNode = $isRootNode && in_array($tTitle, ['Ideen','Projekte','Später','Gelöscht'], true);
+      if (!$isContainerRootNode) {
+        $stSelf = (string)($byId[$curId]['worker_status'] ?? '');
+        if ($stSelf === 'todo_james') $todoJames++;
+        if ($stSelf === 'todo_oliver') $todoOliver++;
+        if ($stSelf === 'done') $done++;
+      }
+
+      // Continue traversal
       $kids = $byParent[$curId] ?? [];
       if ($kids) {
         foreach ($kids as $cc) $stack[] = (int)$cc['id'];
-      } else {
-        // Leaf counting: ignore container roots (Ideen/Projekte/Später/Gelöscht)
-        $isRootLeaf = (($byId[$curId]['parent_id'] ?? null) === null);
-        $tTitle = (string)($byId[$curId]['title'] ?? '');
-        $isContainerRootLeaf = $isRootLeaf && in_array($tTitle, ['Ideen','Projekte','Später','Gelöscht'], true);
-        if ($isContainerRootLeaf) {
-          continue;
-        }
-
-        $st = (string)($byId[$curId]['worker_status'] ?? '');
-        if ($st === 'todo_james') $todoJames++;
-        if ($st === 'todo_oliver') $todoOliver++;
-        if ($st === 'done') $done++;
       }
     }
     $parts = [];
