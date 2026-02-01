@@ -74,6 +74,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $setupPromptTpl
     );
 
+    // Log effective prompt + raw response to llm_file.php viewer
+    $llmDir = '/var/www/coosdash/shared/llm';
+    @mkdir($llmDir, 0775, true);
+    $reqId = 'project_setup_' . date('Ymd_His') . '_' . preg_replace('/[^a-z0-9\-]+/','', $slug);
+    $promptFile = $llmDir . '/' . $reqId . '_prompt.txt';
+    $respFile = $llmDir . '/' . $reqId . '_response.txt';
+    @file_put_contents($promptFile, $setupPrompt);
+
     $llmJson = null;
     try {
       $cmd = 'clawdbot agent --session-id ' . escapeshellarg('coos-project-setup')
@@ -83,6 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $rc = 0;
       exec($cmd . ' 2>&1', $out, $rc);
       $raw = trim(implode("\n", $out));
+      @file_put_contents($respFile, $raw);
 
       // Best-effort: extract first JSON object from response
       $jsonText = $raw;

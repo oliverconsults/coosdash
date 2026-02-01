@@ -7,7 +7,7 @@ $f = (string)($_GET['f'] ?? '');
 $f = basename($f);
 
 // allow only our generated files
-if ($f === '' || !preg_match('/^job_\d+_node_\d+_(prompt|response)\.txt$/', $f)) {
+if ($f === '' || !preg_match('/^(job_\d+_node_\d+_(prompt|response)|project_setup_\d{8}_\d{6}_[a-z0-9\-]+_(prompt|response))\.txt$/', $f)) {
   http_response_code(400);
   echo 'bad file';
   exit;
