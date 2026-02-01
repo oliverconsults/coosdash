@@ -630,7 +630,7 @@ renderHeader('Dashboard');
     <?php if (!empty($doneProjects)): ?>
       <div class="note" style="margin-top:12px">
         <div class="head">Done Projekte</div>
-        <ul style="margin:0; padding-left:18px;">
+        <ul style="margin:0; padding-left:18px; font-size:12px;">
           <?php foreach ($doneProjects as $dp): ?>
             <?php
               $slug = (string)($dp['slug'] ?? '');
