@@ -298,6 +298,22 @@ if ($action === 'set_status') {
   out(true, 'status set');
 }
 
+if ($action === 'set_status_silent') {
+  $st = (string)($_REQUEST['worker_status'] ?? '');
+  $allowed = ['todo_james','todo_oliver','done'];
+  if (!in_array($st, $allowed, true)) out(false, 'invalid worker_status');
+
+  $curStatus = (string)($node['worker_status'] ?? '');
+  if ($curStatus === $st) {
+    out(true, 'status unchanged');
+  }
+
+  $pdo->prepare('UPDATE nodes SET worker_status=? WHERE id=?')->execute([$st, $nodeId]);
+  // Do NOT write into node.description (keeps project descriptions clean).
+  logLine("{$tsLog}  #{$nodeId}  [auto] {$ts} Statusänderung (silent): {$st}");
+  out(true, 'status set (silent)');
+}
+
 if ($action === 'set_blocked_by') {
   $bid = (int)($_REQUEST['blocked_by_node_id'] ?? 0);
   if ($bid <= 0 || $bid === $nodeId) out(false, 'invalid blocked_by_node_id');
