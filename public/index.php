@@ -550,9 +550,9 @@ renderHeader('Dashboard');
           $hrefKanban = '/kanban.php' . ($baseQs ? ('?' . http_build_query($baseQs)) : '');
           $hrefReport = '/report.php' . ($baseQs ? ('?' . http_build_query($baseQs)) : '');
         ?>
-        <a class="btn btn-md <?php echo $view==='work'?'active':''; ?>" href="<?php echo h($hrefWork); ?>">Work</a>
-        <a class="btn btn-md <?php echo $view==='kanban'?'active':''; ?>" href="<?php echo h($hrefKanban); ?>">Kanban</a>
-        <a class="btn btn-md <?php echo $view==='report'?'active':''; ?>" href="<?php echo h($hrefReport); ?>">Report</a>
+        <a class="btn btn-md <?php echo $view==='work'?'btn-gold active':''; ?>" href="<?php echo h($hrefWork); ?>">Work</a>
+        <a class="btn btn-md <?php echo $view==='kanban'?'btn-gold active':''; ?>" href="<?php echo h($hrefKanban); ?>">Kanban</a>
+        <a class="btn btn-md <?php echo $view==='report'?'btn-gold active':''; ?>" href="<?php echo h($hrefReport); ?>">Report</a>
       </div>
     </div>
 

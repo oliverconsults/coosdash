@@ -152,8 +152,8 @@ function renderHeader(string $title='COOS'): void {
       .btn-sm{padding:6px 10px;border-radius:10px;font-size:12px;line-height:1.1}
       .btn:hover{background:rgba(15,22,35,1);border-color:rgba(212,175,55,.35);box-shadow:0 10px 26px rgba(0,0,0,.35), 0 0 0 1px rgba(212,175,55,.08) inset;transform:translateY(-1px)}
       .btn:active{transform:translateY(0px);box-shadow:0 6px 14px rgba(0,0,0,.28)}
-      .btn-gold{border-color:rgba(212,175,55,.85);background:linear-gradient(180deg, rgba(212,175,55,.28) 0%, rgba(212,175,55,.14) 60%, rgba(15,22,35,.92) 100%);box-shadow:0 0 0 1px rgba(212,175,55,.18) inset, 0 10px 26px rgba(0,0,0,.28)}
-      .btn-gold:hover{border-color:rgba(255,215,128,.95);box-shadow:0 12px 34px rgba(0,0,0,.38), 0 0 0 1px rgba(255,215,128,.22) inset}
+      .btn-gold, .btn.active{border-color:rgba(212,175,55,.85);background:linear-gradient(180deg, rgba(212,175,55,.28) 0%, rgba(212,175,55,.14) 60%, rgba(15,22,35,.92) 100%);box-shadow:0 0 0 1px rgba(212,175,55,.18) inset, 0 10px 26px rgba(0,0,0,.28)}
+      .btn-gold:hover, .btn.active:hover{border-color:rgba(255,215,128,.95);box-shadow:0 12px 34px rgba(0,0,0,.38), 0 0 0 1px rgba(255,215,128,.22) inset}
 
       /* James button: keep gold style, no animation */
       .btn-james{padding:5px 12px; border-radius:12px;}
