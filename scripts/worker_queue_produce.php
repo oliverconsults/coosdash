@@ -112,41 +112,10 @@ if ($env !== '') {
   $prompt .= $env . "\n\n";
 }
 
-$defaultRules = "Wie du Änderungen machst (PFLICHT):\n"
-  . "- KEINE direkten SQL-Writes in der **cooscrm** DB. Für cooscrm ausschließlich den CLI-Wrapper nutzen: php /home/deploy/projects/coos/scripts/worker_api_cli.php ...\n"
-  . "- Eigene Projekt-Datenbank (z.B. *_rv/*_test): direkte SQL-Writes sind erlaubt, wenn nötig (vorsichtig, nachvollziehbar).\n"
-  . "- Beispiel: php /home/deploy/projects/coos/scripts/worker_api_cli.php action=ping\n";
-
 $prompt .= prompt_require('worker_rules_block');
-$prompt .= "\nErlaubte Aktionen:\n";
-$prompt .= "- prepend_update (headline, body) [oder headline_b64/body_b64]\n";
-$prompt .= "- set_status (worker_status=todo_james|todo_oliver|done)\n";
-$prompt .= "- set_blocked_by (blocked_by_node_id)\n";
-$prompt .= "- set_blocked_until (blocked_until=YYYY-MM-DD HH:MM)\n";
-$prompt .= "- add_children (titles = newline separated, max 6)\n";
-$prompt .= "- add_attachment (path, display_name optional)\n";
-$prompt .= "- job_done / job_fail (job_id, reason optional)\n";
-$prompt .= "\nErwartetes Ergebnis (wähle genau eins):\n";
-$prompt .= "A) FERTIG: prepend_update + add_attachment(s) (falls vorhanden) + set_status done + job_done\n";
-$prompt .= "B) ZERLEGT: add_children (4–6) + prepend_update (Plan) + job_done\n";
-$prompt .= "C) BLOCKIERT: set_blocked_until ODER set_blocked_by + prepend_update (Begründung) + job_done\n";
-$prompt .= "D) FRAGE AN OLIVER (Delegation): prepend_update (konkrete Frage + was du brauchst) + set_status todo_oliver + job_done\n";
 
-$prompt .= "\nAttachment-Regel:\n";
-$prompt .= "- Wenn du irgendeine Datei erzeugst (PDF/CSV/JSON/TXT/etc.): IMMER via add_attachment anhängen und im Update nur den Attachment-Link referenzieren (keine Serverpfade).\n";
-$prompt .= "- Wenn der Node schon relevante Attachments hat: kurz als Input erwähnen.\n";
-
-$prompt .= "\nTools:\n";
-$prompt .= "- Du darfst Shell/Files/Browser/Tools nutzen (Scope klein halten).\n";
-$prompt .= "- Du darfst kleine Helper-Skripte schreiben (PHP/Python/SQL) für repetitive Arbeit.\n";
-$prompt .= "- Keine externen/public Aktionen (Postings/E-Mail/neue Integrationen) ohne OK von Oliver.\n";
-
-$prompt .= "\nHygiene (wenn FERTIG):\n";
-$prompt .= "- Check: Verifikation/Run? QA/Edge Cases? Integration/Deploy/Monitoring? Docs/How-to?\n";
-$prompt .= "- Wenn etwas fehlt: 1–4 Subtasks unter demselben Parent (max 4) + kurzer Grund.\n";
-
-$prompt .= "\nConstraints:\n";
-$prompt .= "- Neue Task-Titel <= 40 Zeichen.\n";
+$prompt .= "\nOperational (English):\n";
+$prompt .= "- Quick healthcheck: php /home/deploy/projects/coos/scripts/worker_api_cli.php action=ping\n";
 
 $prompt .= "\nRegeln:\n";
 $prompt .= "- Vor done immer Runs/Ergebnis verifizieren.\n";

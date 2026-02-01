@@ -277,40 +277,20 @@ renderHeader('Setup');
 
       $preview .= $workerRulesCur . "\n";
 
-      // Mirror the rest of worker_queue_produce.php so the preview shows the effective prompt.
-      $preview .= "\nErlaubte Aktionen:\n";
-      $preview .= "- prepend_update (headline, body) [oder headline_b64/body_b64]\n";
-      $preview .= "- set_status (worker_status=todo_james|todo_oliver|done)\n";
-      $preview .= "- set_blocked_by (blocked_by_node_id)\n";
-      $preview .= "- set_blocked_until (blocked_until=YYYY-MM-DD HH:MM)\n";
-      $preview .= "- add_children (titles = newline separated, max 6)\n";
-      $preview .= "- add_attachment (path, display_name optional)\n";
-      $preview .= "- job_done / job_fail (job_id, reason optional)\n";
-
-      $preview .= "\nErwartetes Ergebnis (wähle genau eins):\n";
-      $preview .= "A) FERTIG: prepend_update + add_attachment(s) (falls vorhanden) + set_status done + job_done\n";
-      $preview .= "B) ZERLEGT: add_children (4–6) + prepend_update (Plan) + job_done\n";
-      $preview .= "C) BLOCKIERT: set_blocked_until ODER set_blocked_by + prepend_update (Begründung) + job_done\n";
-      $preview .= "D) FRAGE AN OLIVER (Delegation): prepend_update (konkrete Frage + was du brauchst) + set_status todo_oliver + job_done\n";
-
-      $preview .= "\nAttachment-Regel:\n";
-      $preview .= "- Wenn du irgendeine Datei erzeugst (PDF/CSV/JSON/TXT/etc.): IMMER via add_attachment anhängen und im Update nur den Attachment-Link referenzieren (keine Serverpfade).\n";
-      $preview .= "- Wenn der Node schon relevante Attachments hat: kurz als Input erwähnen.\n";
-
-      $preview .= "\nTools:\n";
-      $preview .= "- Du darfst Shell/Files/Browser/Tools nutzen (Scope klein halten).\n";
-      $preview .= "- Du darfst kleine Helper-Skripte schreiben (PHP/Python/SQL) für repetitive Arbeit.\n";
-      $preview .= "- Keine externen/public Aktionen (Postings/E-Mail/neue Integrationen) ohne OK von Oliver.\n";
-
-      $preview .= "\nHygiene (wenn FERTIG):\n";
-      $preview .= "- Check: Verifikation/Run? QA/Edge Cases? Integration/Deploy/Monitoring? Docs/How-to?\n";
-      $preview .= "- Wenn etwas fehlt: 1–4 Subtasks unter demselben Parent (max 4) + kurzer Grund.\n";
-
-      $preview .= "\nConstraints:\n";
-      $preview .= "- Neue Task-Titel <= 40 Zeichen.\n";
-
+      // Mirror worker_queue_produce.php (effective prompt)
       $preview .= "\nOperational (English):\n";
       $preview .= "- Quick healthcheck: php /home/deploy/projects/coos/scripts/worker_api_cli.php action=ping\n";
+
+      $preview .= "\nRegeln:\n";
+      $preview .= "- Vor done immer Runs/Ergebnis verifizieren.\n";
+      $preview .= "- Wichtig (Encoding): wenn du Umlaute/Sonderzeichen oder mehrere Zeilen schreibst, nutze *_b64 Parameter (headline_b64/body_b64).\n";
+      $preview .= "  Base64-Helfer (keine node -e Hacks): printf '%s' \"TEXT\" | php /home/deploy/projects/coos/scripts/b64_stdin.php\n";
+      $preview .= "- WICHTIG: Sobald du set_status todo_oliver setzt (Delegation an Oliver), ist der Job für dich beendet: KEINE weiteren Aktionen wie add_children / set_blocked_* / attachments danach. Direkt job_done.\n";
+      $preview .= "- Delegation ist NUR im Notfall erlaubt: Stelle GENAU 1 präzise Frage an Oliver (max. 2 Zeilen), dann set_status todo_oliver, dann job_done.\n";
+      $preview .= "- Bevor du delegierst: führe mindestens 2 konkrete Recon-Schritte durch (z.B. grep nach Entrypoint, runtime-tree check, cron/scripts check, Attachments/ENV check) und erwähne kurz was du geprüft hast.\n";
+      $preview .= "- Wenn dir Info fehlt: nutze D) FRAGE AN OLIVER (Delegation).\n";
+      $preview .= "- Wenn du nicht weiterkommst: job_fail mit kurzem Grund. Nach 3 fails blockt das System den Task.\n";
+      $preview .= "- Tool-KB: Wenn du ein Tool erfolgreich nutzt/installierst: /home/deploy/clawd/TOOLS.md + /home/deploy/clawd/tools/<tool>.md kurz updaten.\n";
     }
   } catch (Throwable $e) {
     $preview = '';
