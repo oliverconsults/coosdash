@@ -115,15 +115,42 @@ if ($action === 'job_done') {
   $wt = $_REQUEST['worktime'] ?? null; // seconds; if omitted -> compute from claimed_at
 
   // If worker didn't pass tokens, try to infer from Clawdbot session logs (best effort).
+  $sessionId = trim((string)($_REQUEST['session_id'] ?? 'coos-worker-queue'));
+
   if ($tokIn <= 0 && $tokOut <= 0) {
-    $u = clawdbot_find_usage_for_job($jobId, 'job_done');
+    $u = clawdbot_find_usage_for_job($jobId, 'job_done', $sessionId);
     if ($u) {
       $tokIn = (int)($u['input'] ?? 0);
       $tokOut = (int)($u['output'] ?? 0);
+      $_REQUEST['llm_calls'] = (int)($u['calls'] ?? 0);
     }
   }
 
   $pdo->prepare("UPDATE worker_queue SET status='done', done_at=NOW() WHERE id=? AND status IN ('open','claimed')")->execute([$jobId]);
+
+  // Optional: record additional LLM metadata + logfile
+  $llmCalls = (int)($_REQUEST['llm_calls'] ?? 0);
+  try {
+    $st = $pdo->prepare('SELECT node_id, claimed_at FROM worker_queue WHERE id=?');
+    $st->execute([$jobId]);
+    $jr = $st->fetch(PDO::FETCH_ASSOC);
+    $nid = $jr ? (int)($jr['node_id'] ?? 0) : 0;
+    $claimedAt = $jr ? (string)($jr['claimed_at'] ?? '') : '';
+
+    $wtSec = null;
+    if ($claimedAt !== '') {
+      $st2 = $pdo->prepare('SELECT GREATEST(0, TIMESTAMPDIFF(SECOND, ?, NOW())) AS s');
+      $st2->execute([$claimedAt]);
+      $wtSec = (int)$st2->fetchColumn();
+    }
+
+    $p = '/var/www/coosdash/shared/logs/worker_llm_usage.log';
+    @mkdir(dirname($p), 0775, true);
+    $wtPart = ($wtSec !== null) ? (' worktime=' . $wtSec . 's') : '';
+    @file_put_contents($p, date('Y-m-d H:i:s') . "  job={$jobId} node={$nid} llm_calls={$llmCalls} token_in={$tokIn} token_out={$tokOut}{$wtPart} action=job_done session={$sessionId}\n", FILE_APPEND);
+  } catch (Throwable $e) {
+    // ignore
+  }
 
   // Add to node metrics (if columns exist)
   try {
@@ -157,16 +184,43 @@ if ($action === 'job_fail') {
   $wt = $_REQUEST['worktime'] ?? null;
 
   // If worker didn't pass tokens, try to infer from Clawdbot session logs (best effort).
+  $sessionId = trim((string)($_REQUEST['session_id'] ?? 'coos-worker-queue'));
   if ($tokIn <= 0 && $tokOut <= 0) {
-    $u = clawdbot_find_usage_for_job($jobId, 'job_fail');
+    $u = clawdbot_find_usage_for_job($jobId, 'job_fail', $sessionId);
     if ($u) {
       $tokIn = (int)($u['input'] ?? 0);
       $tokOut = (int)($u['output'] ?? 0);
+      $_REQUEST['llm_calls'] = (int)($u['calls'] ?? 0);
     }
   }
 
   // increment fail_count
   $pdo->prepare("UPDATE worker_queue SET status='failed', fail_count=fail_count+1 WHERE id=?")->execute([$jobId]);
+
+  // Optional: record additional LLM metadata + logfile
+  $llmCalls = (int)($_REQUEST['llm_calls'] ?? 0);
+  try {
+    $st = $pdo->prepare('SELECT node_id, claimed_at FROM worker_queue WHERE id=?');
+    $st->execute([$jobId]);
+    $jr = $st->fetch(PDO::FETCH_ASSOC);
+    $nid = $jr ? (int)($jr['node_id'] ?? 0) : 0;
+    $claimedAt = $jr ? (string)($jr['claimed_at'] ?? '') : '';
+
+    $wtSec = null;
+    if ($claimedAt !== '') {
+      $st2 = $pdo->prepare('SELECT GREATEST(0, TIMESTAMPDIFF(SECOND, ?, NOW())) AS s');
+      $st2->execute([$claimedAt]);
+      $wtSec = (int)$st2->fetchColumn();
+    }
+
+    $p = '/var/www/coosdash/shared/logs/worker_llm_usage.log';
+    @mkdir(dirname($p), 0775, true);
+    $wtPart = ($wtSec !== null) ? (' worktime=' . $wtSec . 's') : '';
+    $reasonPart = ($reason !== '') ? (' reason=' . str_replace(["\n","\r","\t"],' ', $reason)) : '';
+    @file_put_contents($p, date('Y-m-d H:i:s') . "  job={$jobId} node={$nid} llm_calls={$llmCalls} token_in={$tokIn} token_out={$tokOut}{$wtPart} action=job_fail session={$sessionId}{$reasonPart}\n", FILE_APPEND);
+  } catch (Throwable $e) {
+    // ignore
+  }
 
   // Add to node metrics (if columns exist)
   try {

@@ -2,48 +2,76 @@
 // Helper: find token usage for a given job_done/job_fail call by scanning Clawdbot session jsonl logs.
 // This is a best-effort heuristic to avoid bloating the worker payload.
 
-function clawdbot_find_usage_for_job(int $jobId, string $action = 'job_done'): ?array {
+function clawdbot_find_usage_for_job(int $jobId, string $action = 'job_done', string $sessionId='coos-worker-queue'): ?array {
   if ($jobId <= 0) return null;
-  $needle = "php /home/deploy/projects/coos/scripts/worker_api_cli.php action={$action} job_id={$jobId}";
 
-  $dir = '/home/deploy/.clawdbot/agents/api/sessions';
-  if (!is_dir($dir)) return null;
+  $needleEnd = "php /home/deploy/projects/coos/scripts/worker_api_cli.php action={$action} job_id={$jobId}";
+  $needleStartA = "JOB_ID={$jobId}";
+  $needleStartB = "Job: id={$jobId}";
 
-  $files = glob($dir . '/*.jsonl');
-  if (!$files) return null;
+  // Prefer explicit session file (this is where `clawdbot agent --session-id coos-worker-queue` writes).
+  $sessionFiles = [];
+  foreach (['/home/deploy/.clawdbot/agents/main/sessions', '/home/deploy/.clawdbot/agents/api/sessions'] as $dir) {
+    if (!is_dir($dir)) continue;
+    $p = $dir . '/' . basename($sessionId) . '.jsonl';
+    if (is_file($p)) $sessionFiles[] = $p;
+  }
 
-  // Newest first
-  usort($files, fn($a,$b) => filemtime($b) <=> filemtime($a));
+  // Fallback: scan recent jsonl files in both dirs.
+  if (!$sessionFiles) {
+    foreach (['/home/deploy/.clawdbot/agents/main/sessions', '/home/deploy/.clawdbot/agents/api/sessions'] as $dir) {
+      if (!is_dir($dir)) continue;
+      foreach (glob($dir . '/*.jsonl') ?: [] as $f) $sessionFiles[] = $f;
+    }
+    if (!$sessionFiles) return null;
+    usort($sessionFiles, fn($a,$b) => filemtime($b) <=> filemtime($a));
+    $sessionFiles = array_slice($sessionFiles, 0, 80);
+  }
 
-  // Limit scan for perf
-  $files = array_slice($files, 0, 60);
-
-  foreach ($files as $path) {
+  foreach ($sessionFiles as $path) {
     $fh = @fopen($path, 'rb');
     if (!$fh) continue;
 
-    $foundUsage = null;
+    $inJob = false;
+    $calls = 0;
+    $tokIn = 0;
+    $tokOut = 0;
 
     while (($line = fgets($fh)) !== false) {
-      if (strpos($line, $needle) === false) continue;
+      // start marker
+      if (!$inJob && (strpos($line, $needleStartA) !== false || strpos($line, $needleStartB) !== false)) {
+        $inJob = true;
+      }
 
-      $obj = json_decode($line, true);
-      if (!is_array($obj)) continue;
+      if ($inJob) {
+        $obj = json_decode($line, true);
+        if (is_array($obj)) {
+          $usage = $obj['usage'] ?? ($obj['message']['usage'] ?? null);
+          if (is_array($usage)) {
+            $calls += 1;
+            $tokIn += (int)($usage['input'] ?? 0);
+            $tokOut += (int)($usage['output'] ?? 0);
+          }
+        }
 
-      // usage may be at top-level or inside message
-      $usage = $obj['usage'] ?? ($obj['message']['usage'] ?? null);
-      if (is_array($usage)) {
-        $in = (int)($usage['input'] ?? 0);
-        $out = (int)($usage['output'] ?? 0);
-        if ($in > 0 || $out > 0) {
-          $foundUsage = ['input' => $in, 'output' => $out];
+        // end marker: the *executed* CLI call that marks the job done/failed.
+        // The prompt itself contains the command string, so we only stop when we see it
+        // inside an assistant toolCall.
+        if (
+          strpos($line, $needleEnd) !== false &&
+          strpos($line, '"role":"assistant"') !== false &&
+          strpos($line, '"toolCall"') !== false
+        ) {
+          if ($calls > 0 || $tokIn > 0 || $tokOut > 0) {
+            fclose($fh);
+            return ['input'=>$tokIn, 'output'=>$tokOut, 'calls'=>$calls, 'session_file'=>$path];
+          }
+          break;
         }
       }
     }
 
     fclose($fh);
-
-    if ($foundUsage) return $foundUsage;
   }
 
   return null;
