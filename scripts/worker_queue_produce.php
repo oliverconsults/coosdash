@@ -106,7 +106,8 @@ if ($blockedUntil !== '' && strtotime($blockedUntil)) $prompt .= "- BLOCKED_UNTI
 $prompt .= "\n";
 
 $prompt .= "Wie du Änderungen machst (PFLICHT):\n";
-$prompt .= "- KEINE direkten SQL-Writes. Nutze ausschließlich den CLI-Wrapper: php /home/deploy/projects/coos/scripts/worker_api_cli.php ...\n";
+$prompt .= "- KEINE direkten SQL-Writes in der **cooscrm** DB. Für cooscrm ausschließlich den CLI-Wrapper nutzen: php /home/deploy/projects/coos/scripts/worker_api_cli.php ...\n";
+$prompt .= "- Eigene Projekt-Datenbank (z.B. *_rv/*_test): direkte SQL-Writes sind erlaubt, wenn nötig (vorsichtig, nachvollziehbar).\n";
 $prompt .= "- Beispiel: php /home/deploy/projects/coos/scripts/worker_api_cli.php action=ping\n";
 $prompt .= "\nErlaubte Aktionen:\n";
 $prompt .= "- prepend_update (headline, body) [oder headline_b64/body_b64]\n";
