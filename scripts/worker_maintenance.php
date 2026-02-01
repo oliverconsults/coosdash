@@ -159,7 +159,27 @@ foreach ($todoIds as $tid) {
 
     if ($pStatus === 'done') {
       $pdo->prepare('UPDATE nodes SET worker_status="todo_james" WHERE id=?')->execute([$pid]);
-      @file_put_contents('/var/www/coosdash/shared/logs/worker.log', $tsLine . "  #{$pid}  [auto] {$tsHuman} Todo bubbled up (child todo -> parent todo_james)\n", FILE_APPEND);
+
+      // Build chain from the original todo leaf up to this parent
+      $chain = [];
+      $x = $tid;
+      for ($j=0; $j<30; $j++) {
+        $stC = $pdo->prepare('SELECT id,parent_id,title FROM nodes WHERE id=?');
+        $stC->execute([$x]);
+        $rr = $stC->fetch(PDO::FETCH_ASSOC);
+        if (!$rr) break;
+        $chain[] = '#' . (int)$rr['id'] . ' ' . (string)$rr['title'];
+        if ((int)$rr['id'] === $pid) break;
+        if ($rr['parent_id'] === null) break;
+        $x = (int)$rr['parent_id'];
+      }
+      $chainTxt = $chain ? implode(' > ', $chain) : ('#' . $tid . ' > #' . $pid);
+
+      @file_put_contents(
+        '/var/www/coosdash/shared/logs/worker.log',
+        $tsLine . "  #{$pid}  [auto] {$tsHuman} Todo bubbled up: {$chainTxt}\n",
+        FILE_APPEND
+      );
       $did['todo_bubbled']++;
     }
 
