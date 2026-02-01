@@ -120,14 +120,14 @@ renderHeader('Setup');
 
     <?php if ($sel === 'worker_rules_block'): ?>
       <label><?php echo h($options[$sel]); ?> (wird an den Job-Prompt angehängt)</label>
-      <textarea name="worker_rules_block"><?php echo h($workerRulesCur); ?></textarea>
+      <textarea name="worker_rules_block" style="min-height:260px;"><?php echo h($workerRulesCur); ?></textarea>
     <?php elseif ($sel === 'summary_cleanup_instructions'): ?>
       <label><?php echo h($options[$sel]); ?></label>
-      <textarea name="summary_cleanup_instructions"><?php echo h($summaryInstrCur); ?></textarea>
+      <textarea name="summary_cleanup_instructions" style="min-height:260px;"><?php echo h($summaryInstrCur); ?></textarea>
     <?php else: ?>
       <label><?php echo h($options[$sel]); ?></label>
       <div class="meta">Placeholders: {JOB_ID}, {NODE_ID}, {JOB_PROMPT}</div>
-      <textarea name="wrapper_prompt_template"><?php echo h($wrapperTplCur); ?></textarea>
+      <textarea name="wrapper_prompt_template" style="min-height:260px;"><?php echo h($wrapperTplCur); ?></textarea>
     <?php endif; ?>
 
     <div class="row" style="margin-top:10px">
