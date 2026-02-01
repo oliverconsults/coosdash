@@ -682,6 +682,25 @@ renderHeader('Dashboard');
           $createdTs = strtotime((string)($node['created_at'] ?? ''));
 
           // metrics (optional columns)
+          $fmtTok = function(int $n): string {
+            $abs = abs($n);
+            $sign = $n < 0 ? '-' : '';
+            if ($abs >= 1000000) {
+              $v = $abs / 1000000;
+              $txt = ($v < 10) ? number_format($v, 1, '.', '') : (string)round($v);
+              // drop trailing .0
+              $txt = preg_replace('/\.0$/', '', $txt);
+              return $sign . $txt . 'M';
+            }
+            if ($abs >= 1000) {
+              $v = $abs / 1000;
+              $txt = ($v < 10) ? number_format($v, 1, '.', '') : (string)round($v);
+              $txt = preg_replace('/\.0$/', '', $txt);
+              return $sign . $txt . 'K';
+            }
+            return (string)$n;
+          };
+
           $tokIn = isset($node['token_in']) ? (int)$node['token_in'] : null;
           $tokOut = isset($node['token_out']) ? (int)$node['token_out'] : null;
           $wt = isset($node['worktime']) ? (int)$node['worktime'] : null;
@@ -746,7 +765,7 @@ renderHeader('Dashboard');
               $showTokAll = ($sumTokAll !== null) ? (int)$sumTokAll : (int)$tokAll;
               $showWtTxt = ($sumWtTxt !== null) ? (string)$sumWtTxt : (string)$wtTxt;
             ?>
-            <span style="white-space:nowrap;"> | Token in/out/all: <?php echo (int)$showTokIn; ?>/<?php echo (int)$showTokOut; ?>/<?php echo (int)$showTokAll; ?>
+            <span style="white-space:nowrap;"> | Token in/out/all: <?php echo h($fmtTok((int)$showTokIn)); ?>/<?php echo h($fmtTok((int)$showTokOut)); ?>/<?php echo h($fmtTok((int)$showTokAll)); ?>
               &nbsp; Worktime: <?php echo htmlspecialchars($showWtTxt, ENT_QUOTES, 'UTF-8'); ?>
             </span>
           <?php endif; ?>
