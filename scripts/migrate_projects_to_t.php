@@ -170,10 +170,7 @@ foreach ($roots as $r) {
     $env .= "- shared: {$shared}\n";
     $env .= "- logs: {$sharedLogs}\n";
     $env .= "- artifacts: {$sharedArtifacts}\n\n";
-    $env .= "rules:\n";
-    $env .= "- cooscrm writes: only via worker_api_cli\n";
-    $env .= "- project db writes: allowed\n";
-    $env .= "- outputs: attach files, keep text short\n";
+    // rules are intentionally not duplicated here; keep env.md purely technical/paths/db.
     @file_put_contents($envPath, $env);
 
     // Placeholder index
