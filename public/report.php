@@ -2,6 +2,6 @@
 require_once __DIR__ . '/functions_v3.inc.php';
 requireLogin();
 
-// Live view wrapper (reuses index.php layout)
-$_GET['view'] = 'live';
+// Report view wrapper (reuses index.php layout)
+$_GET['view'] = 'report';
 require __DIR__ . '/index.php';

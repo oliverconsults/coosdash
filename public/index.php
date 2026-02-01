@@ -9,8 +9,8 @@ $pdo = db();
 $nodeId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 
 // right-panel view
-$view = (string)($_GET['view'] ?? 'kanban');
-if (!in_array($view, ['kanban','test'], true)) $view = 'kanban';
+$view = (string)($_GET['view'] ?? 'work');
+if (!in_array($view, ['work','live','kanban','report'], true)) $view = 'work';
 
 // form state (to preserve user input on validation errors)
 $formNote = '';
@@ -526,18 +526,22 @@ renderHeader('Dashboard');
 <div class="grid">
   <div class="card">
     <div class="row" style="justify-content:space-between; align-items:center;">
-      <h2 style="margin:0;">Projekte / Ideen (<?php echo count($roots); ?>)</h2>
-      <div style="display:flex; gap:8px; align-items:center;">
+      <h2 style="margin:0;">Projektansicht</h2>
+      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:flex-end;">
         <?php
           $baseQs = [];
           if ($nodeId) $baseQs['id'] = (int)$nodeId;
           if (!empty($_GET['open'])) $baseQs['open'] = (string)$_GET['open'];
           if (!empty($_GET['q'])) $baseQs['q'] = (string)$_GET['q'];
-          $hrefKanban = '/?' . http_build_query(array_merge($baseQs, ['view'=>'kanban']));
-          $hrefTest = '/?' . http_build_query(array_merge($baseQs, ['view'=>'test']));
+          $hrefWork   = '/?' . http_build_query(array_merge($baseQs, ['view'=>'work']));
+          $hrefLive   = '/test.php' . ($baseQs ? ('?' . http_build_query($baseQs)) : '');
+          $hrefKanban = '/kanban.php' . ($baseQs ? ('?' . http_build_query($baseQs)) : '');
+          $hrefReport = '/report.php' . ($baseQs ? ('?' . http_build_query($baseQs)) : '');
         ?>
+        <a class="btn btn-md <?php echo $view==='work'?'active':''; ?>" href="<?php echo h($hrefWork); ?>">Work</a>
+        <a class="btn btn-md <?php echo $view==='live'?'active':''; ?>" href="<?php echo h($hrefLive); ?>">Live</a>
         <a class="btn btn-md <?php echo $view==='kanban'?'active':''; ?>" href="<?php echo h($hrefKanban); ?>">Kanban</a>
-        <a class="btn btn-md <?php echo $view==='test'?'active':''; ?>" href="<?php echo h($hrefTest); ?>">Test</a>
+        <a class="btn btn-md <?php echo $view==='report'?'active':''; ?>" href="<?php echo h($hrefReport); ?>">Report</a>
       </div>
     </div>
 
@@ -693,9 +697,9 @@ renderHeader('Dashboard');
 
   <div>
 
-    <?php if ($view === 'test'): ?>
+    <?php if ($view === 'live'): ?>
       <?php
-        // --- TEST VIEW (Graph) lives in the right column (replaces node details / Kanban)
+        // --- LIVE VIEW (Graph) lives in the right column (replaces node details / Kanban)
         $projectsRootId2 = 0;
         foreach ($roots as $r) {
           if (((string)($r['title'] ?? '')) === 'Projekte') $projectsRootId2 = (int)$r['id'];
@@ -941,6 +945,28 @@ renderHeader('Dashboard');
 
           applyFilters();
 
+          // Live updates (poll)
+          let pollT = null;
+          async function poll(){
+            try {
+              const u = new URL('/api_project_graph.php', window.location.origin);
+              u.searchParams.set('id', String(selectedNodeId || 0));
+              const res = await fetch(u.toString(), {credentials:'same-origin'});
+              const j = await res.json();
+              if (j && j.ok && Array.isArray(j.elements)) {
+                // reset elements (simple & robust; animated layout makes it feel alive)
+                cy.elements().remove();
+                cy.add(j.elements);
+                applyFilters();
+                cy.layout({ name:'dagre', rankDir:'TB', nodeSep:18, rankSep:55, edgeSep:10, animate:true, animationDuration:220 }).run();
+              }
+            } catch(e) {
+              // ignore
+            }
+            pollT = setTimeout(poll, 4000);
+          }
+          pollT = setTimeout(poll, 4000);
+
           const root = (activeProjectId ? cy.getElementById('n'+activeProjectId) : null);
           if (root && root.length) {
             focusNode(root);
@@ -953,6 +979,97 @@ renderHeader('Dashboard');
           }
         })();
       </script>
+
+    <?php elseif ($view === 'kanban'): ?>
+      <?php
+        // Simple Kanban view (leafs under Projekte)
+        $projectsRootIdK = 0;
+        foreach ($roots as $r) { if (((string)($r['title'] ?? '')) === 'Projekte') $projectsRootIdK = (int)$r['id']; }
+
+        $isUnderK = function(int $nid, int $rootId) use ($byIdAll): bool {
+          if ($nid <= 0 || $rootId <= 0) return false;
+          $cur = $nid;
+          for ($i=0; $i<120; $i++) {
+            $row = $byIdAll[$cur] ?? null;
+            if (!$row) return false;
+            $pid = $row['parent_id'];
+            if ($pid === null) return false;
+            $pid = (int)$pid;
+            if ($pid === $rootId) return true;
+            $cur = $pid;
+          }
+          return false;
+        };
+
+        $isBlockedK = function(int $id) use ($byIdAll): bool {
+          $n = $byIdAll[$id] ?? null;
+          if (!$n) return true;
+          $bu = (string)($n['blocked_until'] ?? '');
+          $bb = (int)($n['blocked_by_node_id'] ?? 0);
+          if ($bu !== '' && strtotime($bu) && strtotime($bu) > time()) return true;
+          if ($bb > 0) {
+            $bn = $byIdAll[$bb] ?? null;
+            if (!$bn) return true;
+            return (string)($bn['worker_status'] ?? '') !== 'done';
+          }
+          return false;
+        };
+
+        $cols = ['todo_oliver'=>[], 'todo_james'=>[], 'blocked'=>[], 'done'=>[]];
+        foreach ($byIdAll as $id => $n) {
+          $id = (int)$id;
+          if (!$projectsRootIdK || !$isUnderK($id, $projectsRootIdK)) continue;
+          if (!empty($byParentAll[$id] ?? [])) continue; // leafs only
+
+          $ws = (string)($n['worker_status'] ?? '');
+          $key = $ws;
+          if ($ws !== 'done' && $isBlockedK($id)) $key = 'blocked';
+          if (!isset($cols[$key])) continue;
+
+          $cols[$key][] = [
+            'id' => $id,
+            'title' => (string)($n['title'] ?? ''),
+            'updated_at' => (string)($n['updated_at'] ?? ''),
+          ];
+        }
+        foreach ($cols as $k => $arr) {
+          usort($arr, fn($a,$b) => strcmp((string)($b['updated_at'] ?? ''), (string)($a['updated_at'] ?? '')) ?: (($b['id']??0) <=> ($a['id']??0)));
+          $cols[$k] = $arr;
+        }
+        $colTitle = ['todo_oliver'=>'ToDo (Oliver)','todo_james'=>'ToDo (James)','blocked'=>'BLOCKED','done'=>'Done'];
+      ?>
+
+      <div class="card">
+        <h2 style="margin:0 0 10px 0;">Kanban (Leafs: Projekte)</h2>
+        <div class="kanban">
+          <?php foreach (['todo_oliver','todo_james','blocked','done'] as $col): ?>
+            <div class="kanban-col">
+              <h3>
+                <span><?php echo h($colTitle[$col]); ?></span>
+                <span class="pill dim"><?php echo count($cols[$col]); ?></span>
+              </h3>
+              <?php if (empty($cols[$col])): ?>
+                <div class="meta" style="padding:8px 2px;">—</div>
+              <?php else: ?>
+                <?php foreach (array_slice($cols[$col], 0, 40) as $c): ?>
+                  <a class="kanban-card" href="/?id=<?php echo (int)$c['id']; ?>">
+                    <div class="kanban-title"><?php echo h($c['title']); ?></div>
+                    <div class="kanban-meta">
+                      <span class="pill dim"><?php echo h('#' . (int)$c['id']); ?></span>
+                    </div>
+                  </a>
+                <?php endforeach; ?>
+              <?php endif; ?>
+            </div>
+          <?php endforeach; ?>
+        </div>
+      </div>
+
+    <?php elseif ($view === 'report'): ?>
+      <div class="card">
+        <h2 style="margin:0 0 10px 0;">Report</h2>
+        <div class="meta">Platzhalter: hier können wir als nächstes Projekt-Reportings/Charts/Time/Token pro Projekt reinpacken.</div>
+      </div>
 
     <?php elseif ($node): ?>
       <div class="card">
@@ -1534,7 +1651,7 @@ renderHeader('Dashboard');
           <?php endforeach; ?>
         </div>
       </div>
-      <?php elseif ($view === 'test'): ?>
+      <?php elseif ($view === 'live'): ?>
         <?php
           // Build graph data for the CURRENT project under "Projekte" (not the whole Projekte subtree)
           $graph = ['nodes'=>[], 'edges'=>[]];
