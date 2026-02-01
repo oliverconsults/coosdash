@@ -75,9 +75,12 @@ foreach ($lines as $line) {
   $docroot = $root . '/current/public';
   $shared = $root . '/shared';
   $sharedLogs = $shared . '/logs';
+  $sharedArtifacts = $shared . '/artifacts';
+  $sharedArtifactsAtt = $sharedArtifacts . '/att';
 
   @mkdir($docroot, 0775, true);
   @mkdir($sharedLogs, 0775, true);
+  @mkdir($sharedArtifactsAtt, 0775, true);
 
   // DB + user
   $dbName = 'coos_' . str_replace('-', '_', $slug);
@@ -121,7 +124,8 @@ foreach ($lines as $line) {
   $env .= "db_pass: (stored in {$cfgPath})\n\n";
   $env .= "paths:\n";
   $env .= "- shared: {$shared}\n";
-  $env .= "- logs: {$sharedLogs}\n\n";
+  $env .= "- logs: {$sharedLogs}\n";
+  $env .= "- artifacts: {$sharedArtifacts}\n\n";
   $env .= "rules:\n";
   $env .= "- cooscrm writes: only via worker_api_cli\n";
   $env .= "- project db writes: allowed\n";

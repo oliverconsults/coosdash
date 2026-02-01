@@ -24,7 +24,7 @@ if ($file === '' || strlen($file) > 255) {
 }
 
 $pdo = db();
-$st = $pdo->prepare('SELECT orig_name, stored_name, mime, size_bytes FROM node_attachments WHERE token=? AND stored_name=? LIMIT 1');
+$st = $pdo->prepare('SELECT node_id, orig_name, stored_name, mime, size_bytes FROM node_attachments WHERE token=? AND stored_name=? LIMIT 1');
 $st->execute([$token, $file]);
 $row = $st->fetch();
 if (!$row) {
@@ -33,8 +33,27 @@ if (!$row) {
   exit;
 }
 
-$path = '/var/www/coosdash/shared/att/' . $token . '/' . $file;
-if (!is_file($path)) {
+$nodeId = (int)($row['node_id'] ?? 0);
+$path = '';
+
+// Try project-local artifacts first
+try {
+  $slug = project_slug_for_node($pdo, $nodeId);
+  if (is_string($slug) && $slug !== '') {
+    $p1 = '/var/www/t/' . $slug . '/shared/artifacts/att/' . $token . '/' . $file;
+    if (is_file($p1)) $path = $p1;
+  }
+} catch (Throwable $e) {
+  // ignore
+}
+
+// Fallback to legacy central storage
+if ($path === '') {
+  $p2 = '/var/www/coosdash/shared/att/' . $token . '/' . $file;
+  if (is_file($p2)) $path = $p2;
+}
+
+if ($path === '') {
   http_response_code(404);
   echo 'missing file';
   exit;

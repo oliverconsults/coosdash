@@ -106,6 +106,8 @@ foreach ($roots as $r) {
   $docroot = $rootDir . '/current/public';
   $shared = $rootDir . '/shared';
   $sharedLogs = $shared . '/logs';
+  $sharedArtifacts = $shared . '/artifacts';
+  $sharedArtifactsAtt = $sharedArtifacts . '/att';
   $cfgPath = $shared . '/config.local.php';
 
   // if already migrated (env exists + projects row exists), skip
@@ -129,6 +131,7 @@ foreach ($roots as $r) {
   if (!$dryRun) {
     @mkdir($docroot, 0775, true);
     @mkdir($sharedLogs, 0775, true);
+    @mkdir($sharedArtifactsAtt, 0775, true);
 
     // Create DB + user (idempotent)
     $sql = "CREATE DATABASE IF NOT EXISTS `{$dbName}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;\n";
@@ -165,7 +168,8 @@ foreach ($roots as $r) {
     $env .= "db_pass: (stored in {$cfgPath})\n\n";
     $env .= "paths:\n";
     $env .= "- shared: {$shared}\n";
-    $env .= "- logs: {$sharedLogs}\n\n";
+    $env .= "- logs: {$sharedLogs}\n";
+    $env .= "- artifacts: {$sharedArtifacts}\n\n";
     $env .= "rules:\n";
     $env .= "- cooscrm writes: only via worker_api_cli\n";
     $env .= "- project db writes: allowed\n";
@@ -181,6 +185,54 @@ foreach ($roots as $r) {
     // Insert mapping
     $pdo->prepare('INSERT INTO projects (node_id, slug, env_path) VALUES (?,?,?) ON DUPLICATE KEY UPDATE slug=VALUES(slug), env_path=VALUES(env_path)')
         ->execute([$nodeId, $slug, $envPath]);
+
+    // Move existing attachments into project artifacts (best effort)
+    // Note: token dir is unique per upload, so safe to move.
+    try {
+      $allNodeIds = [$nodeId];
+      $stack = [$nodeId];
+      while ($stack) {
+        $cur = array_pop($stack);
+        $stKids = $pdo->prepare('SELECT id FROM nodes WHERE parent_id=?');
+        $stKids->execute([$cur]);
+        foreach ($stKids->fetchAll(PDO::FETCH_ASSOC) as $kid) {
+          $kidId = (int)$kid['id'];
+          if ($kidId <= 0) continue;
+          $allNodeIds[] = $kidId;
+          $stack[] = $kidId;
+        }
+      }
+      $allNodeIds = array_values(array_unique($allNodeIds));
+      if ($allNodeIds) {
+        $in = implode(',', array_fill(0, count($allNodeIds), '?'));
+        $stAtt = $pdo->prepare("SELECT DISTINCT token FROM node_attachments WHERE node_id IN ($in)");
+        $stAtt->execute($allNodeIds);
+        $tokens = $stAtt->fetchAll(PDO::FETCH_COLUMN);
+        foreach ($tokens as $t) {
+          $t = (string)$t;
+          if (!preg_match('/^[a-f0-9]{32}$/', $t)) continue;
+          $src = '/var/www/coosdash/shared/att/' . $t;
+          $dst = $sharedArtifactsAtt . '/' . $t;
+          if (is_dir($dst)) continue;
+          if (is_dir($src)) {
+            if (@rename($src, $dst)) {
+              logline("MOVED att token={$t} -> {$dst}");
+            } else {
+              // fallback copy if rename fails
+              @mkdir($dst, 0775, true);
+              $files = @scandir($src) ?: [];
+              foreach ($files as $fn) {
+                if ($fn === '.' || $fn === '..') continue;
+                @copy($src . '/' . $fn, $dst . '/' . $fn);
+              }
+              logline("COPIED att token={$t} -> {$dst}");
+            }
+          }
+        }
+      }
+    } catch (Throwable $e) {
+      logline('WARN attachment move failed node_id=' . $nodeId);
+    }
 
     // Ensure project root has setup markers (prepend, keep history)
     $ts = date('d.m.Y H:i');

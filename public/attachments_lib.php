@@ -49,7 +49,18 @@ function attachments_store_upload(PDO $pdo, int $nodeId, array $file, string $cr
   }
 
   $token = bin2hex(random_bytes(16));
+
+  // Prefer project-local artifacts storage for nodes under "Projekte".
   $baseDir = '/var/www/coosdash/shared/att';
+  try {
+    $slug = project_slug_for_node($pdo, $nodeId);
+    if (is_string($slug) && $slug !== '') {
+      $baseDir = '/var/www/t/' . $slug . '/shared/artifacts/att';
+    }
+  } catch (Throwable $e) {
+    // fallback to central att
+  }
+
   $destDir = $baseDir . '/' . $token;
   if (!is_dir($destDir) && !mkdir($destDir, 0775, true)) {
     return ['err' => 'Upload fehlgeschlagen (mkdir).'];

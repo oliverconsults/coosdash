@@ -299,6 +299,27 @@ function project_env_path_for_node(PDO $pdo, int $nodeId): ?string {
   return null;
 }
 
+function project_slug_for_node(PDO $pdo, int $nodeId): ?string {
+  $rootId = project_root_for_node($pdo, $nodeId);
+  if ($rootId <= 0) return null;
+  try {
+    projects_migrate($pdo);
+    $st = $pdo->prepare('SELECT slug FROM projects WHERE node_id=? LIMIT 1');
+    $st->execute([$rootId]);
+    $s = $st->fetchColumn();
+    if (is_string($s) && $s !== '') return $s;
+
+    // fallback: derive slug from env path
+    $p = project_env_path_for_node($pdo, $nodeId);
+    if (is_string($p) && preg_match('#/var/www/t/([^/]+)/shared/env\.md#', $p, $m)) {
+      return (string)$m[1];
+    }
+  } catch (Throwable $e) {
+    return null;
+  }
+  return null;
+}
+
 function project_env_text_for_node(PDO $pdo, int $nodeId, int $maxChars=4000): string {
   $p = project_env_path_for_node($pdo, $nodeId);
   if (!$p) return '';
