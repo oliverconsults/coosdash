@@ -1275,12 +1275,44 @@ renderHeader('Dashboard');
       </div>
       <?php elseif ($view === 'test'): ?>
         <?php
-          // Build graph data for "Projekte" subtree
+          // Build graph data for the CURRENT project under "Projekte" (not the whole Projekte subtree)
           $graph = ['nodes'=>[], 'edges'=>[]];
-          if (!empty($projectsRootId)) {
-            $projRoot = (int)$projectsRootId;
+          $activeProjectId = 0;
+
+          // Find active project (top-level child of Projekte root) for current selection
+          if (!empty($projectsRootId) && $nodeId > 0 && !empty($byIdAll[$nodeId]) && $isUnder($nodeId, (int)$projectsRootId)) {
+            $cur = (int)$nodeId;
+            for ($i=0; $i<120; $i++) {
+              $row = $byIdAll[$cur] ?? null;
+              if (!$row) break;
+              $pid = $row['parent_id'];
+              if ($pid === null) break;
+              $pid = (int)$pid;
+              if ($pid === (int)$projectsRootId) { $activeProjectId = $cur; break; }
+              $cur = $pid;
+            }
+          }
+
+          $activeProjectTitle = $activeProjectId ? (string)($byIdAll[$activeProjectId]['title'] ?? '') : '';
+
+          // blocked detection (match selector semantics)
+          $isBlockedNode = function(int $id) use ($byIdAll): bool {
+            $n = $byIdAll[$id] ?? null;
+            if (!$n) return true;
+            $bu = (string)($n['blocked_until'] ?? '');
+            $bb = (int)($n['blocked_by_node_id'] ?? 0);
+            if ($bu !== '' && strtotime($bu) && strtotime($bu) > time()) return true;
+            if ($bb > 0) {
+              $bn = $byIdAll[$bb] ?? null;
+              if (!$bn) return true;
+              return (string)($bn['worker_status'] ?? '') !== 'done';
+            }
+            return false;
+          };
+
+          if ($activeProjectId > 0) {
             $inProj = [];
-            $stack = [$projRoot];
+            $stack = [$activeProjectId];
             while ($stack) {
               $cur = array_pop($stack);
               $inProj[$cur] = true;
@@ -1293,14 +1325,19 @@ renderHeader('Dashboard');
             foreach ($inProj as $id3 => $_) {
               $n3 = $byIdAll[(int)$id3] ?? null;
               if (!$n3) continue;
-              $st = (string)($n3['worker_status'] ?? '');
+
+              $ws = (string)($n3['worker_status'] ?? '');
+              $status = $ws;
+              if ($ws !== 'done' && $isBlockedNode((int)$id3)) $status = 'blocked';
+
               $graph['nodes'][] = [
                 'data' => [
                   'id' => 'n' . (int)$id3,
                   'node_id' => (int)$id3,
                   'label' => '#' . (int)$id3 . ' ' . (string)($n3['title'] ?? ''),
                   'title' => (string)($n3['title'] ?? ''),
-                  'status' => $st,
+                  'status' => $status,
+                  'worker_status' => $ws,
                 ]
               ];
 
@@ -1334,7 +1371,7 @@ renderHeader('Dashboard');
         <div class="card">
           <div class="row" style="justify-content:space-between; align-items:center; gap:12px;">
             <div>
-              <h2 style="margin:0 0 6px 0;">Test: Projekte-Graph</h2>
+              <h2 style="margin:0 0 6px 0;">Test: Projekte-Graph<?php if (!empty($activeProjectTitle)): ?> · <?php echo h($activeProjectTitle); ?><?php endif; ?></h2>
               <div class="meta">Klick = Fokus · Doppelklick = öffnet Node · Filter/Zoom/Highlight. (Experimental)</div>
             </div>
             <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:flex-end;">
@@ -1363,11 +1400,14 @@ renderHeader('Dashboard');
           (function(){
             const elements = <?php echo json_encode(array_merge($graph['nodes'], $graph['edges']), JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES); ?>;
             const selectedNodeId = <?php echo (int)$nodeId; ?>;
+            const activeProjectId = <?php echo (int)$activeProjectId; ?>;
 
             function colorFor(status){
-              if(status==='todo_james') return '#b28cff';
-              if(status==='todo_oliver') return '#78c8ff';
-              if(status==='done') return '#ffd580';
+              // match the chart colors
+              if(status==='todo_james') return '#b28cff'; // purple
+              if(status==='todo_oliver') return '#78c8ff'; // blue
+              if(status==='done') return '#ffd580'; // yellow
+              if(status==='blocked') return 'rgba(255,120,120,0.95)'; // red
               return '#9aa0a6';
             }
 
@@ -1437,9 +1477,9 @@ renderHeader('Dashboard');
               ],
               layout: {
                 name: 'dagre',
-                rankDir: 'LR',
-                nodeSep: 22,
-                rankSep: 60,
+                rankDir: 'TB',
+                nodeSep: 18,
+                rankSep: 55,
                 edgeSep: 10,
                 animate: true,
                 animationDuration: 280
@@ -1485,7 +1525,7 @@ renderHeader('Dashboard');
             });
 
             document.getElementById('gFit').addEventListener('click', (e)=>{ e.preventDefault(); cy.animate({ fit: { eles: cy.elements(':visible'), padding: 50 } }, { duration: 240 }); });
-            document.getElementById('gLayout').addEventListener('click', (e)=>{ e.preventDefault(); cy.layout({ name:'dagre', rankDir:'LR', nodeSep:22, rankSep:60, edgeSep:10, animate:true, animationDuration:260 }).run(); });
+            document.getElementById('gLayout').addEventListener('click', (e)=>{ e.preventDefault(); cy.layout({ name:'dagre', rankDir:'TB', nodeSep:18, rankSep:55, edgeSep:10, animate:true, animationDuration:260 }).run(); });
             document.getElementById('gShowDone').addEventListener('change', applyFilters);
             document.getElementById('gShowBlockedEdges').addEventListener('change', applyFilters);
 
@@ -1510,10 +1550,21 @@ renderHeader('Dashboard');
             applyFilters();
 
             // initial focus
-            if (selectedNodeId) {
-              const n = cy.getElementById('n'+selectedNodeId);
-              if (n && n.length) focusNode(n);
-              else cy.fit(cy.elements(':visible'), 50);
+            if (!elements || elements.length===0) {
+              const hint = document.getElementById('gHint');
+              if (hint) hint.textContent = 'Kein Projekt ausgewählt. Bitte links einen Node unter "Projekte" anklicken.';
+              return;
+            }
+
+            // Prefer showing the project root at the top, then (optionally) focus the selected node.
+            const root = (activeProjectId ? cy.getElementById('n'+activeProjectId) : null);
+            if (root && root.length) {
+              focusNode(root);
+              // if selection is inside this project, focus it afterwards
+              if (selectedNodeId) {
+                const n = cy.getElementById('n'+selectedNodeId);
+                if (n && n.length) setTimeout(()=>focusNode(n), 180);
+              }
             } else {
               cy.fit(cy.elements(':visible'), 50);
             }
