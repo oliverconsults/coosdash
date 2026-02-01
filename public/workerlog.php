@@ -41,7 +41,8 @@ $renderLine = function(string $line): string {
   $safe = h($line);
 
   // Node links
-  $safe = preg_replace('/#(\d+)/', '<a href="/?id=$1">#$1</a>', $safe);
+  // Important: avoid linking queue job references like "job #123" to a node.
+  $safe = preg_replace('/(?<!job )#(\d+)/', '<a href="/?id=$1">#$1</a>', $safe);
 
   // Link local llm file viewer URLs
   $safe = preg_replace(
