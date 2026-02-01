@@ -7,9 +7,11 @@
 
 declare(strict_types=1);
 
-$cfgPath = '/var/www/coosdash/shared/config.local.php';
-$backupDir = '/var/www/coosdash/shared/backups/db';
-$retainDays = 14;
+// Allow overrides via environment (useful for multiple apps/DBs).
+$cfgPath = getenv('CONFIG_PATH') ?: '/var/www/coosdash/shared/config.local.php';
+$backupDir = getenv('BACKUP_DIR') ?: '/var/www/coosdash/shared/backups/db';
+$retainDays = (int)(getenv('RETAIN_DAYS') ?: 14);
+if ($retainDays <= 0) $retainDays = 14;
 
 function fail(string $msg, int $code=1): void {
   fwrite(STDERR, '['.date('c').'] ERROR '.$msg."\n");
@@ -30,11 +32,17 @@ if (!is_dir($backupDir)) fail("Cannot create backup dir: $backupDir");
 // Build a temporary mysql client config to avoid password in process list.
 $tmpCnf = tempnam(sys_get_temp_dir(), 'cooscrm-mysql-');
 if ($tmpCnf === false) fail('tempnam failed');
+$iniEsc = function(string $v): string {
+  // Minimal escape for MySQL option files: wrap in single quotes.
+  $v = str_replace(['\\', "'"], ['\\\\', "\\'"], $v);
+  return "'".$v."'";
+};
+
 $cnf = "[client]\n".
   "host={$db['host']}\n".
   "port={$db['port']}\n".
   "user={$db['user']}\n".
-  "password={$db['pass']}\n";
+  "password=".$iniEsc((string)$db['pass'])."\n";
 file_put_contents($tmpCnf, $cnf);
 @chmod($tmpCnf, 0600);
 
