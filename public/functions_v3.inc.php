@@ -211,6 +211,7 @@ function renderHeader(string $title='COOS'): void {
         <div class="row">
           <?php if (isLoggedIn()): ?>
             <a class="btn" href="/">Dashboard</a>
+            <a class="btn" href="/new_project.php">Neues Projekt</a>
             <?php $jOn = james_enabled(); ?>
             <?php
               $iconFile = $jOn ? (__DIR__ . '/img/james_active.gif') : (__DIR__ . '/img/james_sleep.png');
@@ -223,7 +224,6 @@ function renderHeader(string $title='COOS'): void {
             </a>
             <a class="btn" href="/workerlog.php">Worker Log</a>
             <a class="btn" href="/setup.php">Setup</a>
-            <a class="btn" href="/new_project.php">Neues Projekt</a>
             <!-- Login Log removed -->
             <a class="btn" href="/logout.php">Logout</a>
           <?php endif; ?>
