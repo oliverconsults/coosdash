@@ -326,7 +326,16 @@ function project_env_text_for_node(PDO $pdo, int $nodeId, int $maxChars=4000): s
   if (!is_file($p)) return '';
   $raw = @file_get_contents($p);
   if (!is_string($raw) || trim($raw) === '') return '';
+
   $raw = trim($raw);
+
+  // Normalize global rule line so every prompt has the concrete path.
+  $raw = str_replace(
+    'cooscrm writes: only via worker_api_cli',
+    'cooscrm writes: only via /home/deploy/projects/coos/scripts/worker_api_cli.php',
+    $raw
+  );
+
   if (mb_strlen($raw) > $maxChars) {
     $raw = mb_substr($raw, 0, $maxChars) . "\n…(truncated)";
   }
