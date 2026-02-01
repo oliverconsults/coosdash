@@ -204,4 +204,49 @@ renderHeader('Setup');
   <?php endif; ?>
 </div>
 
+<?php
+  // Preview: wrapper prompt (template filled with sample values)
+  $wrapperPreview = '';
+  if ($wrapperTplCur !== '') {
+    $wrapperPreview = str_replace(
+      ['{JOB_ID}','{NODE_ID}','{JOB_PROMPT}'],
+      ['12345', ($nodeId ?? 0) ? (string)$nodeId : '0', ($preview !== '' ? $preview : '[no worker prompt preview available]')],
+      $wrapperTplCur
+    );
+  }
+
+  // Preview: summary+cleanup prompt (most recent queued summary job)
+  $summaryPreview = '';
+  try {
+    $pdo = db();
+    $st = $pdo->query("SELECT id,node_id,prompt_text,created_at FROM worker_queue WHERE selector_meta LIKE '%summary_cleanup%' ORDER BY id DESC LIMIT 1");
+    $row = $st->fetch();
+    if ($row) {
+      $summaryPreview = (string)($row['prompt_text'] ?? '');
+    }
+  } catch (Throwable $e) {
+    $summaryPreview = '';
+  }
+?>
+
+<div class="card" style="margin-top:14px;">
+  <h2>Preview: Wrapper Prompt (worker_main)</h2>
+  <div class="meta">Template gefüllt mit Dummy JOB_ID=12345 + sample NODE_ID + Worker-Prompt als {JOB_PROMPT}.</div>
+  <?php if ($wrapperPreview !== ''): ?>
+    <textarea readonly style="min-height:260px; opacity:0.95;"><?php echo h($wrapperPreview); ?></textarea>
+  <?php else: ?>
+    <div class="meta">Kein Wrapper-Template gesetzt.</div>
+  <?php endif; ?>
+</div>
+
+<div class="card" style="margin-top:14px;">
+  <h2>Preview: Summary+Cleanup Prompt</h2>
+  <div class="meta">Letzter gequeue-ter Summary+Cleanup Job aus <code>worker_queue</code> (best effort).</div>
+  <?php if ($summaryPreview !== ''): ?>
+    <textarea readonly style="min-height:260px; opacity:0.95;"><?php echo h($summaryPreview); ?></textarea>
+  <?php else: ?>
+    <div class="meta">Kein Summary+Cleanup Preview verfügbar (noch kein Job in worker_queue gefunden).</div>
+  <?php endif; ?>
+</div>
+
 <?php renderFooter();
