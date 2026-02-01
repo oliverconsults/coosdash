@@ -826,13 +826,6 @@ renderHeader('Dashboard');
           <?php endif; ?>
 
           <?php if ($sec === 'Projekte'): ?>
-            <?php if ($isBlockedUntil): ?>
-              <form method="post" action="/actions.php" style="margin:0" onsubmit="return confirm('Time-Block wirklich freigeben?');">
-                <input type="hidden" name="action" value="clear_block">
-                <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
-                <button class="btn" type="submit">Freigeben</button>
-              </form>
-            <?php endif; ?>
             <?php if ($ws === 'done'): ?>
               <form method="post" style="margin:0">
                 <input type="hidden" name="action" value="set_worker">
@@ -879,6 +872,14 @@ renderHeader('Dashboard');
               <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
               <button class="btn" type="submit">löschen</button>
             </form>
+
+            <?php if ($isBlockedUntil): ?>
+              <form method="post" action="/actions.php" style="margin:0" onsubmit="return confirm('Time-Block wirklich entfernen?');">
+                <input type="hidden" name="action" value="clear_block">
+                <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
+                <button class="btn" type="submit">Blocker entfernen</button>
+              </form>
+            <?php endif; ?>
           <?php elseif ($sec === 'Später'): ?>
             <form method="post" action="/actions.php" style="margin:0" onsubmit="return confirm('Wirklich nach „Gelöscht" verschieben? (inkl. Subtasks)');">
               <input type="hidden" name="action" value="remove_recursive">
