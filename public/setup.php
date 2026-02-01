@@ -298,6 +298,17 @@ renderHeader('Setup');
 ?>
 
 <?php if ($sel === 'worker_rules_block'): ?>
+  <?php
+    // Build wrapped (effective) prompt preview here (must be computed before output)
+    $wrapperPreview = '';
+    if ($wrapperTplCur !== '') {
+      $wrapperPreview = str_replace(
+        ['{JOB_ID}','{NODE_ID}','{JOB_PROMPT}'],
+        ['12345', ($nodeId ?? 0) ? (string)$nodeId : '0', ($preview !== '' ? $preview : '[no worker prompt preview available]')],
+        $wrapperTplCur
+      );
+    }
+  ?>
   <div class="card" style="margin-top:14px;">
     <h2>Preview: Effektiver LLM Prompt (Wrapper + env.md + Worker)</h2>
     <div class="meta">Das ist der effektiv gesendete Prompt: <code>wrapper_prompt_template</code> mit <code>{JOB_PROMPT}</code> (= Worker Prompt inkl. env.md) gefüllt. (JOB_ID ist Dummy)</div>
@@ -310,16 +321,6 @@ renderHeader('Setup');
 <?php endif; ?>
 
 <?php
-  // Preview: wrapper prompt (template filled with sample values)
-  $wrapperPreview = '';
-  if ($wrapperTplCur !== '') {
-    $wrapperPreview = str_replace(
-      ['{JOB_ID}','{NODE_ID}','{JOB_PROMPT}'],
-      ['12345', ($nodeId ?? 0) ? (string)$nodeId : '0', ($preview !== '' ? $preview : '[no worker prompt preview available]')],
-      $wrapperTplCur
-    );
-  }
-
   // Preview: summary+cleanup prompt (most recent queued summary job)
   $summaryPreview = '';
   try {
