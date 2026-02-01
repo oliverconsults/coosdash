@@ -222,6 +222,7 @@ function renderHeader(string $title='COOS'): void {
               <span><?php echo $jOn ? 'James aktiv' : 'James sleeps'; ?></span>
             </a>
             <a class="btn" href="/workerlog.php">Worker Log</a>
+            <a class="btn" href="/setup.php">Setup</a>
             <!-- Login Log removed -->
             <a class="btn" href="/logout.php">Logout</a>
           <?php endif; ?>
@@ -231,6 +232,37 @@ function renderHeader(string $title='COOS'): void {
         <div class="flash <?php echo $f['type']==='err'?'err':''; ?>"><?php echo h($f['msg']); ?></div>
       <?php endif; ?>
   <?php
+}
+
+function prompts_path(): string {
+  return '/var/www/coosdash/shared/data/prompts.json';
+}
+
+function prompts_load(): array {
+  $p = prompts_path();
+  if (!is_file($p)) return [];
+  $raw = @file_get_contents($p);
+  if ($raw === false || trim($raw) === '') return [];
+  $j = json_decode($raw, true);
+  return is_array($j) ? $j : [];
+}
+
+function prompt_get(string $key, string $default=''): string {
+  $all = prompts_load();
+  $v = $all[$key] ?? null;
+  if (!is_string($v)) return $default;
+  $v = (string)$v;
+  return $v !== '' ? $v : $default;
+}
+
+function prompt_set(string $key, string $value): bool {
+  $p = prompts_path();
+  @mkdir(dirname($p), 0775, true);
+  $all = prompts_load();
+  $all[$key] = (string)$value;
+  $json = json_encode($all, JSON_PRETTY_PRINT|JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
+  if ($json === false) return false;
+  return @file_put_contents($p, $json) !== false;
 }
 
 function renderFooter(): void {

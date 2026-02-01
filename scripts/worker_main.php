@@ -143,23 +143,29 @@ if ($cLock && flock($cLock, LOCK_EX | LOCK_NB)) {
       $promptText = (string)($job['prompt_text'] ?? '');
 
       // Minimal, explicit prompt so the agent only does one job and then marks it done/fail.
-      $msg = "# James Queue Consumer (worker_main)\n\n".
-        "You are James. Execute exactly ONE queued job that is already claimed.\n\n".
-        "Job: id={$jobId} node_id={$nodeId}\n\n".
-        "Instructions (job.prompt_text):\n".
-        $promptText . "\n\n".
-        "Rules:\n".
-        "- cooscrm DB: KEINE direkten SQL-Writes. Alle Änderungen an cooscrm ausschließlich via: php /home/deploy/projects/coos/scripts/worker_api_cli.php ...\n".
-        "- Eigene Projekt-DB (z.B. *_rv/*_test): direkte SQL-Writes sind erlaubt, wenn nötig (vorsichtig, nachvollziehbar).\n".
-        "- If you need Oliver to decide/confirm something: (1) prepend_update explaining the question + options, (2) set_status to todo_oliver, THEN (3) mark the job done.\n".
-        "  Example:\n".
-        "  php /home/deploy/projects/coos/scripts/worker_api_cli.php action=prepend_update node_id={$nodeId} headline=\"Frage an Oliver\" body=\"...\"\n".
-        "  php /home/deploy/projects/coos/scripts/worker_api_cli.php action=set_status node_id={$nodeId} worker_status=todo_oliver\n".
-        "  php /home/deploy/projects/coos/scripts/worker_api_cli.php action=job_done job_id={$jobId} node_id={$nodeId}\n".
-        "- On success: php /home/deploy/projects/coos/scripts/worker_api_cli.php action=job_done job_id={$jobId} node_id={$nodeId}\n".
-        "- On failure: php /home/deploy/projects/coos/scripts/worker_api_cli.php action=job_fail job_id={$jobId} node_id={$nodeId} reason=\"...\"\n".
-        "- Always end by calling job_done or job_fail (never exit without closing the job).\n".
-        "- Keep it concise. Prefer verification before marking done.\n";
+      $defaultTpl = "# James Queue Consumer (worker_main)\n\n"
+        . "You are James. Execute exactly ONE queued job that is already claimed.\n\n"
+        . "Job: id={JOB_ID} node_id={NODE_ID}\n\n"
+        . "Instructions (job.prompt_text):\n{JOB_PROMPT}\n\n"
+        . "Rules:\n"
+        . "- cooscrm DB: KEINE direkten SQL-Writes. Alle Änderungen an cooscrm ausschließlich via: php /home/deploy/projects/coos/scripts/worker_api_cli.php ...\n"
+        . "- Eigene Projekt-DB (z.B. *_rv/*_test): direkte SQL-Writes sind erlaubt, wenn nötig (vorsichtig, nachvollziehbar).\n"
+        . "- If you need Oliver to decide/confirm something: (1) prepend_update explaining the question + options, (2) set_status to todo_oliver, THEN (3) mark the job done.\n"
+        . "  Example:\n"
+        . "  php /home/deploy/projects/coos/scripts/worker_api_cli.php action=prepend_update node_id={NODE_ID} headline=\"Frage an Oliver\" body=\"...\"\n"
+        . "  php /home/deploy/projects/coos/scripts/worker_api_cli.php action=set_status node_id={NODE_ID} worker_status=todo_oliver\n"
+        . "  php /home/deploy/projects/coos/scripts/worker_api_cli.php action=job_done job_id={JOB_ID} node_id={NODE_ID}\n"
+        . "- On success: php /home/deploy/projects/coos/scripts/worker_api_cli.php action=job_done job_id={JOB_ID} node_id={NODE_ID}\n"
+        . "- On failure: php /home/deploy/projects/coos/scripts/worker_api_cli.php action=job_fail job_id={JOB_ID} node_id={NODE_ID} reason=\"...\"\n"
+        . "- Always end by calling job_done or job_fail (never exit without closing the job).\n"
+        . "- Keep it concise. Prefer verification before marking done.\n";
+
+      $tpl = prompt_get('wrapper_prompt_template', $defaultTpl);
+      $msg = str_replace(
+        ['{JOB_ID}','{NODE_ID}','{JOB_PROMPT}'],
+        [(string)$jobId, (string)$nodeId, (string)$promptText],
+        $tpl
+      );
 
       $agentCmd = 'clawdbot agent --session-id ' . escapeshellarg('coos-worker-queue') .
         ' --message ' . escapeshellarg($msg) .

@@ -137,18 +137,23 @@ foreach ($parents as $p) {
     $prompt .= "Unterkinder gesamt: " . count($desc) . " (rekursiv)\n\n";
   }
 
-  $prompt .= "Aufgabe: Erstelle eine kurze, praegnante Zusammenfassung (3-6 Bullets) aus den Notizen/Notes/Attachments der obigen Kinder/Unterkinder.\n";
-  $prompt .= "- Schreibe komplett auf Deutsch, du-Ansprache ist ok.\n";
-  $prompt .= "- Keine langen Logs, keine Wiederholungen. Fokus: Ergebnis + Links/Artefakte (nur referenzieren).\n";
-  $prompt .= "- Referenziere IDs in Klammern, wenn hilfreich (z.B. \"(aus #362)\").\n\n";
+  $defaultInstr = "Aufgabe: Erstelle eine kurze, praegnante Zusammenfassung (3-6 Bullets) aus den Notizen/Notes/Attachments der obigen Kinder/Unterkinder.\n"
+    . "- Schreibe komplett auf Deutsch, du-Ansprache ist ok.\n"
+    . "- Keine langen Logs, keine Wiederholungen. Fokus: Ergebnis + Links/Artefakte (nur referenzieren).\n"
+    . "- Referenziere IDs in Klammern, wenn hilfreich (z.B. \"(aus #362)\").\n\n"
+    . "Vorgehen (PFLICHT):\n"
+    . "1) Lies Parent (#{$pid}) + alle Descendants (description + node_notes + node_attachments).\n"
+    . "2) Erzeuge SUMMARY Text (ohne Markdown-Overkill).\n"
+    . "3) Rufe dann genau EINEN API Call auf (nutze base64, um Encoding/Shell-Probleme zu vermeiden):\n"
+    . "   Tipp: printf '%s' \"<ZUSAMMENFASSUNG>\" | php /home/deploy/projects/coos/scripts/b64_stdin.php\n"
+    . "   dann: php /home/deploy/projects/coos/scripts/worker_api_cli.php action=cleanup_done_subtree node_id={$pid} job_id={JOB_ID} summary_b64=\"<BASE64>\"\n\n"
+    . "Wichtig: Wenn der API Call fehlschlaegt: NICHTS loeschen/veraendern, sondern job_fail.\n";
 
-  $prompt .= "Vorgehen (PFLICHT):\n";
-  $prompt .= "1) Lies Parent (#{$pid}) + alle Descendants (description + node_notes + node_attachments).\n";
-  $prompt .= "2) Erzeuge SUMMARY Text (ohne Markdown-Overkill).\n";
-  $prompt .= "3) Rufe dann genau EINEN API Call auf (nutze base64, um Encoding/Shell-Probleme zu vermeiden):\n";
-  $prompt .= "   Tipp: printf '%s' \"<ZUSAMMENFASSUNG>\" | php /home/deploy/projects/coos/scripts/b64_stdin.php\n";
-  $prompt .= "   dann: php /home/deploy/projects/coos/scripts/worker_api_cli.php action=cleanup_done_subtree node_id={$pid} job_id={JOB_ID} summary_b64=\"<BASE64>\"\n\n";
-  $prompt .= "Wichtig: Wenn der API Call fehlschlaegt: NICHTS loeschen/veraendern, sondern job_fail.\n";
+  $instr = prompt_get('summary_cleanup_instructions', $defaultInstr);
+  // Allow template placeholders
+  $instr = str_replace('{TARGET_NODE_ID}', (string)$pid, $instr);
+
+  $prompt .= $instr;
 
   $pdo->prepare("INSERT INTO worker_queue (status, node_id, prompt_text, selector_meta) VALUES ('open', ?, ?, ?)")
       ->execute([$pid, $prompt, json_encode(['type'=>'summary_cleanup'], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)]);
