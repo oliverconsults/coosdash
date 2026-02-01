@@ -160,6 +160,7 @@ foreach ($roots as $r) {
     $env .= "url: https://t.coos.eu/{$slug}/\n";
     $env .= "docroot: {$docroot}\n";
     $env .= "repo: /home/deploy/projects/t/{$slug}\n\n";
+    $env .= "routing: multi-entry pretty (directories map to */index.php)\n\n";
     $env .= "php_fpm_sock: /run/php/php8.3-fpm.sock\n\n";
     $env .= "db_host: 127.0.0.1\n";
     $env .= "db_port: 3306\n";
