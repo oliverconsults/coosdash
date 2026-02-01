@@ -144,30 +144,28 @@ if ($cLock && flock($cLock, LOCK_EX | LOCK_NB)) {
       $nodeId = (int)($job['node_id'] ?? 0);
       $promptText = (string)($job['prompt_text'] ?? '');
 
-      // Minimal, explicit prompt so the agent only does one job and then marks it done/fail.
-      $defaultTpl = "# James Queue Consumer (worker_main)\n\n"
-        . "You are James. Execute exactly ONE queued job that is already claimed.\n\n"
-        . "Job: id={JOB_ID} node_id={NODE_ID}\n\n"
-        . "Instructions (job.prompt_text):\n{JOB_PROMPT}\n\n"
-        . "Rules:\n"
-        . "- cooscrm DB: KEINE direkten SQL-Writes. Alle Änderungen an cooscrm ausschließlich via: php /home/deploy/projects/coos/scripts/worker_api_cli.php ...\n"
-        . "- Eigene Projekt-DB (z.B. *_rv/*_test): direkte SQL-Writes sind erlaubt, wenn nötig (vorsichtig, nachvollziehbar).\n"
-        . "- If you need Oliver to decide/confirm something: (1) prepend_update explaining the question + options, (2) set_status to todo_oliver, THEN (3) mark the job done.\n"
-        . "  Example:\n"
-        . "  php /home/deploy/projects/coos/scripts/worker_api_cli.php action=prepend_update node_id={NODE_ID} headline=\"Frage an Oliver\" body=\"...\"\n"
-        . "  php /home/deploy/projects/coos/scripts/worker_api_cli.php action=set_status node_id={NODE_ID} worker_status=todo_oliver\n"
-        . "  php /home/deploy/projects/coos/scripts/worker_api_cli.php action=job_done job_id={JOB_ID} node_id={NODE_ID}\n"
-        . "- On success: php /home/deploy/projects/coos/scripts/worker_api_cli.php action=job_done job_id={JOB_ID} node_id={NODE_ID}\n"
-        . "- On failure: php /home/deploy/projects/coos/scripts/worker_api_cli.php action=job_fail job_id={JOB_ID} node_id={NODE_ID} reason=\"...\"\n"
-        . "- Always end by calling job_done or job_fail (never exit without closing the job).\n"
-        . "- Keep it concise. Prefer verification before marking done.\n";
+      // For project setup jobs: send ONLY the stored prompt_text to the LLM (no wrapper),
+      // then let worker_main apply the JSON result (create subtasks + QC subpoints) and close the job.
+      $isProjectSetup = false;
+      $reqId = '';
+      $meta = json_decode((string)($job['selector_meta'] ?? ''), true);
+      if (is_array($meta) && ($meta['type'] ?? '') === 'project_setup') {
+        $isProjectSetup = true;
+        $reqId = (string)($meta['req_id'] ?? '');
+      }
 
-      $tpl = prompt_require('wrapper_prompt_template');
-      $msg = str_replace(
-        ['{JOB_ID}','{NODE_ID}','{JOB_PROMPT}'],
-        [(string)$jobId, (string)$nodeId, (string)$promptText],
-        $tpl
-      );
+      $msg = '';
+      if ($isProjectSetup) {
+        $msg = $promptText;
+      } else {
+        // Normal jobs: wrap prompt_text with the existing wrapper template
+        $tpl = prompt_require('wrapper_prompt_template');
+        $msg = str_replace(
+          ['{JOB_ID}','{NODE_ID}','{JOB_PROMPT}'],
+          [(string)$jobId, (string)$nodeId, (string)$promptText],
+          $tpl
+        );
+      }
 
       // --- LLM prompt/response logging (effective prompt sent to agent + raw CLI output)
       $llmDir = '/var/www/coosdash/shared/llm';
@@ -179,7 +177,8 @@ if ($cLock && flock($cLock, LOCK_EX | LOCK_NB)) {
       $respPath = $llmDir . '/job_' . $jobId . '_node_' . $nodeId . '_response.txt';
       @file_put_contents($promptPath, $msg);
 
-      $agentCmd = 'clawdbot agent --session-id ' . escapeshellarg('coos-worker-queue') .
+      $session = $isProjectSetup ? 'coos-project-setup' : 'coos-worker-queue';
+      $agentCmd = 'clawdbot agent --session-id ' . escapeshellarg($session) .
         ' --message ' . escapeshellarg($msg) .
         ' --timeout 300 --thinking low';
 
@@ -189,6 +188,128 @@ if ($cLock && flock($cLock, LOCK_EX | LOCK_NB)) {
 
       $respRaw = implode("\n", $agentOut);
       @file_put_contents($respPath, $respRaw);
+
+      // If this is a project-setup job, also write to the project_setup_* files so the UI can show it.
+      if ($isProjectSetup && $reqId !== '') {
+        $projResp = $llmDir . '/' . $reqId . '_response.txt';
+        @file_put_contents($projResp, $respRaw);
+      }
+
+      // Project setup application (server-side): parse JSON and create subtasks under the project.
+      if ($isProjectSetup) {
+        $jsonText = trim($respRaw);
+        if (preg_match('/\{.*\}/s', $respRaw, $m)) {
+          $jsonText = $m[0];
+        }
+        $spec = json_decode($jsonText, true);
+
+        $fail = function(string $reason) use ($base,$jobId,$nodeId,$tsLine,$tsHuman) {
+          @file_put_contents('/var/www/coosdash/shared/logs/worker.log', $tsLine . "  #{$nodeId}  [auto] {$tsHuman} Project-Setup fail: {$reason}\n", FILE_APPEND);
+          $cmd = '/usr/bin/php ' . escapeshellarg($base . '/worker_api_cli.php') .
+            ' action=job_fail job_id=' . escapeshellarg((string)$jobId) .
+            ' node_id=' . escapeshellarg((string)$nodeId) .
+            ' reason=' . escapeshellarg($reason) .
+            ' session_id=' . escapeshellarg('coos-project-setup');
+          $o=[]; $c=0; exec($cmd . ' 2>&1', $o, $c);
+        };
+
+        if (!is_array($spec)) {
+          $fail('invalid json');
+        } else {
+          $children = is_array($spec['children'] ?? null) ? $spec['children'] : [];
+          $qualityTitle = is_string($spec['quality_title'] ?? null) ? trim((string)$spec['quality_title']) : 'Qualitätskontrolle';
+          $qc = is_array($spec['quality_children'] ?? null) ? $spec['quality_children'] : [];
+
+          // normalize children (4-6, last=qualityTitle)
+          $norm = [];
+          foreach ($children as $t) {
+            if (!is_string($t)) continue;
+            $t = trim($t);
+            if ($t === '') continue;
+            if (mb_strlen($t) > 40) $t = mb_substr($t, 0, 40);
+            $norm[] = $t;
+          }
+          // dedup
+          $seen=[]; $tmp=[];
+          foreach ($norm as $t) {
+            $k = mb_strtolower($t);
+            if (isset($seen[$k])) continue;
+            $seen[$k]=true;
+            $tmp[]=$t;
+          }
+          $norm = array_values(array_filter($tmp, fn($t)=>mb_strtolower($t)!==mb_strtolower($qualityTitle)));
+          if (count($norm) > 5) $norm = array_slice($norm, 0, 5);
+          while (count($norm) < 4) $norm[] = 'Implementierung (MVP)';
+          $norm[] = $qualityTitle;
+
+          // create children via API (chunks of 6)
+          $add = function(int $parent, array $titles) use ($base,$jobId): array {
+            $titles = array_values(array_filter($titles, fn($t)=>is_string($t) && trim($t) !== ''));
+            if (!$titles) return [];
+            $payload = implode("\n", $titles);
+            $cmd = '/usr/bin/php ' . escapeshellarg($base . '/worker_api_cli.php') .
+              ' action=add_children node_id=' . escapeshellarg((string)$parent) .
+              ' titles=' . escapeshellarg($payload);
+            $o=[]; $c=0; exec($cmd . ' 2>&1', $o, $c);
+            $raw = trim(implode("\n", $o));
+            $j = json_decode($raw, true);
+            return (is_array($j) && !empty($j['new_ids']) && is_array($j['new_ids'])) ? $j['new_ids'] : (is_array($j['data']['new_ids'] ?? null) ? $j['data']['new_ids'] : []);
+          };
+
+          // Ensure we don't duplicate if children already exist
+          try {
+            $dbEnv = getDbConfig($cfgPath);
+            if ($dbEnv) {
+              $dsn = 'mysql:host=' . $dbEnv['host'] . ';port=' . (int)$dbEnv['port'] . ';dbname=' . $dbEnv['name'] . ';charset=utf8mb4';
+              $pdo2 = new PDO($dsn, $dbEnv['user'], $dbEnv['pass'], [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+              $st = $pdo2->prepare('SELECT COUNT(*) FROM nodes WHERE parent_id=?');
+              $st->execute([$nodeId]);
+              $hasKids = (int)$st->fetchColumn();
+              if ($hasKids === 0) {
+                $newIds = $add($nodeId, $norm);
+                // find quality node id by title
+                $qualityId = 0;
+                $st = $pdo2->prepare('SELECT id FROM nodes WHERE parent_id=? AND title=? ORDER BY id DESC LIMIT 1');
+                $st->execute([$nodeId, $qualityTitle]);
+                $qualityId = (int)($st->fetchColumn() ?: 0);
+
+                // quality children: 5-10, chunked
+                $qnorm=[];
+                foreach ($qc as $t) {
+                  if (!is_string($t)) continue;
+                  $t=trim($t);
+                  if ($t==='') continue;
+                  if (mb_strlen($t)>40) $t=mb_substr($t,0,40);
+                  $qnorm[]=$t;
+                }
+                // dedup + clamp
+                $seen=[]; $tmp=[];
+                foreach ($qnorm as $t){$k=mb_strtolower($t); if(isset($seen[$k])) continue; $seen[$k]=true; $tmp[]=$t;}
+                $qnorm=$tmp;
+                if (count($qnorm)>10) $qnorm=array_slice($qnorm,0,10);
+                while (count($qnorm)<5) $qnorm[]='Smoke-Test (kritische Pfade)';
+
+                if ($qualityId>0) {
+                  for ($i=0; $i<count($qnorm); $i+=6) {
+                    $add($qualityId, array_slice($qnorm, $i, 6));
+                  }
+                }
+
+                @file_put_contents('/var/www/coosdash/shared/logs/worker.log', $tsLine . "  #{$nodeId}  [auto] {$tsHuman} Project-Setup applied (children=" . count($norm) . ", qc=" . count($qnorm) . ")\n", FILE_APPEND);
+              }
+            }
+          } catch (Throwable $e) {
+            // ignore
+          }
+
+          // close job
+          $doneCmd = '/usr/bin/php ' . escapeshellarg($base . '/worker_api_cli.php') .
+            ' action=job_done job_id=' . escapeshellarg((string)$jobId) .
+            ' node_id=' . escapeshellarg((string)$nodeId) .
+            ' session_id=' . escapeshellarg('coos-project-setup');
+          $o=[]; $c=0; exec($doneCmd . ' 2>&1', $o, $c);
+        }
+      }
 
       $tail = implode(' / ', array_slice($agentOut, -6));
       logline('consumer: agent exit=' . $agentCode . ($tail ? (' | ' . $tail) : ''));
