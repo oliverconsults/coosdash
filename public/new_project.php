@@ -152,7 +152,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       ];
       @file_put_contents($queuePath, json_encode($req, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES) . "\n", FILE_APPEND);
 
-      // Create a markdown meta file (for audit / context) and attach it to the project.
+      // Create a markdown meta file (for audit / context).
+      // IMPORTANT: do NOT attach it to the project node (keeps description clean).
       $metaMd = "# Projekt Setup (LLM)\n\n";
       $metaMd .= "- Node: #{$parentId}\n";
       $metaMd .= "- Title: {$title}\n";
@@ -164,8 +165,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $metaMd .= "## Beschreibung\n\n" . $desc . "\n";
       $metaPath = $llmDir . '/' . $reqId . '_meta.md';
       @file_put_contents($metaPath, $metaMd);
-      // Best effort attach
-      @exec('php ' . escapeshellarg(__DIR__ . '/../scripts/worker_api_cli.php') . ' action=add_attachment node_id=' . escapeshellarg((string)$parentId) . ' path=' . escapeshellarg($metaPath) . ' ' . escapeshellarg('project-setup.md') . ' 2>/dev/null');
 
       // Enqueue a project-setup job for worker_main (runs as deploy, can call clawdbot agent)
       require_once __DIR__ . '/../scripts/migrate_worker_queue.php';
