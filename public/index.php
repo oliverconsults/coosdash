@@ -408,7 +408,13 @@ function renderTree(array $byParent, array $byId, array $sectionByIdAll, array $
       // Otherwise browser default <details> layout can add extra indentation when fully expanded (search).
       echo '<details class="tree-branch" ' . ($isOpen ? 'open' : '') . '>';
       echo '<summary class="tree-item ' . ($isActive ? 'active' : '') . $msClass . '" style="margin-left:' . $indent . 'px">';
-      echo '<a href="/?id=' . $id . '" style="display:flex;align-items:center;gap:0;">'
+      $href = '/?id=' . $id;
+      // Under "Ideen": clicking should jump to "Neues Projekt" prefilled from this node.
+      // (but NOT for the Ideen container root itself)
+      if ($sec === 'Ideen' && (($byId[$id]['parent_id'] ?? null) !== null)) {
+        $href = '/new_project.php?from_node=' . $id;
+      }
+      echo '<a href="' . h($href) . '" style="display:flex;align-items:center;gap:0;">'
         . '<span style="color:' . $col . ';">' . h($num) . '</span>'
         . '&nbsp;'
         . '<span style="color:' . $col . ';">' . h($title) . h($countTxt) . $attIcon . '</span>'
@@ -420,7 +426,13 @@ function renderTree(array $byParent, array $byId, array $sectionByIdAll, array $
     } else {
       echo '<div class="tree-leaf">';
       echo '<div class="tree-item ' . ($isActive ? 'active' : '') . $msClass . '" style="margin-left:' . $indent . 'px">';
-      echo '<a href="/?id=' . $id . '" style="display:flex;align-items:center;gap:0;">'
+      $href = '/?id=' . $id;
+      // Under "Ideen": clicking should jump to "Neues Projekt" prefilled from this node.
+      // (but NOT for the Ideen container root itself)
+      if ($sec === 'Ideen' && (($byId[$id]['parent_id'] ?? null) !== null)) {
+        $href = '/new_project.php?from_node=' . $id;
+      }
+      echo '<a href="' . h($href) . '" style="display:flex;align-items:center;gap:0;">'
         . '<span style="color:' . $col . ';">' . h($num) . '</span>'
         . '&nbsp;'
         . '<span style="color:' . $col . ';">' . h($title) . h($countTxt) . $attIcon . '</span>'

@@ -30,10 +30,29 @@ if (is_file(prompts_path())) {
 
 $err = '';
 
+// Optional: convert an existing "Ideen" node into a project under "Projekte"
+$fromNodeId = isset($_REQUEST['from_node']) ? (int)$_REQUEST['from_node'] : 0;
+$prefill = ['title'=>'','description'=>''];
+if ($fromNodeId > 0) {
+  try {
+    $pdo = db();
+    $st = $pdo->prepare('SELECT id,title,description FROM nodes WHERE id=?');
+    $st->execute([$fromNodeId]);
+    $r = $st->fetch(PDO::FETCH_ASSOC);
+    if ($r) {
+      $prefill['title'] = (string)$r['title'];
+      $prefill['description'] = (string)$r['description'];
+    }
+  } catch (Throwable $e) {
+    // ignore
+  }
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $title = trim((string)($_POST['title'] ?? ''));
   $slug = strtolower(trim((string)($_POST['slug'] ?? '')));
   $desc = trim((string)($_POST['description'] ?? ''));
+  $fromNodeId = isset($_POST['from_node']) ? (int)$_POST['from_node'] : 0;
 
   if ($title === '' || $slug === '' || $desc === '') {
     $err = 'Bitte alle Felder ausfüllen.';
@@ -49,17 +68,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($projectsId <= 0) {
       $err = 'Root "Projekte" nicht gefunden.';
     } else {
-      // Create parent project node
       $ts = date('d.m.Y H:i');
       $createdBy = (string)($_SESSION['username'] ?? 'oliver');
+
       $baseDesc = "[oliver] {$ts} Projektbeschreibung\n\n" . $desc . "\n\n";
       $baseDesc .= "[setup] slug={$slug}\n";
       $baseDesc .= "[setup] url=https://t.coos.eu/{$slug}/\n";
       $baseDesc .= "[setup] env=/var/www/t/{$slug}/shared/env.md\n\n";
 
-      $stIns = $pdo->prepare('INSERT INTO nodes (parent_id,title,description,created_by,worker_status,created_at,updated_at) VALUES (?,?,?,?,?,NOW(),NOW())');
-      $stIns->execute([$projectsId, $title, $baseDesc, $createdBy, 'todo_james']);
-      $parentId = (int)$pdo->lastInsertId();
+      // Either create a new project node, or re-use an existing Ideen-node (move it under Projekte).
+      if ($fromNodeId > 0) {
+        // Verify source exists
+        $st = $pdo->prepare('SELECT id,parent_id,title,description FROM nodes WHERE id=?');
+        $st->execute([$fromNodeId]);
+        $src = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$src) {
+          $err = 'Source-Node nicht gefunden.';
+        } else {
+          // Move under Projekte + set status
+          $pdo->prepare('UPDATE nodes SET parent_id=?, title=?, worker_status=?, updated_at=NOW() WHERE id=?')
+              ->execute([$projectsId, $title, 'todo_james', $fromNodeId]);
+
+          // Prepend new project description + setup markers, keep old text below for context
+          $oldDesc = (string)($src['description'] ?? '');
+          $newDesc = $baseDesc . $oldDesc;
+          $pdo->prepare('UPDATE nodes SET description=? WHERE id=?')->execute([$newDesc, $fromNodeId]);
+
+          $parentId = $fromNodeId;
+        }
+      } else {
+        // Create parent project node
+        $stIns = $pdo->prepare('INSERT INTO nodes (parent_id,title,description,created_by,worker_status,created_at,updated_at) VALUES (?,?,?,?,?,NOW(),NOW())');
+        $stIns->execute([$projectsId, $title, $baseDesc, $createdBy, 'todo_james']);
+        $parentId = (int)$pdo->lastInsertId();
+      }
+
+      if ($err !== '') {
+        // fall through to render form
+      } else {
 
       // Children: deterministic starter set (LLM integration later)
       $children = [
@@ -70,8 +116,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'Qualitätskontrolle',
       ];
 
-      foreach ($children as $ct) {
-        $stIns->execute([$parentId, $ct, '', $createdBy, 'todo_james']);
+      // Only create default children when we created a fresh node.
+      if ($fromNodeId <= 0) {
+        foreach ($children as $ct) {
+          $stIns->execute([$parentId, $ct, '', $createdBy, 'todo_james']);
+        }
       }
 
       // Persist project metadata (env.md path etc.)
@@ -93,9 +142,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       ];
       @file_put_contents($queuePath, json_encode($req, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES) . "\n", FILE_APPEND);
 
-      flash_set('Projekt angelegt (#' . $parentId . '). Provisioning läuft per Cron.', 'info');
+      flash_set(($fromNodeId > 0 ? 'Projekt aus Idee erstellt/verschoben (#' : 'Projekt angelegt (#') . $parentId . '). Provisioning läuft per Cron.', 'info');
       header('Location: /?id=' . $parentId);
       exit;
+    }
     }
   }
 }
@@ -112,14 +162,19 @@ renderHeader('Neues Projekt');
   <?php endif; ?>
 
   <form method="post" action="/new_project.php" onsubmit="return confirm('Projekt wirklich anlegen?');">
+    <?php if ($fromNodeId > 0): ?>
+      <input type="hidden" name="from_node" value="<?php echo (int)$fromNodeId; ?>">
+      <div class="meta">Aus Idee-Node: #<?php echo (int)$fromNodeId; ?> (wird nach "Projekte" verschoben)</div>
+    <?php endif; ?>
+
     <label>Projektname</label>
-    <input name="title" value="<?php echo h((string)($_POST['title'] ?? '')); ?>" required maxlength="80" />
+    <input name="title" value="<?php echo h((string)($_POST['title'] ?? ($prefill['title'] ?? ''))); ?>" required maxlength="80" />
 
     <label>Slug (für URL: t.coos.eu/&lt;slug&gt;/)</label>
     <input name="slug" value="<?php echo h((string)($_POST['slug'] ?? '')); ?>" required maxlength="40" placeholder="z.B. game" />
 
     <label>Projektbeschreibung</label>
-    <textarea name="description" required style="min-height:220px;"><?php echo h((string)($_POST['description'] ?? '')); ?></textarea>
+    <textarea name="description" required style="min-height:220px;"><?php echo h((string)($_POST['description'] ?? ($prefill['description'] ?? ''))); ?></textarea>
 
     <div class="row" style="margin-top:10px;">
       <button class="btn btn-gold" type="submit">Projekt anlegen</button>
