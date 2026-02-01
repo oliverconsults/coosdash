@@ -76,7 +76,7 @@ foreach ($depthById as $id => $d) {
   $n = $byId[$id] ?? null;
   if (!$n) continue;
   if (($n['worker_status'] ?? '') !== 'todo_james') continue;
-  if (!empty($children[$id] ?? [])) continue; // leaf only
+  // NOTE: we no longer require leaf-only; James should pick the deepest open node even if it has children.
   if ($isBlocked($n)) continue; // do not pick blocked tasks
 
   $projId = $topProjectId((int)$id);
@@ -151,8 +151,6 @@ $cands = array_values(array_filter($cands, function($c) use ($children, $byId, $
     $sn = $byId[$sid] ?? null;
     if (!$sn) continue;
     if (($sn['worker_status'] ?? '') !== 'todo_james') continue;
-    // only leaf siblings
-    if (!empty($children[$sid] ?? [])) continue;
     // ignore blocked siblings for the "oldest-first" rule
     if ($isBlocked($sn)) continue;
     if ($min === null || $sid < $min) $min = $sid;
