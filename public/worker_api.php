@@ -478,6 +478,9 @@ if ($action === 'cleanup_done_subtree') {
   arsort($desc); // depth desc
   $deleted = 0;
   foreach (array_keys($desc) as $did) {
+    // If other nodes are blocked by this node, clear those refs (avoid dangling blockers)
+    $pdo->prepare('UPDATE nodes SET blocked_by_node_id=NULL WHERE blocked_by_node_id=?')->execute([(int)$did]);
+
     $pdo->prepare('DELETE FROM nodes WHERE id=?')->execute([(int)$did]);
     $deleted += 1;
   }

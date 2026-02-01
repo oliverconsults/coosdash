@@ -231,6 +231,9 @@ function deleteSubtreePermanent(PDO $pdo, int $nodeId): int {
     $count += deleteSubtreePermanent($pdo, (int)$row['id']);
   }
 
+  // If other nodes are blocked by this node, clear those refs (avoid dangling blockers)
+  $pdo->prepare('UPDATE nodes SET blocked_by_node_id=NULL WHERE blocked_by_node_id=?')->execute([$nodeId]);
+
   // delete legacy notes + node itself
   $pdo->prepare('DELETE FROM node_notes WHERE node_id=?')->execute([$nodeId]);
   $pdo->prepare('DELETE FROM nodes WHERE id=?')->execute([$nodeId]);
