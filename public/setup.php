@@ -268,6 +268,13 @@ renderHeader('Setup');
       if ($blockedUntil !== '' && strtotime($blockedUntil)) $preview .= "- BLOCKED_UNTIL={$blockedUntil}\n";
       $preview .= "\n";
 
+      // Project env (matches worker_queue_produce)
+      $env = project_env_text_for_node($pdo, $nodeId);
+      if ($env !== '') {
+        $preview .= "PROJEKT_UMGEBUNG (immer beachten):\n";
+        $preview .= $env . "\n\n";
+      }
+
       $preview .= $workerRulesCur . "\n";
       $preview .= "\n… (restliche statische Teile: erwartetes Ergebnis / attachments / tools / hygiene / constraints / regeln)\n";
     }
