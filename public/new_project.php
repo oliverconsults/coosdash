@@ -96,6 +96,19 @@ function renderTree_np(array $byParent, array $byId, array $sectionById, int $cu
 
 $sectionByIdAll = buildSectionMap_np($byParentAll, 0, '');
 
+// metrics for small progress chart (same as dashboard)
+$metricsRows = [];
+try {
+  $st = $pdo->prepare("SELECT ts, projects_todo_oliver, projects_todo_james, projects_blocked, projects_done
+                        FROM metrics_hourly
+                        WHERE ts >= (SELECT DATE_SUB(MAX(ts), INTERVAL 72 HOUR) FROM metrics_hourly)
+                        ORDER BY ts ASC");
+  $st->execute();
+  $metricsRows = $st->fetchAll(PDO::FETCH_ASSOC);
+} catch (Throwable $e) {
+  $metricsRows = [];
+}
+
 // Prompt key for the setup LLM (stored in prompts.json)
 $defaultSetupPrompt = "# COOS Project Setup (LLM)\n\n"
   . "Input:\n"
@@ -411,6 +424,90 @@ renderHeader('Neues Projekt');
     <div class="tree">
       <?php renderTree_np($byParentAll, $byIdAll, $sectionByIdAll, (int)$fromNodeId, 0, 0); ?>
     </div>
+
+    <?php if (!empty($metricsRows) && count($metricsRows) >= 2): ?>
+      <?php
+        $w = 320; $h = 92;
+        $pTodoJ = array_map(fn($r) => (int)$r['projects_todo_james'], $metricsRows);
+        $pDone  = array_map(fn($r) => (int)$r['projects_done'], $metricsRows);
+        $pTodoO = array_map(fn($r) => (int)$r['projects_todo_oliver'], $metricsRows);
+        $pBlocked = array_map(fn($r) => (int)$r['projects_blocked'], $metricsRows);
+
+        $totals = [];
+        for ($i=0; $i<count($metricsRows); $i++) {
+          $totals[] = $pDone[$i] + $pBlocked[$i] + $pTodoJ[$i] + $pTodoO[$i];
+        }
+        $totalMax = max(1, max($totals));
+        $pad = 8;
+        $x0 = $pad; $y0 = $pad; $x1 = $w - $pad; $y1 = $h - $pad;
+        $n = count($metricsRows);
+        $xs = [];
+        for ($i=0; $i<$n; $i++) $xs[] = ($n===1) ? $x0 : ($x0 + ($x1-$x0) * ($i/($n-1)));
+
+        $yFor = function(int $i, int $sum) use ($y0,$y1,$totalMax): float {
+          $t = $sum / $totalMax;
+          return $y1 - ($y1-$y0) * $t;
+        };
+
+        $areas = [
+          ['key'=>'done','label'=>'Done','color'=>'rgba(255,215,128,0.78)'],
+          ['key'=>'blocked','label'=>'Blocked','color'=>'rgba(255,120,120,0.55)'],
+          ['key'=>'todo_j','label'=>'ToDo (J)','color'=>'rgba(180,140,255,0.55)'],
+          ['key'=>'todo_o','label'=>'ToDo (O)','color'=>'rgba(120,200,255,0.55)'],
+        ];
+        $series = [
+          'done' => $pDone,
+          'blocked' => $pBlocked,
+          'todo_j' => $pTodoJ,
+          'todo_o' => $pTodoO,
+        ];
+
+        $makeAreaPath = function(array $stackBelow, array $values) use ($xs,$yFor,$n): string {
+          $topPts = [];
+          $botPts = [];
+          for ($i=0; $i<$n; $i++) {
+            $below = (int)$stackBelow[$i];
+            $val = (int)$values[$i];
+            $topSum = $below + $val;
+            $topPts[] = [$xs[$i], $yFor($i, $topSum)];
+            $botPts[] = [$xs[$i], $yFor($i, $below)];
+          }
+          $d = 'M ' . number_format($topPts[0][0],2,'.','') . ' ' . number_format($topPts[0][1],2,'.','');
+          for ($i=1; $i<$n; $i++) $d .= ' L ' . number_format($topPts[$i][0],2,'.','') . ' ' . number_format($topPts[$i][1],2,'.','');
+          for ($i=$n-1; $i>=0; $i--) $d .= ' L ' . number_format($botPts[$i][0],2,'.','') . ' ' . number_format($botPts[$i][1],2,'.','');
+          $d .= ' Z';
+          return $d;
+        };
+
+        $tsFirst = strtotime((string)$metricsRows[0]['ts']);
+        $midIdx = (int)floor(($n-1)/2);
+        $tsMid = strtotime((string)$metricsRows[$midIdx]['ts']);
+        $tsLast = strtotime((string)$metricsRows[$n-1]['ts']);
+      ?>
+
+      <div class="note" style="margin-top:12px">
+        <div class="head">Fortschritt (stündlich)</div>
+
+        <svg viewBox="0 0 <?php echo (int)$w; ?> <?php echo (int)$h; ?>" width="100%" height="<?php echo (int)$h; ?>" preserveAspectRatio="none" style="display:block; background:linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02)); border-radius:10px;">
+          <?php
+            $stack = array_fill(0, $n, 0);
+            foreach ($areas as $a) {
+              $k = $a['key'];
+              $d = $makeAreaPath($stack, $series[$k]);
+              echo '<path d="' . h($d) . '" fill="' . h($a['color']) . '" stroke="rgba(255,255,255,0.15)" stroke-width="0.5" />';
+              for ($i=0; $i<$n; $i++) $stack[$i] += (int)$series[$k][$i];
+            }
+          ?>
+        </svg>
+
+        <div class="row" style="justify-content:space-between; margin-top:6px;">
+          <span class="meta"><?php echo h(date('d.m H:i', $tsFirst)); ?></span>
+          <span class="meta"><?php echo h(date('d.m H:i', $tsMid)); ?></span>
+          <span class="meta"><?php echo h(date('d.m H:i', $tsLast)); ?></span>
+        </div>
+      </div>
+    <?php endif; ?>
+
   </div>
 
   <div>
