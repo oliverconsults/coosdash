@@ -193,10 +193,14 @@ if ($cLock && flock($cLock, LOCK_EX | LOCK_NB)) {
       $tail = implode(' / ', array_slice($agentOut, -6));
       logline('consumer: agent exit=' . $agentCode . ($tail ? (' | ' . $tail) : ''));
 
-      // Human-readable line in worker logs
+      // Human-readable line in worker logs (with clickable links via llm_file.php)
       $tsLine = date('Y-m-d H:i:s');
-      @file_put_contents($llmLog, $tsLine . "  job_id={$jobId} node_id={$nodeId} exit={$agentCode} prompt=" . basename($promptPath) . " response=" . basename($respPath) . "\n", FILE_APPEND);
-      @file_put_contents('/var/www/coosdash/shared/logs/worker.log', $tsLine . "  #{$nodeId}  [llm] job_id={$jobId} exit={$agentCode} (siehe worker_llm.log)\n", FILE_APPEND);
+      $pBase = basename($promptPath);
+      $rBase = basename($respPath);
+      $pUrl = '/llm_file.php?f=' . rawurlencode($pBase);
+      $rUrl = '/llm_file.php?f=' . rawurlencode($rBase);
+      @file_put_contents($llmLog, $tsLine . "  job_id={$jobId} node_id={$nodeId} exit={$agentCode} prompt={$pUrl} response={$rUrl}\n", FILE_APPEND);
+      @file_put_contents('/var/www/coosdash/shared/logs/worker.log', $tsLine . "  #{$nodeId}  [llm] job_id={$jobId} exit={$agentCode} (details: worker_llm.log)\n", FILE_APPEND);
 
       // Safety net: if the agent forgot to close the job, fail it so the queue doesn't stall.
       try {

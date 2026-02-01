@@ -36,10 +36,27 @@ if ($logPath !== '' && is_file($logPath)) {
   }
 }
 
-// Make "#123" clickable
+// Make "#123" clickable + link llm_file.php URLs in logs
 $renderLine = function(string $line): string {
   $safe = h($line);
+
+  // Node links
   $safe = preg_replace('/#(\d+)/', '<a href="/?id=$1">#$1</a>', $safe);
+
+  // Link local llm file viewer URLs
+  $safe = preg_replace(
+    '#(/llm_file\.php\?f=[A-Za-z0-9._%\-]+)#',
+    '<a href="$1" target="_blank" rel="noopener">$1</a>',
+    $safe
+  );
+
+  // Link http(s) URLs (fallback)
+  $safe = preg_replace(
+    '#(https?://[^\s<]+)#',
+    '<a href="$1" target="_blank" rel="noopener">$1</a>',
+    $safe
+  );
+
   return $safe;
 };
 ?>
