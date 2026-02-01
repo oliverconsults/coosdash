@@ -8,6 +8,10 @@ $pdo = db();
 // current selection
 $nodeId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 
+// right-panel view
+$view = (string)($_GET['view'] ?? 'kanban');
+if (!in_array($view, ['kanban','test'], true)) $view = 'kanban';
+
 // form state (to preserve user input on validation errors)
 $formNote = '';
 $formAsChild = false;
@@ -524,7 +528,16 @@ renderHeader('Dashboard');
     <div class="row" style="justify-content:space-between; align-items:center;">
       <h2 style="margin:0;">Projekte / Ideen (<?php echo count($roots); ?>)</h2>
       <div style="display:flex; gap:8px; align-items:center;">
-        <a class="btn btn-md" href="/">Kanban</a>
+        <?php
+          $baseQs = [];
+          if ($nodeId) $baseQs['id'] = (int)$nodeId;
+          if (!empty($_GET['open'])) $baseQs['open'] = (string)$_GET['open'];
+          if (!empty($_GET['q'])) $baseQs['q'] = (string)$_GET['q'];
+          $hrefKanban = '/?' . http_build_query(array_merge($baseQs, ['view'=>'kanban']));
+          $hrefTest = '/?' . http_build_query(array_merge($baseQs, ['view'=>'test']));
+        ?>
+        <a class="btn btn-md <?php echo $view==='kanban'?'active':''; ?>" href="<?php echo h($hrefKanban); ?>">Kanban</a>
+        <a class="btn btn-md <?php echo $view==='test'?'active':''; ?>" href="<?php echo h($hrefTest); ?>">Test</a>
       </div>
     </div>
 
@@ -1179,6 +1192,7 @@ renderHeader('Dashboard');
 
       ?>
 
+      <?php if ($view === 'kanban'): ?>
       <div class="card">
         <h2 style="margin-bottom:10px">Kanban (Leafs: Projekte)</h2>
         <div class="kanban">
@@ -1259,6 +1273,253 @@ renderHeader('Dashboard');
           <?php endforeach; ?>
         </div>
       </div>
+      <?php elseif ($view === 'test'): ?>
+        <?php
+          // Build graph data for "Projekte" subtree
+          $graph = ['nodes'=>[], 'edges'=>[]];
+          if (!empty($projectsRootId)) {
+            $projRoot = (int)$projectsRootId;
+            $inProj = [];
+            $stack = [$projRoot];
+            while ($stack) {
+              $cur = array_pop($stack);
+              $inProj[$cur] = true;
+              foreach (($byParentAll[$cur] ?? []) as $ch) {
+                $cid = (int)$ch['id'];
+                $stack[] = $cid;
+              }
+            }
+
+            foreach ($inProj as $id3 => $_) {
+              $n3 = $byIdAll[(int)$id3] ?? null;
+              if (!$n3) continue;
+              $st = (string)($n3['worker_status'] ?? '');
+              $graph['nodes'][] = [
+                'data' => [
+                  'id' => 'n' . (int)$id3,
+                  'node_id' => (int)$id3,
+                  'label' => '#' . (int)$id3 . ' ' . (string)($n3['title'] ?? ''),
+                  'title' => (string)($n3['title'] ?? ''),
+                  'status' => $st,
+                ]
+              ];
+
+              $pid = $n3['parent_id'] === null ? 0 : (int)$n3['parent_id'];
+              if ($pid > 0 && isset($inProj[$pid])) {
+                $graph['edges'][] = [
+                  'data' => [
+                    'id' => 'e' . $pid . '_' . (int)$id3,
+                    'source' => 'n' . $pid,
+                    'target' => 'n' . (int)$id3,
+                    'type' => 'tree',
+                  ]
+                ];
+              }
+
+              $bb = (int)($n3['blocked_by_node_id'] ?? 0);
+              if ($bb > 0 && isset($inProj[$bb])) {
+                $graph['edges'][] = [
+                  'data' => [
+                    'id' => 'b' . (int)$id3 . '_' . $bb,
+                    'source' => 'n' . $bb,
+                    'target' => 'n' . (int)$id3,
+                    'type' => 'blocked_by',
+                  ]
+                ];
+              }
+            }
+          }
+        ?>
+
+        <div class="card">
+          <div class="row" style="justify-content:space-between; align-items:center; gap:12px;">
+            <div>
+              <h2 style="margin:0 0 6px 0;">Test: Projekte-Graph</h2>
+              <div class="meta">Klick = Fokus · Doppelklick = öffnet Node · Filter/Zoom/Highlight. (Experimental)</div>
+            </div>
+            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:flex-end;">
+              <input id="gSearch" type="text" placeholder="#id oder Text…" style="width:220px;">
+              <label class="pill" style="display:flex; gap:6px; align-items:center;"><input id="gShowDone" type="checkbox" checked> Done</label>
+              <label class="pill" style="display:flex; gap:6px; align-items:center;"><input id="gShowBlockedEdges" type="checkbox" checked> Blocker-Kanten</label>
+              <a class="btn btn-md" href="#" id="gFit">Fit</a>
+              <a class="btn btn-md" href="#" id="gLayout">Layout</a>
+            </div>
+          </div>
+
+          <div style="height:12px"></div>
+          <div id="cy" style="height: calc(100vh - 240px); min-height:520px; border-radius:14px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08);"></div>
+
+          <div style="height:10px"></div>
+          <div class="meta" id="gHint"></div>
+        </div>
+
+        <link rel="stylesheet" href="https://unpkg.com/cytoscape-panzoom/cytoscape.js-panzoom.css">
+        <script src="https://unpkg.com/cytoscape@3.26.0/dist/cytoscape.min.js"></script>
+        <script src="https://unpkg.com/dagre@0.8.5/dist/dagre.min.js"></script>
+        <script src="https://unpkg.com/cytoscape-dagre@2.5.0/cytoscape-dagre.js"></script>
+        <script src="https://unpkg.com/cytoscape-panzoom/cytoscape-panzoom.js"></script>
+
+        <script>
+          (function(){
+            const elements = <?php echo json_encode(array_merge($graph['nodes'], $graph['edges']), JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES); ?>;
+            const selectedNodeId = <?php echo (int)$nodeId; ?>;
+
+            function colorFor(status){
+              if(status==='todo_james') return '#b28cff';
+              if(status==='todo_oliver') return '#78c8ff';
+              if(status==='done') return '#ffd580';
+              return '#9aa0a6';
+            }
+
+            const cy = window.cy = cytoscape({
+              container: document.getElementById('cy'),
+              elements,
+              wheelSensitivity: 0.20,
+              style: [
+                {
+                  selector: 'node',
+                  style: {
+                    'background-color': ele => colorFor(ele.data('status')),
+                    'label': 'data(label)',
+                    'color': 'rgba(255,255,255,0.92)',
+                    'text-outline-color': 'rgba(0,0,0,0.55)',
+                    'text-outline-width': 2,
+                    'font-size': 11,
+                    'text-wrap': 'wrap',
+                    'text-max-width': 140,
+                    'width': 26,
+                    'height': 26,
+                    'border-width': 1,
+                    'border-color': 'rgba(255,255,255,0.15)'
+                  }
+                },
+                {
+                  selector: 'node[status="done"]',
+                  style: { 'opacity': 0.55 }
+                },
+                {
+                  selector: 'edge[type="tree"]',
+                  style: {
+                    'width': 1.4,
+                    'line-color': 'rgba(255,255,255,0.14)',
+                    'curve-style': 'bezier',
+                    'target-arrow-shape': 'none'
+                  }
+                },
+                {
+                  selector: 'edge[type="blocked_by"]',
+                  style: {
+                    'width': 1.6,
+                    'line-color': 'rgba(255,120,120,0.65)',
+                    'line-style': 'dashed',
+                    'target-arrow-shape': 'triangle',
+                    'target-arrow-color': 'rgba(255,120,120,0.75)',
+                    'curve-style': 'bezier'
+                  }
+                },
+                {
+                  selector: '.hidden',
+                  style: { 'display': 'none' }
+                },
+                {
+                  selector: '.faded',
+                  style: { 'opacity': 0.12 }
+                },
+                {
+                  selector: '.focused',
+                  style: {
+                    'border-width': 3,
+                    'border-color': 'rgba(255,255,255,0.65)',
+                    'width': 30,
+                    'height': 30
+                  }
+                }
+              ],
+              layout: {
+                name: 'dagre',
+                rankDir: 'LR',
+                nodeSep: 22,
+                rankSep: 60,
+                edgeSep: 10,
+                animate: true,
+                animationDuration: 280
+              }
+            });
+
+            try { cy.panzoom({}); } catch(e) {}
+
+            function applyFilters(){
+              const showDone = document.getElementById('gShowDone').checked;
+              const showBlockedEdges = document.getElementById('gShowBlockedEdges').checked;
+
+              cy.nodes().forEach(n => {
+                const isDone = (n.data('status') === 'done');
+                n.toggleClass('hidden', isDone && !showDone);
+              });
+              cy.edges('[type="blocked_by"]').toggleClass('hidden', !showBlockedEdges);
+            }
+
+            function focusNode(n){
+              cy.elements().removeClass('focused');
+              cy.elements().addClass('faded');
+              n.removeClass('faded');
+              n.addClass('focused');
+              // show neighborhood
+              n.closedNeighborhood().removeClass('faded');
+              cy.animate({ fit: { eles: n.closedNeighborhood(), padding: 60 } }, { duration: 260 });
+              const hint = document.getElementById('gHint');
+              if (hint) hint.textContent = `Fokus: #${n.data('node_id')} · ${n.data('title')} · status=${n.data('status')}`;
+            }
+
+            cy.on('tap', 'node', (evt) => {
+              const n = evt.target;
+              focusNode(n);
+            });
+
+            cy.on('dbltap', 'node', (evt) => {
+              const nid = evt.target.data('node_id');
+              const qs = new URLSearchParams(window.location.search);
+              qs.set('id', nid);
+              qs.set('view', 'test');
+              window.location.href = '/?' + qs.toString();
+            });
+
+            document.getElementById('gFit').addEventListener('click', (e)=>{ e.preventDefault(); cy.animate({ fit: { eles: cy.elements(':visible'), padding: 50 } }, { duration: 240 }); });
+            document.getElementById('gLayout').addEventListener('click', (e)=>{ e.preventDefault(); cy.layout({ name:'dagre', rankDir:'LR', nodeSep:22, rankSep:60, edgeSep:10, animate:true, animationDuration:260 }).run(); });
+            document.getElementById('gShowDone').addEventListener('change', applyFilters);
+            document.getElementById('gShowBlockedEdges').addEventListener('change', applyFilters);
+
+            const searchEl = document.getElementById('gSearch');
+            let searchT = null;
+            function doSearch(){
+              const q = (searchEl.value || '').trim().toLowerCase();
+              if (!q){
+                cy.elements().removeClass('faded');
+                document.getElementById('gHint').textContent = '';
+                return;
+              }
+              const hit = cy.nodes().filter(n => {
+                const id = String(n.data('node_id'));
+                const label = String(n.data('label')||'').toLowerCase();
+                return ('#'+id) === q || id === q || label.includes(q);
+              })[0];
+              if (hit) focusNode(hit);
+            }
+            searchEl.addEventListener('input', ()=>{ clearTimeout(searchT); searchT=setTimeout(doSearch, 160); });
+
+            applyFilters();
+
+            // initial focus
+            if (selectedNodeId) {
+              const n = cy.getElementById('n'+selectedNodeId);
+              if (n && n.length) focusNode(n);
+              else cy.fit(cy.elements(':visible'), 50);
+            } else {
+              cy.fit(cy.elements(':visible'), 50);
+            }
+          })();
+        </script>
+      <?php endif; ?>
     <?php endif; ?>
   </div>
 </div>
