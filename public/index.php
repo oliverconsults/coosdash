@@ -737,14 +737,16 @@ renderHeader('Dashboard');
           <?php if ($createdTs): ?> am <?php echo h(date('d.m.Y H:i', $createdTs)); ?><?php endif; ?>
 
           <?php if ($isInProjekte && $tokIn !== null && $tokOut !== null && $wtTxt !== null): ?>
-            <span style="white-space:nowrap;"> | Token in/out/all: <?php echo (int)$tokIn; ?>/<?php echo (int)$tokOut; ?>/<?php echo (int)$tokAll; ?>
-              &nbsp; Worktime: <?php echo htmlspecialchars($wtTxt, ENT_QUOTES, 'UTF-8'); ?>
+            <?php
+              // For Projekte: show aggregated metrics for the current node + all descendants.
+              $showTokIn = ($sumTokIn !== null) ? (int)$sumTokIn : (int)$tokIn;
+              $showTokOut = ($sumTokOut !== null) ? (int)$sumTokOut : (int)$tokOut;
+              $showTokAll = ($sumTokAll !== null) ? (int)$sumTokAll : (int)$tokAll;
+              $showWtTxt = ($sumWtTxt !== null) ? (string)$sumWtTxt : (string)$wtTxt;
+            ?>
+            <span style="white-space:nowrap;"> | Token in/out/all: <?php echo (int)$showTokIn; ?>/<?php echo (int)$showTokOut; ?>/<?php echo (int)$showTokAll; ?>
+              &nbsp; Worktime: <?php echo htmlspecialchars($showWtTxt, ENT_QUOTES, 'UTF-8'); ?>
             </span>
-            <?php if ($sumTokIn !== null && $sumTokOut !== null && $sumWtTxt !== null): ?>
-              <span style="white-space:nowrap;"> | Σ (Subtree) Token in/out/all: <?php echo (int)$sumTokIn; ?>/<?php echo (int)$sumTokOut; ?>/<?php echo (int)$sumTokAll; ?>
-                &nbsp; Worktime: <?php echo htmlspecialchars($sumWtTxt, ENT_QUOTES, 'UTF-8'); ?>
-              </span>
-            <?php endif; ?>
           <?php endif; ?>
         </div>
 
