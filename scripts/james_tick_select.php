@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/../public/functions.inc.php';
+require_once __DIR__ . '/../public/functions_v3.inc.php';
 
 $pdo = db();
 $rows = $pdo->query("SELECT id,parent_id,title,worker_status,description,created_at,blocked_until,blocked_by_node_id FROM nodes ORDER BY id")->fetchAll();
