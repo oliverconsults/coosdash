@@ -229,7 +229,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // Load full tree for nav
-$allNodes = $pdo->query("SELECT id, parent_id, title, worker_status, priority, created_at, updated_at, blocked_until, blocked_by_node_id FROM nodes ORDER BY COALESCE(priority,999), id")->fetchAll();
+$allNodes = $pdo->query("SELECT id, parent_id, title, worker_status, priority, created_at, updated_at, blocked_until, blocked_by_node_id, token_in, token_out, worktime FROM nodes ORDER BY COALESCE(priority,999), id")->fetchAll();
 $byParentAll = [];
 $byIdAll = [];
 foreach ($allNodes as $n) {
