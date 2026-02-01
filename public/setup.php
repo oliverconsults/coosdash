@@ -122,9 +122,7 @@ renderHeader('Setup');
   <h2>Setup: LLM Prompts</h2>
   <div class="meta">Diese Texte sind die <b>Source of Truth</b>. Sie werden immer verwendet.</div>
 
-  <?php $hist = prompt_history_list($sel, 100); ?>
-
-  <form method="post" action="/setup.php" onsubmit="return confirm('Wirklich speichern? (History wird automatisch geführt)');">
+  <form method="post" action="/setup.php?p=<?php echo h($sel); ?>" onsubmit="return confirm('Wirklich speichern? (History wird automatisch geführt)');">
 
     <?php
       $sel = (string)($_GET['p'] ?? 'worker_rules_block');
@@ -169,6 +167,7 @@ renderHeader('Setup');
   <h2>History (<?php echo h($sel); ?>)</h2>
   <div class="meta">Letzte 100 Versionen, restore mit Bestätigung.</div>
 
+  <?php $hist = prompt_history_list($sel, 100); ?>
   <?php if (!$hist): ?>
     <div class="meta">Noch keine History vorhanden.</div>
   <?php else: ?>
