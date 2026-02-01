@@ -1004,6 +1004,23 @@ renderHeader('Dashboard');
           'done' => [],
         ];
 
+        $topProjectTitle = function(int $nodeId) use ($byIdAll, $projectsRootId): string {
+          if ($nodeId <= 0 || !$projectsRootId) return '';
+          $cur = $nodeId;
+          for ($i=0; $i<120; $i++) {
+            $row = $byIdAll[$cur] ?? null;
+            if (!$row) return '';
+            $pid = $row['parent_id'];
+            if ($pid === null) return '';
+            $pid = (int)$pid;
+            if ($pid === $projectsRootId) {
+              return (string)($row['title'] ?? '');
+            }
+            $cur = $pid;
+          }
+          return '';
+        };
+
         foreach ($byIdAll as $id => $n) {
           $id = (int)$id;
           // leaf only
@@ -1029,10 +1046,14 @@ renderHeader('Dashboard');
           $sec = (string)($sectionByIdAll[$id] ?? '');
           if ($sec !== 'Projekte') continue;
 
+          $projTitle = $topProjectTitle($id);
+          if ($projTitle === '') $projTitle = $sec;
+
           $cards[$st][] = [
             'id' => $id,
             'title' => (string)($n['title'] ?? ''),
             'section' => $sec,
+            'project' => $projTitle,
             'updated_at' => (string)($n['updated_at'] ?? ''),
             'has_att' => !empty($attCountById[$id]),
           ];
@@ -1140,7 +1161,7 @@ renderHeader('Dashboard');
                   <a class="kanban-card" href="/?id=<?php echo (int)$c['id']; ?>">
                     <div class="kanban-title"><?php echo h($c['title']); ?><?php if (!empty($c['has_att'])): ?> <span class="att-clip" title="Attachment">📁</span><?php endif; ?></div>
                     <div class="kanban-meta">
-                      <span class="pill section"><?php echo h($c['section']); ?></span>
+                      <span class="pill section"><?php echo h((string)($c['project'] ?? $c['section'])); ?></span>
                       <?php $right = '#' . (int)$c['id']; ?>
                       <?php if ($col === 'done'): ?>
                         <?php $ts = strtotime((string)($c['updated_at'] ?? '')); ?>
