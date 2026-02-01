@@ -222,7 +222,7 @@ function renderHeader(string $title='COOS'): void {
               <span><?php echo $jOn ? 'James aktiv' : 'James sleeps'; ?></span>
             </a>
             <a class="btn" href="/workerlog.php">Worker Log</a>
-            <a class="btn" href="/loginlog.php">Login Log</a>
+            <!-- Login Log removed -->
             <a class="btn" href="/logout.php">Logout</a>
           <?php endif; ?>
         </div>
