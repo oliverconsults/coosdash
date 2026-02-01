@@ -693,7 +693,268 @@ renderHeader('Dashboard');
 
   <div>
 
-    <?php if ($node): ?>
+    <?php if ($view === 'test'): ?>
+      <?php
+        // --- TEST VIEW (Graph) lives in the right column (replaces node details / Kanban)
+        $projectsRootId2 = 0;
+        foreach ($roots as $r) {
+          if (((string)($r['title'] ?? '')) === 'Projekte') $projectsRootId2 = (int)$r['id'];
+        }
+
+        $isUnder2 = function(int $nodeId2, int $rootId2) use ($byIdAll): bool {
+          if (!$rootId2) return false;
+          $cur2 = $nodeId2;
+          for ($i=0; $i<120; $i++) {
+            $row2 = $byIdAll[$cur2] ?? null;
+            if (!$row2) return false;
+            $pid2 = $row2['parent_id'];
+            if ($pid2 === null) return false;
+            $pid2 = (int)$pid2;
+            if ($pid2 === $rootId2) return true;
+            $cur2 = $pid2;
+          }
+          return false;
+        };
+
+        // Find active project (top-level child of Projekte root) for current selection
+        $activeProjectId = 0;
+        if ($projectsRootId2 && $nodeId > 0 && !empty($byIdAll[$nodeId]) && $isUnder2($nodeId, $projectsRootId2)) {
+          $cur = (int)$nodeId;
+          for ($i=0; $i<160; $i++) {
+            $row = $byIdAll[$cur] ?? null;
+            if (!$row) break;
+            $pid = $row['parent_id'];
+            if ($pid === null) break;
+            $pid = (int)$pid;
+            if ($pid === $projectsRootId2) { $activeProjectId = $cur; break; }
+            $cur = $pid;
+          }
+        }
+        $activeProjectTitle = $activeProjectId ? (string)($byIdAll[$activeProjectId]['title'] ?? '') : '';
+
+        // blocked detection (match selector semantics)
+        $isBlockedNode = function(int $id) use ($byIdAll): bool {
+          $n = $byIdAll[$id] ?? null;
+          if (!$n) return true;
+          $bu = (string)($n['blocked_until'] ?? '');
+          $bb = (int)($n['blocked_by_node_id'] ?? 0);
+          if ($bu !== '' && strtotime($bu) && strtotime($bu) > time()) return true;
+          if ($bb > 0) {
+            $bn = $byIdAll[$bb] ?? null;
+            if (!$bn) return true;
+            return (string)($bn['worker_status'] ?? '') !== 'done';
+          }
+          return false;
+        };
+
+        // Build graph data for current project
+        $graph = ['nodes'=>[], 'edges'=>[]];
+        if ($activeProjectId > 0) {
+          $inProj = [];
+          $stack = [$activeProjectId];
+          while ($stack) {
+            $cur = array_pop($stack);
+            $inProj[$cur] = true;
+            foreach (($byParentAll[$cur] ?? []) as $ch) {
+              $cid = (int)$ch['id'];
+              $stack[] = $cid;
+            }
+          }
+
+          foreach ($inProj as $id3 => $_) {
+            $n3 = $byIdAll[(int)$id3] ?? null;
+            if (!$n3) continue;
+
+            $ws = (string)($n3['worker_status'] ?? '');
+            $status = $ws;
+            if ($ws !== 'done' && $isBlockedNode((int)$id3)) $status = 'blocked';
+
+            $graph['nodes'][] = [
+              'data' => [
+                'id' => 'n' . (int)$id3,
+                'node_id' => (int)$id3,
+                'label' => '#' . (int)$id3 . ' ' . (string)($n3['title'] ?? ''),
+                'title' => (string)($n3['title'] ?? ''),
+                'status' => $status,
+                'worker_status' => $ws,
+              ]
+            ];
+
+            $pid = $n3['parent_id'] === null ? 0 : (int)$n3['parent_id'];
+            if ($pid > 0 && isset($inProj[$pid])) {
+              $graph['edges'][] = [
+                'data' => [
+                  'id' => 'e' . $pid . '_' . (int)$id3,
+                  'source' => 'n' . $pid,
+                  'target' => 'n' . (int)$id3,
+                  'type' => 'tree',
+                ]
+              ];
+            }
+
+            $bb = (int)($n3['blocked_by_node_id'] ?? 0);
+            if ($bb > 0 && isset($inProj[$bb])) {
+              $graph['edges'][] = [
+                'data' => [
+                  'id' => 'b' . (int)$id3 . '_' . $bb,
+                  'source' => 'n' . $bb,
+                  'target' => 'n' . (int)$id3,
+                  'type' => 'blocked_by',
+                ]
+              ];
+            }
+          }
+        }
+      ?>
+
+      <div class="card">
+        <div class="row" style="justify-content:space-between; align-items:center; gap:12px;">
+          <div>
+            <h2 style="margin:0 0 6px 0;">Test: Projekte-Graph<?php if ($activeProjectTitle !== ''): ?> · <?php echo h($activeProjectTitle); ?><?php endif; ?></h2>
+            <div class="meta">Klick = Fokus · Doppelklick = öffnet Node · Filter/Zoom/Highlight. (Experimental)</div>
+          </div>
+          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:flex-end;">
+            <input id="gSearch" type="text" placeholder="#id oder Text…" style="width:220px;">
+            <label class="pill" style="display:flex; gap:6px; align-items:center;"><input id="gShowDone" type="checkbox" checked> Done</label>
+            <label class="pill" style="display:flex; gap:6px; align-items:center;"><input id="gShowBlockedEdges" type="checkbox" checked> Blocker-Kanten</label>
+            <a class="btn btn-md" href="#" id="gFit">Fit</a>
+            <a class="btn btn-md" href="#" id="gLayout">Layout</a>
+          </div>
+        </div>
+
+        <div style="height:12px"></div>
+        <div id="cy" style="height: calc(100vh - 220px); min-height:560px; border-radius:14px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08);"></div>
+
+        <div style="height:10px"></div>
+        <div class="meta" id="gHint"></div>
+      </div>
+
+      <link rel="stylesheet" href="https://unpkg.com/cytoscape-panzoom/cytoscape.js-panzoom.css">
+      <script src="https://unpkg.com/cytoscape@3.26.0/dist/cytoscape.min.js"></script>
+      <script src="https://unpkg.com/dagre@0.8.5/dist/dagre.min.js"></script>
+      <script src="https://unpkg.com/cytoscape-dagre@2.5.0/cytoscape-dagre.js"></script>
+      <script src="https://unpkg.com/cytoscape-panzoom/cytoscape-panzoom.js"></script>
+
+      <script>
+        (function(){
+          const elements = <?php echo json_encode(array_merge($graph['nodes'], $graph['edges']), JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES); ?>;
+          const selectedNodeId = <?php echo (int)$nodeId; ?>;
+          const activeProjectId = <?php echo (int)$activeProjectId; ?>;
+
+          function colorFor(status){
+            if(status==='todo_james') return '#b28cff';
+            if(status==='todo_oliver') return '#78c8ff';
+            if(status==='done') return '#ffd580';
+            if(status==='blocked') return 'rgba(255,120,120,0.95)';
+            return '#9aa0a6';
+          }
+
+          if (!elements || elements.length === 0) {
+            const hint = document.getElementById('gHint');
+            if (hint) hint.textContent = 'Kein Projekt ausgewählt. Bitte links einen Node unter "Projekte" anklicken.';
+            return;
+          }
+
+          const cy = window.cy = cytoscape({
+            container: document.getElementById('cy'),
+            elements,
+            wheelSensitivity: 0.20,
+            style: [
+              { selector:'node', style:{
+                'background-color': ele => colorFor(ele.data('status')),
+                'label':'data(label)',
+                'color':'rgba(255,255,255,0.92)',
+                'text-outline-color':'rgba(0,0,0,0.55)',
+                'text-outline-width':2,
+                'font-size':11,
+                'text-wrap':'wrap',
+                'text-max-width':140,
+                'width':26,
+                'height':26,
+                'border-width':1,
+                'border-color':'rgba(255,255,255,0.15)'
+              }},
+              { selector:'node[status="done"]', style:{ 'opacity':0.55 }},
+              { selector:'edge[type="tree"]', style:{ 'width':1.4, 'line-color':'rgba(255,255,255,0.14)', 'curve-style':'bezier', 'target-arrow-shape':'none' }},
+              { selector:'edge[type="blocked_by"]', style:{ 'width':1.6, 'line-color':'rgba(255,120,120,0.65)', 'line-style':'dashed', 'target-arrow-shape':'triangle', 'target-arrow-color':'rgba(255,120,120,0.75)', 'curve-style':'bezier' }},
+              { selector:'.hidden', style:{ 'display':'none' }},
+              { selector:'.faded', style:{ 'opacity':0.12 }},
+              { selector:'.focused', style:{ 'border-width':3, 'border-color':'rgba(255,255,255,0.65)', 'width':30, 'height':30 }}
+            ],
+            layout: { name:'dagre', rankDir:'TB', nodeSep:18, rankSep:55, edgeSep:10, animate:true, animationDuration:280 }
+          });
+
+          try { cy.panzoom({}); } catch(e) {}
+
+          function applyFilters(){
+            const showDone = document.getElementById('gShowDone').checked;
+            const showBlockedEdges = document.getElementById('gShowBlockedEdges').checked;
+            cy.nodes().forEach(n => {
+              const isDone = (n.data('status') === 'done');
+              n.toggleClass('hidden', isDone && !showDone);
+            });
+            cy.edges('[type="blocked_by"]').toggleClass('hidden', !showBlockedEdges);
+          }
+
+          function focusNode(n){
+            cy.elements().removeClass('focused');
+            cy.elements().addClass('faded');
+            n.removeClass('faded');
+            n.addClass('focused');
+            n.closedNeighborhood().removeClass('faded');
+            cy.animate({ fit: { eles: n.closedNeighborhood(), padding: 60 } }, { duration: 260 });
+            const hint = document.getElementById('gHint');
+            if (hint) hint.textContent = `Fokus: #${n.data('node_id')} · ${n.data('title')} · status=${n.data('status')}`;
+          }
+
+          cy.on('tap', 'node', (evt) => focusNode(evt.target));
+          cy.on('dbltap', 'node', (evt) => {
+            const nid = evt.target.data('node_id');
+            const qs = new URLSearchParams(window.location.search);
+            qs.set('id', nid);
+            qs.set('view', 'test');
+            window.location.href = '/?' + qs.toString();
+          });
+
+          document.getElementById('gFit').addEventListener('click', (e)=>{ e.preventDefault(); cy.animate({ fit: { eles: cy.elements(':visible'), padding: 50 } }, { duration: 240 }); });
+          document.getElementById('gLayout').addEventListener('click', (e)=>{ e.preventDefault(); cy.layout({ name:'dagre', rankDir:'TB', nodeSep:18, rankSep:55, edgeSep:10, animate:true, animationDuration:260 }).run(); });
+          document.getElementById('gShowDone').addEventListener('change', applyFilters);
+          document.getElementById('gShowBlockedEdges').addEventListener('change', applyFilters);
+
+          const searchEl = document.getElementById('gSearch');
+          let searchT = null;
+          function doSearch(){
+            const q = (searchEl.value || '').trim().toLowerCase();
+            if (!q){
+              cy.elements().removeClass('faded');
+              document.getElementById('gHint').textContent = '';
+              return;
+            }
+            const hit = cy.nodes().filter(n => {
+              const id = String(n.data('node_id'));
+              const label = String(n.data('label')||'').toLowerCase();
+              return ('#'+id) === q || id === q || label.includes(q);
+            })[0];
+            if (hit) focusNode(hit);
+          }
+          searchEl.addEventListener('input', ()=>{ clearTimeout(searchT); searchT=setTimeout(doSearch, 160); });
+
+          applyFilters();
+
+          const root = (activeProjectId ? cy.getElementById('n'+activeProjectId) : null);
+          if (root && root.length) {
+            focusNode(root);
+            if (selectedNodeId) {
+              const n = cy.getElementById('n'+selectedNodeId);
+              if (n && n.length) setTimeout(()=>focusNode(n), 180);
+            }
+          } else {
+            cy.fit(cy.elements(':visible'), 50);
+          }
+        })();
+      </script>
+
+    <?php elseif ($node): ?>
       <div class="card">
         <?php
           // breadcrumb
