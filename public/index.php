@@ -228,7 +228,7 @@ try {
   projects_migrate($pdo);
   $projectsId = projects_root_id($pdo);
   if ($projectsId > 0) {
-    $st = $pdo->prepare("SELECT n.id, n.title, p.slug
+    $st = $pdo->prepare("SELECT n.id, n.title, p.slug, n.updated_at
                          FROM nodes n
                          JOIN projects p ON p.node_id = n.id
                          WHERE n.parent_id = ? AND n.worker_status = 'done'
@@ -638,7 +638,14 @@ renderHeader('Dashboard');
               if ($slug === '') continue;
               $url = 'https://t.coos.eu/' . rawurlencode($slug) . '/';
             ?>
-            <li><a href="<?php echo h($url); ?>" target="_blank" rel="noopener"><?php echo h($title); ?></a></li>
+            <?php $tsDone = strtotime((string)($dp['updated_at'] ?? '')); ?>
+            <?php $doneTxt = $tsDone ? date('d.m.Y H:i:s', $tsDone) : ''; ?>
+            <li>
+              <a href="<?php echo h($url); ?>" target="_blank" rel="noopener"><?php echo h($title); ?></a>
+              <?php if ($doneTxt !== ''): ?>
+                <span class="meta">(Fertig seit: <?php echo h($doneTxt); ?>)</span>
+              <?php endif; ?>
+            </li>
           <?php endforeach; ?>
         </ul>
       </div>
