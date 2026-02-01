@@ -751,6 +751,11 @@ renderHeader('Dashboard');
             Blockiert
             <?php if ($isBlockedUntil): ?>
               bis <?php echo h(date('d.m.Y H:i:s', strtotime($blockedUntil))); ?>
+              <form method="post" action="/actions.php" style="display:inline; margin-left:8px" onsubmit="return confirm('Time-Block wirklich freigeben?');">
+                <input type="hidden" name="action" value="clear_block">
+                <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
+                <button class="btn btn-sm" type="submit">Freigeben</button>
+              </form>
             <?php endif; ?>
             <?php if ($isBlockedBy): ?>
               <?php if ($isBlockedUntil): ?>·<?php endif; ?> wartet auf <a href="/?id=<?php echo (int)$blockedBy; ?>">#<?php echo (int)$blockedBy; ?></a>

@@ -113,24 +113,25 @@ if ($action === 'set_block') {
 }
 
 if ($action === 'clear_block') {
-  // Only James manages blockers for now
+  // Allow Oliver to clear time-blocks quickly from UI.
+  // (Used for "Blockiert bis ... [Freigeben]".)
   $u = strtolower((string)($_SESSION['username'] ?? ''));
-  if ($u !== 'james') {
-    flash_set('Blocker-Optionen werden aktuell nur von James verwaltet.', 'err');
+  if (!in_array($u, ['james','oliver'], true)) {
+    flash_set('Keine Berechtigung.', 'err');
     header('Location: /?id=' . $nodeId);
     exit;
   }
 
-  $pdo->prepare('UPDATE nodes SET blocked_until=NULL, blocked_by_node_id=NULL WHERE id=?')
-      ->execute([$nodeId]);
+  // Only clear blocked_until (time-block) here. Keep blocked_by untouched.
+  $pdo->prepare('UPDATE nodes SET blocked_until=NULL WHERE id=?')->execute([$nodeId]);
+
   $ts = date('d.m.Y H:i');
-  $line = "[oliver] {$ts} Blocker: entfernt\n\n";
+  $line = "[oliver] {$ts} Blocker: time-block entfernt\n\n";
   $pdo->prepare('UPDATE nodes SET description=CONCAT(?, COALESCE(description,\'\')) WHERE id=?')
       ->execute([$line, $nodeId]);
-  $ts = date('d.m.Y H:i');
-  workerlog_append($nodeId, "[oliver] {$ts} UI: clear_block");
+  workerlog_append($nodeId, "[oliver] {$ts} UI: clear_blocked_until");
 
-  flash_set('Blocker entfernt.', 'info');
+  flash_set('Time-Block entfernt.', 'info');
   header('Location: /?id=' . $nodeId);
   exit;
 }
