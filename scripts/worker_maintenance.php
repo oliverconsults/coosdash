@@ -158,7 +158,7 @@ foreach ($todoIds as $tid) {
     $stS->execute([$pid]);
     $pStatus = (string)($stS->fetchColumn() ?: '');
 
-    if ($pStatus === 'done') {
+    if ($pStatus !== 'todo_james') {
       $pdo->prepare('UPDATE nodes SET worker_status="todo_james" WHERE id=?')->execute([$pid]);
 
       // Build chain from the original todo leaf up to this parent
