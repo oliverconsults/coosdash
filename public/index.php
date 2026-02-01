@@ -928,14 +928,9 @@ renderHeader('Dashboard');
             </div>
           <?php endif; ?>
 
-          <label>Aktueller Task-Text (read-only, Top 10 Zeilen)</label>
-          <?php
-            $descCur = (string)($node['description'] ?? '');
-            $lines = preg_split('/\R/', $descCur);
-            if (!is_array($lines)) $lines = [];
-            $top = implode("\n", array_slice($lines, 0, 10));
-          ?>
-          <textarea readonly style="min-height:180px; max-height:240px; overflow:auto; opacity:0.95; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:12px;"><?php echo h($top); ?></textarea>
+          <label>Aktueller Task-Text (read-only)</label>
+          <?php $descCur = (string)($node['description'] ?? ''); ?>
+          <textarea readonly style="min-height:180px; max-height:320px; overflow:auto; opacity:0.95; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:12px;"><?php echo h($descCur); ?></textarea>
           <div class="meta">Direktes Editieren ist deaktiviert. Bitte neue Subtasks anlegen.</div>
           <div style="height:14px"></div>
         <?php endif; ?>
