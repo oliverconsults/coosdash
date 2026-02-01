@@ -58,6 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $slug = strtolower(trim((string)($_POST['slug'] ?? '')));
   $desc = trim((string)($_POST['description'] ?? ''));
   $fromNodeId = isset($_POST['from_node']) ? (int)$_POST['from_node'] : 0;
+  $confirmPurge = !empty($_POST['confirm_purge']);
 
   if ($title === '' || $slug === '' || $desc === '') {
     $err = 'Bitte alle Felder ausfüllen.';
@@ -65,6 +66,102 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $err = 'Slug ungültig. Erlaubt: a-z, 0-9, -, Länge 2–41.';
   } else {
     $pdo = db();
+
+    // --- Slug safety check (prevent reusing slugs with leftover data) ---
+    projects_migrate($pdo);
+    $deletedRootId = (int)$pdo->query("SELECT id FROM nodes WHERE parent_id IS NULL AND title='Gelöscht' LIMIT 1")->fetchColumn();
+
+    $existing = null;
+    $st = $pdo->prepare('SELECT node_id FROM projects WHERE slug=? LIMIT 1');
+    $st->execute([$slug]);
+    $existingNodeId = (int)($st->fetchColumn() ?: 0);
+    if ($existingNodeId > 0) {
+      $st2 = $pdo->prepare('SELECT id,title,parent_id FROM nodes WHERE id=?');
+      $st2->execute([$existingNodeId]);
+      $existing = $st2->fetch(PDO::FETCH_ASSOC);
+    }
+
+    $slugDir = '/var/www/t/' . $slug;
+    $slugDirExists = is_dir($slugDir);
+
+    $existingInDeleted = false;
+    if ($existing && $deletedRootId > 0) {
+      // walk parents to see if node is under Gelöscht
+      $cur = (int)$existing['id'];
+      for ($i=0; $i<80; $i++) {
+        $st3 = $pdo->prepare('SELECT parent_id FROM nodes WHERE id=?');
+        $st3->execute([$cur]);
+        $pid = $st3->fetchColumn();
+        if ($pid === null) break;
+        $pid = (int)$pid;
+        if ($pid === $deletedRootId) { $existingInDeleted = true; break; }
+        $cur = $pid;
+      }
+    }
+
+    if (($existingNodeId > 0 || $slugDirExists) && !$confirmPurge) {
+      // If the slug is active already -> hard block.
+      if ($existingNodeId > 0 && !$existingInDeleted) {
+        $err = 'Slug ist bereits vergeben (aktives Projekt #' . $existingNodeId . '). Bitte anderen Slug wählen.';
+      } else {
+        $err = 'Slug ist bereits vorhanden (altes Projekt/Dateien). Bitte bestätigen, dass alles alte endgültig gelöscht werden soll.';
+      }
+    }
+
+    // If confirmed: purge old deleted project + runtime directory before creating the new project.
+    if ($err === '' && $confirmPurge && ($existingInDeleted || $slugDirExists)) {
+      // delete old node subtree if it exists in Gelöscht
+      if ($existingNodeId > 0 && $existingInDeleted) {
+        $deleteSubtree = function(int $nodeId) use (&$deleteSubtree, $pdo): int {
+          $count = 0;
+          $st = $pdo->prepare('SELECT id FROM nodes WHERE parent_id=?');
+          $st->execute([$nodeId]);
+          foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $count += $deleteSubtree((int)$row['id']);
+          }
+          // clean related tables
+          $pdo->prepare('DELETE FROM worker_queue WHERE node_id=?')->execute([$nodeId]);
+          try { $pdo->prepare('DELETE FROM node_attachments WHERE node_id=?')->execute([$nodeId]); } catch (Throwable $e) {}
+          $pdo->prepare('DELETE FROM node_notes WHERE node_id=?')->execute([$nodeId]);
+          $pdo->prepare('DELETE FROM nodes WHERE id=?')->execute([$nodeId]);
+          return $count + 1;
+        };
+        $pdo->beginTransaction();
+        try {
+          $deleteSubtree($existingNodeId);
+          $pdo->prepare('DELETE FROM projects WHERE node_id=?')->execute([$existingNodeId]);
+          $pdo->commit();
+        } catch (Throwable $e) {
+          $pdo->rollBack();
+          $err = 'Konnte altes Projekt nicht löschen: ' . $e->getMessage();
+        }
+      }
+
+      // delete runtime dir /var/www/t/<slug> (best-effort)
+      if ($err === '' && $slugDirExists) {
+        $rr = function(string $p) use (&$rr): void {
+          if (is_link($p)) { @unlink($p); return; }
+          if (is_file($p)) { @unlink($p); return; }
+          if (!is_dir($p)) return;
+          foreach (@scandir($p) ?: [] as $f) {
+            if ($f === '.' || $f === '..') continue;
+            $rr($p . '/' . $f);
+          }
+          @rmdir($p);
+        };
+        $rr($slugDir);
+      }
+
+      // also remove convenience symlink if present
+      $linkPath = '/home/deploy/projects/t/' . $slug;
+      if (is_link($linkPath)) {
+        @unlink($linkPath);
+      }
+    }
+
+    if ($err !== '') {
+      // fall through to render form
+    } else {
 
     // Build project setup prompt (will be executed by worker_main as deploy user)
     $setupPromptTpl = prompt_require('project_setup_prompt');
@@ -130,51 +227,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if ($err !== '') {
         // fall through to render form
       } else {
+        // Children are generated asynchronously by worker_main (project setup job).
 
-      // Children are generated asynchronously by worker_main (project setup job).
+        // Persist project metadata (env.md path etc.)
+        projects_migrate($pdo);
+        $envPath = '/var/www/t/' . $slug . '/shared/env.md';
+        $pdo->prepare('INSERT INTO projects (node_id, slug, env_path) VALUES (?,?,?) ON DUPLICATE KEY UPDATE slug=VALUES(slug), env_path=VALUES(env_path)')
+            ->execute([$parentId, $slug, $envPath]);
 
-      // Persist project metadata (env.md path etc.)
-      projects_migrate($pdo);
-      $envPath = '/var/www/t/' . $slug . '/shared/env.md';
-      $pdo->prepare('INSERT INTO projects (node_id, slug, env_path) VALUES (?,?,?) ON DUPLICATE KEY UPDATE slug=VALUES(slug), env_path=VALUES(env_path)')
-          ->execute([$parentId, $slug, $envPath]);
+        // Enqueue provisioning request for deploy-side cron
+        $queuePath = '/var/www/coosdash/shared/data/project_setup_queue.jsonl';
+        @mkdir(dirname($queuePath), 0775, true);
+        $req = [
+          'ts' => date('Y-m-d H:i:s'),
+          'slug' => $slug,
+          'title' => $title,
+          'description' => $desc,
+          'node_id' => $parentId,
+          'requested_by' => $createdBy,
+        ];
+        @file_put_contents($queuePath, json_encode($req, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES) . "\n", FILE_APPEND);
 
-      // Enqueue provisioning request for deploy-side cron
-      $queuePath = '/var/www/coosdash/shared/data/project_setup_queue.jsonl';
-      @mkdir(dirname($queuePath), 0775, true);
-      $req = [
-        'ts' => date('Y-m-d H:i:s'),
-        'slug' => $slug,
-        'title' => $title,
-        'description' => $desc,
-        'node_id' => $parentId,
-        'requested_by' => $createdBy,
-      ];
-      @file_put_contents($queuePath, json_encode($req, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES) . "\n", FILE_APPEND);
+        // Create a markdown meta file (for audit / context).
+        $metaMd = "# Projekt Setup (LLM)\n\n";
+        $metaMd .= "- Node: #{$parentId}\n";
+        $metaMd .= "- Title: {$title}\n";
+        $metaMd .= "- Slug: {$slug}\n";
+        $metaMd .= "- URL: https://t.coos.eu/{$slug}/\n";
+        $metaMd .= "- Env: /var/www/t/{$slug}/shared/env.md\n";
+        $metaMd .= "- Prompt: /llm_file.php?f=" . basename($promptFile) . "\n";
+        $metaMd .= "- Response: /llm_file.php?f=" . basename($reqId . '_response.txt') . "\n\n";
+        $metaMd .= "## Beschreibung\n\n" . $desc . "\n";
+        $metaPath = $llmDir . '/' . $reqId . '_meta.md';
+        @file_put_contents($metaPath, $metaMd);
 
-      // Create a markdown meta file (for audit / context).
-      // IMPORTANT: do NOT attach it to the project node (keeps description clean).
-      $metaMd = "# Projekt Setup (LLM)\n\n";
-      $metaMd .= "- Node: #{$parentId}\n";
-      $metaMd .= "- Title: {$title}\n";
-      $metaMd .= "- Slug: {$slug}\n";
-      $metaMd .= "- URL: https://t.coos.eu/{$slug}/\n";
-      $metaMd .= "- Env: /var/www/t/{$slug}/shared/env.md\n";
-      $metaMd .= "- Prompt: /llm_file.php?f=" . basename($promptFile) . "\n";
-      $metaMd .= "- Response: /llm_file.php?f=" . basename($reqId . '_response.txt') . "\n\n";
-      $metaMd .= "## Beschreibung\n\n" . $desc . "\n";
-      $metaPath = $llmDir . '/' . $reqId . '_meta.md';
-      @file_put_contents($metaPath, $metaMd);
+        // Enqueue a project-setup job for worker_main (runs as deploy, can call clawdbot agent)
+        require_once __DIR__ . '/../scripts/migrate_worker_queue.php';
+        $pdo->prepare("INSERT INTO worker_queue (status,node_id,prompt_text,selector_meta) VALUES ('open', ?, ?, ?)")
+            ->execute([$parentId, $setupPrompt, json_encode(['type'=>'project_setup','req_id'=>$reqId,'slug'=>$slug], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)]);
 
-      // Enqueue a project-setup job for worker_main (runs as deploy, can call clawdbot agent)
-      require_once __DIR__ . '/../scripts/migrate_worker_queue.php';
-      $pdo->prepare("INSERT INTO worker_queue (status,node_id,prompt_text,selector_meta) VALUES ('open', ?, ?, ?)")
-          ->execute([$parentId, $setupPrompt, json_encode(['type'=>'project_setup','req_id'=>$reqId,'slug'=>$slug], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)]);
-
-      flash_set(($fromNodeId > 0 ? 'Projekt aus Idee erstellt/verschoben (#' : 'Projekt angelegt (#') . $parentId . '). Setup-Subtasks werden jetzt via LLM erzeugt (Worker). Provisioning läuft per Cron.', 'info');
-      header('Location: /?id=' . $parentId);
-      exit;
+        flash_set(($fromNodeId > 0 ? 'Projekt aus Idee erstellt/verschoben (#' : 'Projekt angelegt (#') . $parentId . '). Setup-Subtasks werden jetzt via LLM erzeugt (Worker). Provisioning läuft per Cron.', 'info');
+        header('Location: /?id=' . $parentId);
+        exit;
+      }
     }
+
+    // close slug-check else-block
     }
   }
 }
@@ -195,6 +293,13 @@ renderHeader('Neues Projekt');
       <input type="hidden" name="from_node" value="<?php echo (int)$fromNodeId; ?>">
       <div class="meta">Aus Idee-Node: #<?php echo (int)$fromNodeId; ?> (wird nach "Projekte" verschoben)</div>
     <?php endif; ?>
+
+    <label style="margin-top:0">Slug-Reuse (Sicherheitscheck)</label>
+    <div class="meta">Wenn ein Slug schon mal existierte (z.B. im Bereich „Gelöscht“ oder als Verzeichnis unter /var/www/t/&lt;slug&gt;), muss das vorher endgültig bereinigt werden.</div>
+    <label style="margin-top:8px; display:flex; align-items:center; gap:8px;">
+      <input type="checkbox" name="confirm_purge" value="1" style="width:auto;" <?php echo !empty($_POST['confirm_purge']) ? 'checked' : ''; ?> />
+      <span>Ja, altes Projekt/Dateien für diesen Slug endgültig löschen (falls vorhanden)</span>
+    </label>
 
     <label>Projektname</label>
     <input name="title" value="<?php echo h((string)($_POST['title'] ?? ($prefill['title'] ?? ''))); ?>" required maxlength="80" />
