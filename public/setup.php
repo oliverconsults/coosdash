@@ -63,18 +63,44 @@ $defaultWrapperTpl = "# James Queue Consumer (worker_main)\n\n"
   . "- Keep it concise. Prefer verification before marking done.\n";
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+  $action = (string)($_POST['action'] ?? 'save');
+
+  if ($action === 'restore_history') {
+    $key = (string)($_POST['key'] ?? '');
+    $idx = (int)($_POST['restore_idx'] ?? -1);
+    if ($key === '') {
+      flash_set('Missing key.', 'err');
+      header('Location: /setup.php');
+      exit;
+    }
+
+    $hist = prompt_history_list($key, 100);
+    $row = $hist[$idx] ?? null;
+    if (!is_array($row)) {
+      flash_set('Ungültige History-Auswahl.', 'err');
+      header('Location: /setup.php?p=' . rawurlencode($key));
+      exit;
+    }
+
+    $old = (string)($row['old'] ?? '');
+    $ok = prompt_set($key, $old);
+    flash_set($ok ? 'Version wiederhergestellt.' : 'Fehler beim Restore.', $ok ? 'info' : 'err');
+    header('Location: /setup.php?p=' . rawurlencode($key));
+    exit;
+  }
+
+  // default: save edits
   $workerRules = (string)($_POST['worker_rules_block'] ?? '');
   $summaryInstr = (string)($_POST['summary_cleanup_instructions'] ?? '');
   $wrapperTpl = (string)($_POST['wrapper_prompt_template'] ?? '');
 
-  // save
   $ok = true;
-  $ok = $ok && prompt_set('worker_rules_block', $workerRules);
-  $ok = $ok && prompt_set('summary_cleanup_instructions', $summaryInstr);
-  $ok = $ok && prompt_set('wrapper_prompt_template', $wrapperTpl);
+  if ($workerRules !== '') $ok = $ok && prompt_set('worker_rules_block', $workerRules);
+  if ($summaryInstr !== '') $ok = $ok && prompt_set('summary_cleanup_instructions', $summaryInstr);
+  if ($wrapperTpl !== '') $ok = $ok && prompt_set('wrapper_prompt_template', $wrapperTpl);
 
   flash_set($ok ? 'Setup gespeichert.' : 'Fehler beim Speichern.', $ok ? 'info' : 'err');
-  header('Location: /setup.php');
+  header('Location: /setup.php?p=' . rawurlencode((string)($_GET['p'] ?? 'worker_rules_block')));
   exit;
 }
 
@@ -96,7 +122,9 @@ renderHeader('Setup');
   <h2>Setup: LLM Prompts</h2>
   <div class="meta">Diese Texte sind die <b>Source of Truth</b>. Sie werden immer verwendet.</div>
 
-  <form method="post" action="/setup.php">
+  <?php $hist = prompt_history_list($sel, 100); ?>
+
+  <form method="post" action="/setup.php" onsubmit="return confirm('Wirklich speichern? (History wird automatisch geführt)');">
 
     <?php
       $sel = (string)($_GET['p'] ?? 'worker_rules_block');
@@ -135,6 +163,32 @@ renderHeader('Setup');
       <a class="btn" href="/">Zurück</a>
     </div>
   </form>
+</div>
+
+<div class="card" style="margin-top:14px;">
+  <h2>History (<?php echo h($sel); ?>)</h2>
+  <div class="meta">Letzte 100 Versionen, restore mit Bestätigung.</div>
+
+  <?php if (!$hist): ?>
+    <div class="meta">Noch keine History vorhanden.</div>
+  <?php else: ?>
+    <form method="post" action="/setup.php?p=<?php echo h($sel); ?>" onsubmit="return confirm('Diese Version wirklich wiederherstellen?');">
+      <input type="hidden" name="action" value="restore_history">
+      <input type="hidden" name="key" value="<?php echo h($sel); ?>">
+      <label>Restore Version</label>
+      <select name="restore_idx" style="max-width:720px;">
+        <?php foreach ($hist as $idx => $hrow): ?>
+          <?php
+            $label = (string)($hrow['ts'] ?? '') . ' · user=' . (string)($hrow['user'] ?? '-') . ' · sha=' . substr((string)($hrow['new_sha1'] ?? ''), 0, 8);
+          ?>
+          <option value="<?php echo (int)$idx; ?>"><?php echo h($label); ?></option>
+        <?php endforeach; ?>
+      </select>
+      <div class="row" style="margin-top:10px;">
+        <button class="btn" type="submit">Restore</button>
+      </div>
+    </form>
+  <?php endif; ?>
 </div>
 
 <?php

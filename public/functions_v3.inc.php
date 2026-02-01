@@ -238,6 +238,10 @@ function prompts_path(): string {
   return '/var/www/coosdash/shared/data/prompts.json';
 }
 
+function prompts_history_path(): string {
+  return '/var/www/coosdash/shared/data/prompts_history.jsonl';
+}
+
 function prompts_load(): array {
   $p = prompts_path();
   if (!is_file($p)) return [];
@@ -257,10 +261,60 @@ function prompt_require(string $key): string {
   return (string)$v;
 }
 
+function prompt_history_append(string $key, string $oldValue, string $newValue): void {
+  $p = prompts_history_path();
+  @mkdir(dirname($p), 0775, true);
+
+  $u = (string)($_SESSION['username'] ?? '');
+  $entry = [
+    'ts' => date('Y-m-d H:i:s'),
+    'user' => ($u !== '' ? $u : '-'),
+    'key' => $key,
+    'old' => $oldValue,
+    'new_sha1' => sha1($newValue),
+  ];
+  @file_put_contents($p, json_encode($entry, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES) . "\n", FILE_APPEND);
+
+  // Keep only the last 100 entries (simple truncate)
+  try {
+    $lines = @file($p, FILE_IGNORE_NEW_LINES);
+    if (is_array($lines) && count($lines) > 100) {
+      $tail = array_slice($lines, -100);
+      @file_put_contents($p, implode("\n", $tail) . "\n");
+    }
+  } catch (Throwable $e) {
+    // ignore
+  }
+}
+
+function prompt_history_list(string $key, int $limit=100): array {
+  $p = prompts_history_path();
+  if (!is_file($p)) return [];
+  $lines = @file($p, FILE_IGNORE_NEW_LINES);
+  if (!is_array($lines) || !$lines) return [];
+
+  $out = [];
+  for ($i=count($lines)-1; $i>=0; $i--) {
+    $j = json_decode($lines[$i], true);
+    if (!is_array($j)) continue;
+    if (($j['key'] ?? '') !== $key) continue;
+    $out[] = $j;
+    if (count($out) >= $limit) break;
+  }
+  return $out;
+}
+
 function prompt_set(string $key, string $value): bool {
   $p = prompts_path();
   @mkdir(dirname($p), 0775, true);
   $all = prompts_load();
+  $old = is_string($all[$key] ?? null) ? (string)$all[$key] : '';
+
+  // Record history only on actual change
+  if ($old !== (string)$value) {
+    prompt_history_append($key, $old, (string)$value);
+  }
+
   $all[$key] = (string)$value;
   $json = json_encode($all, JSON_PRETTY_PRINT|JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
   if ($json === false) return false;
