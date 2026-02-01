@@ -300,11 +300,21 @@ renderHeader('Setup');
 <?php if ($sel === 'worker_rules_block'): ?>
   <div class="card" style="margin-top:14px;">
     <h2>Preview: Worker Prompt (best effort)</h2>
-    <div class="meta">Beispiel-Prompt mit echter Parent-Chain aus dem aktuellsten todo_james Node. (JOB_ID ist Dummy)</div>
+    <div class="meta">Das ist der Job-Prompt, wie er in <code>worker_queue.prompt_text</code> gespeichert wird (JOB_ID ist Dummy).</div>
     <?php if ($preview !== ''): ?>
-      <textarea readonly style="min-height:260px; opacity:0.95;"><?php echo h($preview); ?></textarea>
+      <textarea readonly style="min-height:240px; opacity:0.95;"><?php echo h($preview); ?></textarea>
     <?php else: ?>
       <div class="meta">Kein Preview verfügbar (keine todo_james Nodes gefunden).</div>
+    <?php endif; ?>
+  </div>
+
+  <div class="card" style="margin-top:14px;">
+    <h2>Preview: Effektiver LLM Prompt (Wrapper + Worker)</h2>
+    <div class="meta">So wird der Call an das LLM gesendet: Wrapper Template + {JOB_PROMPT} = oben stehender Worker Prompt.</div>
+    <?php if ($wrapperPreview !== ''): ?>
+      <textarea readonly style="min-height:260px; opacity:0.95;"><?php echo h($wrapperPreview); ?></textarea>
+    <?php else: ?>
+      <div class="meta">Kein Wrapper-Template gesetzt.</div>
     <?php endif; ?>
   </div>
 <?php endif; ?>
