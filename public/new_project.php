@@ -71,65 +71,73 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     projects_migrate($pdo);
     $deletedRootId = (int)$pdo->query("SELECT id FROM nodes WHERE parent_id IS NULL AND title='Gelöscht' LIMIT 1")->fetchColumn();
 
-    $existing = null;
-    $st = $pdo->prepare('SELECT node_id FROM projects WHERE slug=? LIMIT 1');
+    // There may be multiple entries for the same slug (no unique index).
+    $st = $pdo->prepare('SELECT node_id FROM projects WHERE slug=? ORDER BY node_id DESC');
     $st->execute([$slug]);
-    $existingNodeId = (int)($st->fetchColumn() ?: 0);
-    if ($existingNodeId > 0) {
-      $st2 = $pdo->prepare('SELECT id,title,parent_id FROM nodes WHERE id=?');
-      $st2->execute([$existingNodeId]);
-      $existing = $st2->fetch(PDO::FETCH_ASSOC);
-    }
+    $existingNodeIds = array_map('intval', array_column($st->fetchAll(PDO::FETCH_ASSOC), 'node_id'));
 
     $slugDir = '/var/www/t/' . $slug;
     $slugDirExists = is_dir($slugDir);
 
-    $existingInDeleted = false;
-    if ($existing && $deletedRootId > 0) {
-      // walk parents to see if node is under Gelöscht
-      $cur = (int)$existing['id'];
-      for ($i=0; $i<80; $i++) {
-        $st3 = $pdo->prepare('SELECT parent_id FROM nodes WHERE id=?');
-        $st3->execute([$cur]);
-        $pid = $st3->fetchColumn();
-        if ($pid === null) break;
+    // Determine whether any existing node for this slug is active vs. deleted
+    $activeExistingIds = [];
+    $deletedExistingIds = [];
+
+    $isUnderDeleted = function(int $nid) use ($pdo, $deletedRootId): bool {
+      if ($nid <= 0 || $deletedRootId <= 0) return false;
+      $cur = $nid;
+      for ($i=0; $i<120; $i++) {
+        $st = $pdo->prepare('SELECT parent_id FROM nodes WHERE id=?');
+        $st->execute([$cur]);
+        $pid = $st->fetchColumn();
+        if ($pid === false || $pid === null) return false;
         $pid = (int)$pid;
-        if ($pid === $deletedRootId) { $existingInDeleted = true; break; }
+        if ($pid === $deletedRootId) return true;
         $cur = $pid;
       }
+      return false;
+    };
+
+    foreach ($existingNodeIds as $eid) {
+      if ($eid <= 0) continue;
+      if ($isUnderDeleted($eid)) $deletedExistingIds[] = $eid;
+      else $activeExistingIds[] = $eid;
     }
 
-    if (($existingNodeId > 0 || $slugDirExists) && !$confirmPurge) {
-      // If the slug is active already -> hard block.
-      if ($existingNodeId > 0 && !$existingInDeleted) {
-        $err = 'Slug ist bereits vergeben (aktives Projekt #' . $existingNodeId . '). Bitte anderen Slug wählen.';
-      } else {
-        $err = 'Slug ist bereits vorhanden (altes Projekt/Dateien). Bitte bestätigen, dass alles alte endgültig gelöscht werden soll.';
-      }
+    // Hard rule: if slug is already used by an active project, always block (even if confirm_purge is checked).
+    if (!empty($activeExistingIds)) {
+      $err = 'Slug ist bereits vergeben (aktives Projekt #' . (int)$activeExistingIds[0] . '). Bitte anderen Slug wählen.';
     }
 
-    // If confirmed: purge old deleted project + runtime directory before creating the new project.
-    if ($err === '' && $confirmPurge && ($existingInDeleted || $slugDirExists)) {
-      // delete old node subtree if it exists in Gelöscht
-      if ($existingNodeId > 0 && $existingInDeleted) {
-        $deleteSubtree = function(int $nodeId) use (&$deleteSubtree, $pdo): int {
-          $count = 0;
-          $st = $pdo->prepare('SELECT id FROM nodes WHERE parent_id=?');
-          $st->execute([$nodeId]);
-          foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $row) {
-            $count += $deleteSubtree((int)$row['id']);
-          }
-          // clean related tables
-          $pdo->prepare('DELETE FROM worker_queue WHERE node_id=?')->execute([$nodeId]);
-          try { $pdo->prepare('DELETE FROM node_attachments WHERE node_id=?')->execute([$nodeId]); } catch (Throwable $e) {}
-          $pdo->prepare('DELETE FROM node_notes WHERE node_id=?')->execute([$nodeId]);
-          $pdo->prepare('DELETE FROM nodes WHERE id=?')->execute([$nodeId]);
-          return $count + 1;
-        };
+    // If slug exists only as deleted project and/or leftover dir: require explicit confirmation.
+    if ($err === '' && ((count($deletedExistingIds) > 0) || $slugDirExists) && !$confirmPurge) {
+      $err = 'Slug ist bereits vorhanden (altes Projekt/Dateien). Bitte bestätigen, dass alles alte endgültig gelöscht werden soll.';
+    }
+
+    // If confirmed: purge old deleted project(s) + runtime directory before creating the new project.
+    if ($err === '' && $confirmPurge && ((count($deletedExistingIds) > 0) || $slugDirExists)) {
+      $deleteSubtree = function(int $nodeId) use (&$deleteSubtree, $pdo): int {
+        $count = 0;
+        $st = $pdo->prepare('SELECT id FROM nodes WHERE parent_id=?');
+        $st->execute([$nodeId]);
+        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $row) {
+          $count += $deleteSubtree((int)$row['id']);
+        }
+        // clean related tables
+        $pdo->prepare('DELETE FROM worker_queue WHERE node_id=?')->execute([$nodeId]);
+        try { $pdo->prepare('DELETE FROM node_attachments WHERE node_id=?')->execute([$nodeId]); } catch (Throwable $e) {}
+        $pdo->prepare('DELETE FROM node_notes WHERE node_id=?')->execute([$nodeId]);
+        $pdo->prepare('DELETE FROM nodes WHERE id=?')->execute([$nodeId]);
+        return $count + 1;
+      };
+
+      if (count($deletedExistingIds) > 0) {
         $pdo->beginTransaction();
         try {
-          $deleteSubtree($existingNodeId);
-          $pdo->prepare('DELETE FROM projects WHERE node_id=?')->execute([$existingNodeId]);
+          foreach ($deletedExistingIds as $eid) {
+            $deleteSubtree($eid);
+            $pdo->prepare('DELETE FROM projects WHERE node_id=?')->execute([$eid]);
+          }
           $pdo->commit();
         } catch (Throwable $e) {
           $pdo->rollBack();
