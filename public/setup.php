@@ -385,15 +385,7 @@ renderHeader('Setup');
 <?php endif; ?>
 
 <?php if ($sel === 'summary_cleanup_instructions'): ?>
-  <div class="card" style="margin-top:14px;">
-    <h2>Preview: Summary+Cleanup Prompt</h2>
-    <div class="meta">Letzter gequeue-ter Summary+Cleanup Job aus <code>worker_queue</code> (best effort).</div>
-    <?php if ($summaryPreview !== ''): ?>
-      <textarea readonly style="min-height:260px; opacity:0.95;"><?php echo h($summaryPreview); ?></textarea>
-    <?php else: ?>
-      <div class="meta">Kein Summary+Cleanup Preview verfügbar (noch kein Job in worker_queue gefunden).</div>
-    <?php endif; ?>
-  </div>
+  <!-- Preview removed. Use "Check next effective Prompt (Queue)" for the effective view from DB. -->
 <?php endif; ?>
 
 <script>
