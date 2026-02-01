@@ -160,7 +160,7 @@ if ($cLock && flock($cLock, LOCK_EX | LOCK_NB)) {
         . "- Always end by calling job_done or job_fail (never exit without closing the job).\n"
         . "- Keep it concise. Prefer verification before marking done.\n";
 
-      $tpl = prompt_get('wrapper_prompt_template', $defaultTpl);
+      $tpl = prompt_require('wrapper_prompt_template');
       $msg = str_replace(
         ['{JOB_ID}','{NODE_ID}','{JOB_PROMPT}'],
         [(string)$jobId, (string)$nodeId, (string)$promptText],

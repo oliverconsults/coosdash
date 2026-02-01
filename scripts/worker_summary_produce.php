@@ -149,7 +149,7 @@ foreach ($parents as $p) {
     . "   dann: php /home/deploy/projects/coos/scripts/worker_api_cli.php action=cleanup_done_subtree node_id={$pid} job_id={JOB_ID} summary_b64=\"<BASE64>\"\n\n"
     . "Wichtig: Wenn der API Call fehlschlaegt: NICHTS loeschen/veraendern, sondern job_fail.\n";
 
-  $instr = prompt_get('summary_cleanup_instructions', $defaultInstr);
+  $instr = prompt_require('summary_cleanup_instructions');
   // Allow template placeholders
   $instr = str_replace('{TARGET_NODE_ID}', (string)$pid, $instr);
 

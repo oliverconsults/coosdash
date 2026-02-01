@@ -247,12 +247,14 @@ function prompts_load(): array {
   return is_array($j) ? $j : [];
 }
 
-function prompt_get(string $key, string $default=''): string {
+function prompt_require(string $key): string {
   $all = prompts_load();
   $v = $all[$key] ?? null;
-  if (!is_string($v)) return $default;
-  $v = (string)$v;
-  return $v !== '' ? $v : $default;
+  if (!is_string($v) || trim($v) === '') {
+    http_response_code(500);
+    die('Missing prompt: ' . $key);
+  }
+  return (string)$v;
 }
 
 function prompt_set(string $key, string $value): bool {

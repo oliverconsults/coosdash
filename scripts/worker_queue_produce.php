@@ -110,7 +110,7 @@ $defaultRules = "Wie du Änderungen machst (PFLICHT):\n"
   . "- Eigene Projekt-Datenbank (z.B. *_rv/*_test): direkte SQL-Writes sind erlaubt, wenn nötig (vorsichtig, nachvollziehbar).\n"
   . "- Beispiel: php /home/deploy/projects/coos/scripts/worker_api_cli.php action=ping\n";
 
-$prompt .= prompt_get('worker_rules_block', $defaultRules);
+$prompt .= prompt_require('worker_rules_block');
 $prompt .= "\nErlaubte Aktionen:\n";
 $prompt .= "- prepend_update (headline, body) [oder headline_b64/body_b64]\n";
 $prompt .= "- set_status (worker_status=todo_james|todo_oliver|done)\n";

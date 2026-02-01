@@ -78,16 +78,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   exit;
 }
 
-$workerRulesCur = prompt_get('worker_rules_block', $defaultWorkerRules);
-$summaryInstrCur = prompt_get('summary_cleanup_instructions', $defaultSummaryInstr);
-$wrapperTplCur = prompt_get('wrapper_prompt_template', $defaultWrapperTpl);
+// Bootstrap: if missing, write defaults once so prompts.json becomes the single source of truth.
+if (!is_file(prompts_path())) {
+  prompt_set('worker_rules_block', $defaultWorkerRules);
+  prompt_set('summary_cleanup_instructions', $defaultSummaryInstr);
+  prompt_set('wrapper_prompt_template', $defaultWrapperTpl);
+}
+
+$workerRulesCur = prompt_require('worker_rules_block');
+$summaryInstrCur = prompt_require('summary_cleanup_instructions');
+$wrapperTplCur = prompt_require('wrapper_prompt_template');
 
 renderHeader('Setup');
 ?>
 
 <div class="card">
   <h2>Setup: LLM Prompts</h2>
-  <div class="meta">Diese Texte sind Overrides. Wenn leer, greifen Defaults aus Code.</div>
+  <div class="meta">Diese Texte sind die <b>Source of Truth</b>. Sie werden immer verwendet.</div>
 
   <form method="post" action="/setup.php">
 
