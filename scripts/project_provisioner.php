@@ -72,15 +72,73 @@ foreach ($lines as $line) {
   logline("start slug={$slug} node_id={$nodeId}");
 
   $root = '/var/www/t/' . $slug;
-  $docroot = $root . '/current/public';
+  $current = $root . '/current';
+  $docroot = $current . '/public';
   $shared = $root . '/shared';
   $sharedLogs = $shared . '/logs';
   $sharedArtifacts = $shared . '/artifacts';
   $sharedArtifactsAtt = $sharedArtifacts . '/att';
 
+  // Project repo checkout (separate repo per project)
+  $repoBase = '/home/deploy/projects/t';
+  $repoPath = $repoBase . '/' . $slug;
+
+  @mkdir($repoBase, 0775, true);
+  if (!is_dir($repoPath)) {
+    @mkdir($repoPath, 0775, true);
+  }
+
+  // Initialize git repo if missing (empty starter)
+  if (is_dir($repoPath) && !is_dir($repoPath . '/.git')) {
+    $outGit = []; $rcGit = 0;
+    exec('cd ' . escapeshellarg($repoPath) . ' && git init 2>&1', $outGit, $rcGit);
+    @file_put_contents($repoPath . '/README.md', "# {$title}\n\nslug: {$slug}\n");
+    if (!is_dir($repoPath . '/public')) {
+      @mkdir($repoPath . '/public', 0775, true);
+    }
+    if (!is_file($repoPath . '/public/index.php')) {
+      @file_put_contents($repoPath . '/public/index.php', "<?php\nheader('Content-Type: text/plain; charset=utf-8');\necho 'OK {$slug}';\n");
+    }
+    @file_put_contents($repoPath . '/.gitignore', "/vendor/\n/.env\n/shared/\n", FILE_APPEND);
+  }
+
+  // Runtime folders
   @mkdir($docroot, 0775, true);
   @mkdir($sharedLogs, 0775, true);
   @mkdir($sharedArtifactsAtt, 0775, true);
+
+  // If docroot is only the placeholder we created earlier, switch it to symlink to repo/public
+  $repoPublic = $repoPath . '/public';
+  if (is_dir($repoPublic)) {
+    $canLink = true;
+    if (is_link($docroot)) {
+      $canLink = false;
+    } elseif (is_dir($docroot)) {
+      $files = array_values(array_diff(@scandir($docroot) ?: [], ['.','..']));
+      if (count($files) === 1 && $files[0] === 'index.html') {
+        $html = @file_get_contents($docroot . '/index.html');
+        if (!is_string($html) || strpos($html, "OK {$slug}") === false) {
+          $canLink = false;
+        }
+      } elseif (count($files) === 0) {
+        // ok
+      } else {
+        $canLink = false;
+      }
+    } else {
+      // not a dir? ok to link
+    }
+
+    if ($canLink) {
+      // remove empty/placeholder dir
+      if (is_dir($docroot) && !is_link($docroot)) {
+        $files = array_values(array_diff(@scandir($docroot) ?: [], ['.','..']));
+        foreach ($files as $fn) { @unlink($docroot . '/' . $fn); }
+        @rmdir($docroot);
+      }
+      @symlink($repoPublic, $docroot);
+    }
+  }
 
   // DB + user
   $dbName = 'coos_' . str_replace('-', '_', $slug);
@@ -115,7 +173,7 @@ foreach ($lines as $line) {
   $env .= "slug: {$slug}\n\n";
   $env .= "url: https://t.coos.eu/{$slug}/\n";
   $env .= "docroot: {$docroot}\n";
-  $env .= "repo: /home/deploy/projects/t/{$slug}\n\n";
+  $env .= "repo: {$repoPath}\n\n";
   $env .= "php_fpm_sock: /run/php/php8.3-fpm.sock\n\n";
   $env .= "db_host: 127.0.0.1\n";
   $env .= "db_port: 3306\n";
