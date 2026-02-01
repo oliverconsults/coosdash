@@ -1043,9 +1043,29 @@ renderHeader('Dashboard');
         };
 
         $cols = ['todo_oliver'=>[], 'todo_james'=>[], 'blocked'=>[], 'done'=>[]];
+        // Optional filter: if an id is selected, show only tasks that are that node or under it.
+        $filterRootId = ($nodeId > 0) ? (int)$nodeId : 0;
+
+        $isUnderFilter = function(int $nid, int $rootId) use ($byIdAll): bool {
+          if ($rootId <= 0) return true;
+          if ($nid === $rootId) return true;
+          $cur = $nid;
+          for ($i=0; $i<200; $i++) {
+            $row = $byIdAll[$cur] ?? null;
+            if (!$row) return false;
+            $pid = $row['parent_id'];
+            if ($pid === null) return false;
+            $pid = (int)$pid;
+            if ($pid === $rootId) return true;
+            $cur = $pid;
+          }
+          return false;
+        };
+
         foreach ($byIdAll as $id => $n) {
           $id = (int)$id;
           if (!$projectsRootIdK || !$isUnderK($id, $projectsRootIdK)) continue;
+          if (!$isUnderFilter($id, $filterRootId)) continue;
           if (!empty($byParentAll[$id] ?? [])) continue; // leafs only
 
           $ws = (string)($n['worker_status'] ?? '');
