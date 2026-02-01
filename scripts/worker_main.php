@@ -24,6 +24,11 @@ $lockPath = '/var/www/coosdash/shared/tmp/worker_main.lock';
 $logPath  = '/var/www/coosdash/shared/logs/worker_main.cron.log';
 $statePath = '/var/www/coosdash/shared/data/james_state.json';
 
+$cfgPath = '/var/www/coosdash/shared/config.local.php';
+$consumerLockPath = '/var/www/coosdash/shared/tmp/worker_consumer.lock';
+$consumerLastRunPath = '/var/www/coosdash/shared/tmp/worker_consumer_last_run.txt';
+$consumerMinIntervalSec = 600; // throttle LLM usage (10 min)
+
 function logline(string $msg) : void {
   global $logPath;
   @mkdir(dirname($logPath), 0775, true);
@@ -37,6 +42,17 @@ function isEnabled(string $statePath): bool {
   $j = json_decode($raw, true);
   if (!is_array($j)) return false;
   return !empty($j['enabled']);
+}
+
+function getDbConfig(string $cfgPath): ?array {
+  if (!is_file($cfgPath)) return null;
+  $cfg = require $cfgPath;
+  if (!is_array($cfg) || empty($cfg['db']) || !is_array($cfg['db'])) return null;
+  $db = $cfg['db'];
+  foreach (['host','port','name','user','pass'] as $k) {
+    if (!isset($db[$k]) || $db[$k]==='') return null;
+  }
+  return $db;
 }
 
 function runScript(string $path, array $env = []): int {
@@ -87,10 +103,70 @@ $base = '/home/deploy/projects/coos/scripts';
 // 1) Produce queue (no LLM)
 runScript($base . '/worker_queue_produce.php');
 
-// 2) Queue consumer: intentionally NOT started from here yet.
-//    (Oliver is at LLM usage limit; keeping consumer out avoids surprise LLM calls.)
-//    Once ready: we can add a guard that checks for open jobs and then triggers consumer.
-logline('SKIP consumer (disabled in worker_main)');
+// 2) Queue consumer (LLM): claim exactly one job and process it.
+// Guardrails:
+// - only when enabled
+// - throttled via a timestamp file
+// - lock to prevent parallel consumer runs
+
+@mkdir(dirname($consumerLockPath), 0775, true);
+$cLock = @fopen($consumerLockPath, 'c');
+if ($cLock && flock($cLock, LOCK_EX | LOCK_NB)) {
+  $last = @file_get_contents($consumerLastRunPath);
+  $lastTs = $last ? (int)trim($last) : 0;
+  if ($lastTs > 0 && (time() - $lastTs) < $consumerMinIntervalSec) {
+    logline('SKIP consumer (throttled)');
+  } else {
+    // Claim next job (DB write: claim). If none, noop.
+    $claimOut = [];
+    $claimCode = 0;
+    $claimCmd = '/usr/bin/php ' . escapeshellarg($base . '/worker_api_cli.php') .
+      ' action=job_claim_next claimed_by=' . escapeshellarg('worker_main');
+    exec($claimCmd . ' 2>&1', $claimOut, $claimCode);
+    $claimRaw = trim(implode("\n", $claimOut));
+
+    $job = null;
+    if ($claimCode === 0 && $claimRaw !== '') {
+      $j = json_decode($claimRaw, true);
+      if (is_array($j) && !empty($j['job']) && is_array($j['job'])) $job = $j['job'];
+    }
+
+    if (!$job) {
+      logline('consumer: no job');
+    } else {
+      // Write last-run timestamp before starting (prevents rapid re-entry)
+      @file_put_contents($consumerLastRunPath, (string)time());
+
+      $jobId = (int)($job['id'] ?? 0);
+      $nodeId = (int)($job['node_id'] ?? 0);
+      $promptText = (string)($job['prompt_text'] ?? '');
+
+      // Minimal, explicit prompt so the agent only does one job and then marks it done/fail.
+      $msg = "# James Queue Consumer (worker_main)\n\n".
+        "You are James. Execute exactly ONE queued job that is already claimed.\n\n".
+        "Job: id={$jobId} node_id={$nodeId}\n\n".
+        "Instructions (job.prompt_text):\n".
+        $promptText . "\n\n".
+        "Rules:\n".
+        "- ALL writes must go via: php /home/deploy/projects/coos/scripts/worker_api_cli.php ...\n".
+        "- On success: php /home/deploy/projects/coos/scripts/worker_api_cli.php action=job_done job_id={$jobId} node_id={$nodeId}\n".
+        "- On failure: php /home/deploy/projects/coos/scripts/worker_api_cli.php action=job_fail job_id={$jobId} node_id={$nodeId} reason=\"...\"\n".
+        "- Keep it concise. Prefer verification before marking done.\n";
+
+      $agentCmd = 'clawdbot agent --session-id ' . escapeshellarg('coos-worker-queue') .
+        ' --message ' . escapeshellarg($msg) .
+        ' --timeout 300 --thinking low';
+
+      $agentOut = [];
+      $agentCode = 0;
+      exec($agentCmd . ' 2>&1', $agentOut, $agentCode);
+      $tail = implode(' / ', array_slice($agentOut, -6));
+      logline('consumer: agent exit=' . $agentCode . ($tail ? (' | ' . $tail) : ''));
+    }
+  }
+} else {
+  logline('SKIP consumer (lock busy)');
+}
 
 // 3) Queue maintenance
 runScript($base . '/worker_queue_maintenance.php');
