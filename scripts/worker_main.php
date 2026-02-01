@@ -149,7 +149,8 @@ if ($cLock && flock($cLock, LOCK_EX | LOCK_NB)) {
         "Instructions (job.prompt_text):\n".
         $promptText . "\n\n".
         "Rules:\n".
-        "- ALL writes must go via: php /home/deploy/projects/coos/scripts/worker_api_cli.php ...\n".
+        "- cooscrm DB: KEINE direkten SQL-Writes. Alle Änderungen an cooscrm ausschließlich via: php /home/deploy/projects/coos/scripts/worker_api_cli.php ...\n".
+        "- Eigene Projekt-DB (z.B. *_rv/*_test): direkte SQL-Writes sind erlaubt, wenn nötig (vorsichtig, nachvollziehbar).\n".
         "- If you need Oliver to decide/confirm something: (1) prepend_update explaining the question + options, (2) set_status to todo_oliver, THEN (3) mark the job done.\n".
         "  Example:\n".
         "  php /home/deploy/projects/coos/scripts/worker_api_cli.php action=prepend_update node_id={$nodeId} headline=\"Frage an Oliver\" body=\"...\"\n".
