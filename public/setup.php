@@ -115,4 +115,71 @@ renderHeader('Setup');
   </form>
 </div>
 
+<?php
+  // Preview: show a real, composed worker prompt for the newest todo_james node (best effort).
+  $preview = '';
+  try {
+    $pdo = db();
+    $st = $pdo->query("SELECT id,parent_id,title,description,blocked_until,blocked_by_node_id FROM nodes WHERE worker_status='todo_james' ORDER BY updated_at DESC, id DESC LIMIT 1");
+    $node = $st->fetch();
+    if ($node) {
+      $nodeId = (int)$node['id'];
+      $blockedUntil = (string)($node['blocked_until'] ?? '');
+      $blockedBy = (int)($node['blocked_by_node_id'] ?? 0);
+
+      // parent chain
+      $chain = [];
+      $cur = $nodeId;
+      for ($i=0; $i<40; $i++) {
+        $st2 = $pdo->prepare('SELECT id,parent_id,title FROM nodes WHERE id=?');
+        $st2->execute([$cur]);
+        $r = $st2->fetch();
+        if (!$r) break;
+        $chain[] = '#' . (int)$r['id'] . ' ' . (string)$r['title'];
+        if ($r['parent_id'] === null) break;
+        $cur = (int)$r['parent_id'];
+      }
+      $chain = array_reverse($chain);
+
+      $desc = (string)($node['description'] ?? '');
+      $isUmsetzung = (strpos($desc, '##UMSETZUNG##') !== false);
+
+      $preview .= "# COOS Worker Job (aus Queue)\n\n";
+      $preview .= "JOB_ID=12345\n";
+      $preview .= "TARGET_NODE_ID={$nodeId}\n";
+      $preview .= "TITLE=" . (string)$node['title'] . "\n\n";
+
+      if ($isUmsetzung) {
+        $preview .= "AUFGABENTYP=UMSETZUNG (hart)\n";
+        $preview .= "- Erwartung: Endergebnis liefern und abschließen (nicht nur planen).\n";
+        $preview .= "- add_children nur im echten Notfall und nur wenn depth < 8 (kurz begründen).\n\n";
+      }
+
+      $preview .= "Sprache / Ton (hart):\n";
+      $preview .= "- Schreibe komplett auf Deutsch (keine englischen Labels wie SPLIT/DONE/etc.).\n";
+      $preview .= "- Sprich Oliver mit 'du' an (kurz, klar, technisch).\n\n";
+      $preview .= "Kette (Parent-Chain):\n- " . implode("\n- ", $chain) . "\n\n";
+      $preview .= "Kontext:\n";
+      if ($blockedBy > 0) $preview .= "- BLOCKED_BY_NODE_ID={$blockedBy}\n";
+      if ($blockedUntil !== '' && strtotime($blockedUntil)) $preview .= "- BLOCKED_UNTIL={$blockedUntil}\n";
+      $preview .= "\n";
+
+      $preview .= $workerRulesCur . "\n";
+      $preview .= "\n… (restliche statische Teile: erwartetes Ergebnis / attachments / tools / hygiene / constraints / regeln)\n";
+    }
+  } catch (Throwable $e) {
+    $preview = '';
+  }
+?>
+
+<div class="card" style="margin-top:14px;">
+  <h2>Preview: Worker Prompt (best effort)</h2>
+  <div class="meta">Beispiel-Prompt mit echter Parent-Chain aus dem aktuellsten todo_james Node. (JOB_ID ist Dummy)</div>
+  <?php if ($preview !== ''): ?>
+    <textarea readonly style="min-height:260px; opacity:0.95;"><?php echo h($preview); ?></textarea>
+  <?php else: ?>
+    <div class="meta">Kein Preview verfügbar (keine todo_james Nodes gefunden).</div>
+  <?php endif; ?>
+</div>
+
 <?php renderFooter();
