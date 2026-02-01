@@ -469,7 +469,8 @@ if ($action === 'cleanup_done_subtree') {
   }
   $txt .= "\n\n";
 
-  prependDesc($pdo, $nodeId, $txt);
+  // Replace parent description with the new summary+cleanup block (do not prepend).
+  $pdo->prepare('UPDATE nodes SET description=? WHERE id=?')->execute([$txt, $nodeId]);
   $pdo->prepare('UPDATE nodes SET worker_status="todo_james" WHERE id=?')->execute([$nodeId]);
   logLine(date('Y-m-d H:i:s') . "  #{$nodeId}  [auto] {$ts2} Cleanup+Summary: moved_att={$movedAtt} deleted_nodes={$deleted} rolled_in={$rolled['token_in']} rolled_out={$rolled['token_out']} rolled_worktime={$rolled['worktime']}s -> todo_james");
 
