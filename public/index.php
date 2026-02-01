@@ -1063,14 +1063,19 @@ renderHeader('Dashboard');
                 $topId = $top ? (int)$top['id'] : 0;
                 $topSec = $top ? (string)$top['section'] : '';
 
+                // Depth bars should be comparable across columns.
+                // We scale everything against the maximum depth in "Projekte" (deepest node under Projekte).
+                $scaleMaxD = (int)$maxDepthProjects;
+                if ($scaleMaxD <= 0) $scaleMaxD = (int)$maxDepthIdeas; // fallback only if Projekte root missing
+
+                // Current depth is still computed under the node's own section root.
                 $rootId = 0;
-                $maxD = 0;
-                if ($topSec === 'Projekte') { $rootId = $projectsRootId; $maxD = $maxDepthProjects; }
-                if ($topSec === 'Ideen') { $rootId = $ideasRootId; $maxD = $maxDepthIdeas; }
+                if ($topSec === 'Projekte') $rootId = $projectsRootId;
+                if ($topSec === 'Ideen') $rootId = $ideasRootId;
 
                 $curDepth = ($rootId && $topId) ? $depthUnderRoot($topId, $rootId) : 0;
-                $pct = ($maxD > 0 && $curDepth > 0) ? max(0, min(100, (int)round(($curDepth / $maxD) * 100))) : 0;
-                $tt = $topId ? ('Top-Task: Tiefe ' . $curDepth . ' / ' . $maxD . ' (#' . $topId . ')') : '—';
+                $pct = ($scaleMaxD > 0 && $curDepth > 0) ? max(0, min(100, (int)round(($curDepth / $scaleMaxD) * 100))) : 0;
+                $tt = $topId ? ('Top-Task: Tiefe ' . $curDepth . ' / ' . $scaleMaxD . ' (#' . $topId . ')') : '—';
               ?>
 
               <?php if ($pct > 0): ?>
