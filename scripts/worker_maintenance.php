@@ -8,7 +8,7 @@
 // - auto-close: if a parent has children and all direct children are done => set parent to done and prepend a short summary
 // - NO deletions, NO moves.
 
-require_once __DIR__ . '/../public/functions.inc.php';
+require_once __DIR__ . '/../public/functions_v3.inc.php';
 
 $pdo = db();
 

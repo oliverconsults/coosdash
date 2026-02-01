@@ -2,7 +2,7 @@
 // Worker queue maintenance
 // - Reset stale claimed jobs back to open if claimed_at older than 10 minutes.
 
-require_once __DIR__ . '/../public/functions.inc.php';
+require_once __DIR__ . '/../public/functions_v3.inc.php';
 $pdo = db();
 
 // Ensure table exists
