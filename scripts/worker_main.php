@@ -149,8 +149,14 @@ if ($cLock && flock($cLock, LOCK_EX | LOCK_NB)) {
         $promptText . "\n\n".
         "Rules:\n".
         "- ALL writes must go via: php /home/deploy/projects/coos/scripts/worker_api_cli.php ...\n".
+        "- If you need Oliver to decide/confirm something: (1) prepend_update explaining the question + options, (2) set_status to todo_oliver, THEN (3) mark the job done.\n".
+        "  Example:\n".
+        "  php /home/deploy/projects/coos/scripts/worker_api_cli.php action=prepend_update node_id={$nodeId} headline=\"Frage an Oliver\" body=\"...\"\n".
+        "  php /home/deploy/projects/coos/scripts/worker_api_cli.php action=set_status node_id={$nodeId} worker_status=todo_oliver\n".
+        "  php /home/deploy/projects/coos/scripts/worker_api_cli.php action=job_done job_id={$jobId} node_id={$nodeId}\n".
         "- On success: php /home/deploy/projects/coos/scripts/worker_api_cli.php action=job_done job_id={$jobId} node_id={$nodeId}\n".
         "- On failure: php /home/deploy/projects/coos/scripts/worker_api_cli.php action=job_fail job_id={$jobId} node_id={$nodeId} reason=\"...\"\n".
+        "- Always end by calling job_done or job_fail (never exit without closing the job).\n".
         "- Keep it concise. Prefer verification before marking done.\n";
 
       $agentCmd = 'clawdbot agent --session-id ' . escapeshellarg('coos-worker-queue') .
@@ -162,6 +168,31 @@ if ($cLock && flock($cLock, LOCK_EX | LOCK_NB)) {
       exec($agentCmd . ' 2>&1', $agentOut, $agentCode);
       $tail = implode(' / ', array_slice($agentOut, -6));
       logline('consumer: agent exit=' . $agentCode . ($tail ? (' | ' . $tail) : ''));
+
+      // Safety net: if the agent forgot to close the job, fail it so the queue doesn't stall.
+      try {
+        $dbEnv = getDbConfig($cfgPath);
+        if ($dbEnv) {
+          $dsn = 'mysql:host=' . $dbEnv['host'] . ';port=' . (int)$dbEnv['port'] . ';dbname=' . $dbEnv['name'] . ';charset=utf8mb4';
+          $pdo = new PDO($dsn, $dbEnv['user'], $dbEnv['pass'], [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+          $st = $pdo->prepare('SELECT status FROM worker_queue WHERE id=?');
+          $st->execute([$jobId]);
+          $stt = (string)($st->fetchColumn() ?: '');
+          if ($stt === 'claimed' || $stt === 'open') {
+            $reason = 'agent did not call job_done/job_fail';
+            $failCmd = '/usr/bin/php ' . escapeshellarg($base . '/worker_api_cli.php') .
+              ' action=job_fail job_id=' . escapeshellarg((string)$jobId) .
+              ' node_id=' . escapeshellarg((string)$nodeId) .
+              ' reason=' . escapeshellarg($reason);
+            $fo = [];
+            $fc = 0;
+            exec($failCmd . ' 2>&1', $fo, $fc);
+            logline('consumer: auto-job_fail (safety net) exit=' . $fc . ' reason=' . $reason);
+          }
+        }
+      } catch (Throwable $e) {
+        // ignore
+      }
     }
   }
 } else {
