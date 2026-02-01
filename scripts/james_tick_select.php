@@ -69,7 +69,25 @@ $topProjectId = function(int $nodeId) use ($byId, $projectsRoot): int {
   return 0;
 };
 
-// Build candidate leaves (unblocked todo_james) + compute their top project
+// If a node has (somewhere below) a task that is blocked AND not open for James,
+// we should not pick the ancestor (otherwise James "works" on the wrong level and misses a hidden blocker).
+$hasBlockedNonOpenDesc = function(int $nodeId) use (&$hasBlockedNonOpenDesc, $children, $byId, $isBlocked): bool {
+  foreach (($children[$nodeId] ?? []) as $cid) {
+    $cid = (int)$cid;
+    $cn = $byId[$cid] ?? null;
+    if (!$cn) continue;
+
+    $st = (string)($cn['worker_status'] ?? '');
+    // "not open" = not todo_james (done is fine)
+    $notOpen = ($st !== 'todo_james' && $st !== 'done');
+    if ($notOpen && $isBlocked($cn)) return true;
+
+    if ($hasBlockedNonOpenDesc($cid)) return true;
+  }
+  return false;
+};
+
+// Build candidate nodes (unblocked todo_james) + compute their top project
 $cands = [];
 foreach ($depthById as $id => $d) {
   if ($id === $projectsRoot) continue;
@@ -78,6 +96,7 @@ foreach ($depthById as $id => $d) {
   if (($n['worker_status'] ?? '') !== 'todo_james') continue;
   // NOTE: we no longer require leaf-only; James should pick the deepest open node even if it has children.
   if ($isBlocked($n)) continue; // do not pick blocked tasks
+  if ($hasBlockedNonOpenDesc((int)$id)) continue; // avoid ancestors above blocked non-open tasks
 
   $projId = $topProjectId((int)$id);
   if ($projId <= 0) continue;
@@ -162,6 +181,11 @@ usort($cands, function($a, $b) {
   if ($a['depth'] !== $b['depth']) return $b['depth'] <=> $a['depth'];
   return $a['id'] <=> $b['id'];
 });
+
+if (!$cands) {
+  echo "NO_TODO\n";
+  exit(0);
+}
 
 $target = $cands[0];
 
