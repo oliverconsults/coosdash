@@ -9,8 +9,14 @@ $pdo = db();
 $nodeId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 
 // right-panel view
-$view = (string)($_GET['view'] ?? 'work');
-if (!in_array($view, ['work','live','kanban','report'], true)) $view = 'work';
+$view = (string)($_GET['view'] ?? '');
+if ($view === '') {
+  $view = (string)($_COOKIE['coos_view'] ?? 'work');
+}
+if (!in_array($view, ['work','kanban','report'], true)) $view = 'work';
+
+// persist selected view
+@setcookie('coos_view', $view, time() + 60*60*24*180, '/');
 
 // form state (to preserve user input on validation errors)
 $formNote = '';
@@ -457,7 +463,10 @@ function renderTree(array $byParent, array $byId, array $sectionByIdAll, array $
       // Otherwise browser default <details> layout can add extra indentation when fully expanded (search).
       echo '<details class="tree-branch" ' . ($isOpen ? 'open' : '') . '>';
       echo '<summary class="tree-item ' . ($isActive ? 'active' : '') . $msClass . '" style="margin-left:' . $indent . 'px">';
-      $href = '/?id=' . $id;
+      $v = (string)($_GET['view'] ?? ($_COOKIE['coos_view'] ?? 'work'));
+      if (!in_array($v, ['work','kanban','report'], true)) $v = 'work';
+      $base = ($v === 'kanban') ? '/kanban.php' : (($v === 'report') ? '/report.php' : '/');
+      $href = $base . '?id=' . $id . '&view=' . rawurlencode($v);
       // Under "Ideen": clicking should jump to "Neues Projekt" prefilled from this node.
       // (but NOT for the Ideen container root itself)
       if ($sec === 'Ideen' && (($byId[$id]['parent_id'] ?? null) !== null)) {
@@ -475,7 +484,10 @@ function renderTree(array $byParent, array $byId, array $sectionByIdAll, array $
     } else {
       echo '<div class="tree-leaf">';
       echo '<div class="tree-item ' . ($isActive ? 'active' : '') . $msClass . '" style="margin-left:' . $indent . 'px">';
-      $href = '/?id=' . $id;
+      $v = (string)($_GET['view'] ?? ($_COOKIE['coos_view'] ?? 'work'));
+      if (!in_array($v, ['work','kanban','report'], true)) $v = 'work';
+      $base = ($v === 'kanban') ? '/kanban.php' : (($v === 'report') ? '/report.php' : '/');
+      $href = $base . '?id=' . $id . '&view=' . rawurlencode($v);
       // Under "Ideen": clicking should jump to "Neues Projekt" prefilled from this node.
       // (but NOT for the Ideen container root itself)
       if ($sec === 'Ideen' && (($byId[$id]['parent_id'] ?? null) !== null)) {
@@ -533,19 +545,19 @@ renderHeader('Dashboard');
           if ($nodeId) $baseQs['id'] = (int)$nodeId;
           if (!empty($_GET['open'])) $baseQs['open'] = (string)$_GET['open'];
           if (!empty($_GET['q'])) $baseQs['q'] = (string)$_GET['q'];
+
           $hrefWork   = '/?' . http_build_query(array_merge($baseQs, ['view'=>'work']));
-          $hrefLive   = '/test.php' . ($baseQs ? ('?' . http_build_query($baseQs)) : '');
           $hrefKanban = '/kanban.php' . ($baseQs ? ('?' . http_build_query($baseQs)) : '');
           $hrefReport = '/report.php' . ($baseQs ? ('?' . http_build_query($baseQs)) : '');
         ?>
         <a class="btn btn-md <?php echo $view==='work'?'active':''; ?>" href="<?php echo h($hrefWork); ?>">Work</a>
-        <a class="btn btn-md <?php echo $view==='live'?'active':''; ?>" href="<?php echo h($hrefLive); ?>">Live</a>
         <a class="btn btn-md <?php echo $view==='kanban'?'active':''; ?>" href="<?php echo h($hrefKanban); ?>">Kanban</a>
         <a class="btn btn-md <?php echo $view==='report'?'active':''; ?>" href="<?php echo h($hrefReport); ?>">Report</a>
       </div>
     </div>
 
     <form method="get" style="margin:8px 0 0 0; display:flex; gap:10px;">
+      <input type="hidden" name="view" value="<?php echo h($view); ?>">
       <input type="text" name="q" placeholder="Notizen durchsuchen..." value="<?php echo h((string)($_GET['q'] ?? '')); ?>" style="flex:1">
       <?php if ($nodeId): ?><input type="hidden" name="id" value="<?php echo (int)$nodeId; ?>"><?php endif; ?>
       <?php if (!empty($_GET['open'])): ?><input type="hidden" name="open" value="<?php echo h((string)$_GET['open']); ?>"><?php endif; ?>

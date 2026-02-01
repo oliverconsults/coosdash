@@ -1,7 +1,11 @@
 <?php
-require_once __DIR__ . '/functions_v3.inc.php';
-requireLogin();
+// Legacy entrypoint kept for compatibility.
+// Live is no longer a top-level view; redirect to Work.
 
-// Live view wrapper (reuses index.php layout)
-$_GET['view'] = 'live';
-require __DIR__ . '/index.php';
+$id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+$qs = ['view' => 'work'];
+if ($id) $qs['id'] = $id;
+if (!empty($_GET['open'])) $qs['open'] = (string)$_GET['open'];
+if (!empty($_GET['q'])) $qs['q'] = (string)$_GET['q'];
+header('Location: /?' . http_build_query($qs));
+exit;
