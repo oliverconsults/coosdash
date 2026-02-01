@@ -70,53 +70,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $action = $_POST['action'] ?? '';
 
   if ($action === 'save_task') {
-    $nid = (int)($_POST['node_id'] ?? 0);
-    $formNote = (string)($_POST['description'] ?? '');
-    $taskType = (string)($_POST['task_type'] ?? 'planung');
-    if (!in_array($taskType, ['planung','umsetzung'], true)) $taskType = 'planung';
-    $submitTo = (string)($_POST['submit_to'] ?? '');
-    $toJames = ($submitTo === 'james');
-
-    // block editing of container roots
-    $st = $pdo->prepare('SELECT parent_id, title FROM nodes WHERE id=?');
-    $st->execute([$nid]);
-    $row = $st->fetch();
-    $isContainerRoot = $row && ($row['parent_id'] === null) && in_array((string)$row['title'], ['Ideen','Projekte','Später','Gelöscht'], true);
-
-    if (!$nid) {
-      flash_set('Projekt fehlt.', 'err');
-    } elseif ($isContainerRoot) {
-      flash_set('Oberprojekte haben kein Notizfeld. Bitte nur Subtasks anlegen.', 'err');
-    } elseif (trim($formNote) === '') {
-      flash_set('Text fehlt.', 'err');
-    } else {
-      $ts = date('d.m.Y H:i');
-      // Put newest status at the top (not the bottom)
-      $marker = ($taskType === 'umsetzung') ? ' ##UMSETZUNG##' : '';
-      $stTxt = $toJames ? 'todo_james' : 'todo_oliver';
-      $newDesc = "[oliver] {$ts} Statusänderung: {$stTxt}{$marker}\n\n" . rtrim($formNote);
-
-      $st = $pdo->prepare('UPDATE nodes SET description=?, worker_status=? WHERE id=?');
-      $st->execute([$newDesc, $stTxt, $nid]);
-
-      // optional attachment upload (Oliver)
-      if (!empty($_FILES['attachment'])) {
-        try {
-          $res = attachments_store_upload($pdo, $nid, $_FILES['attachment'], 'oliver');
-          if (is_array($res) && !empty($res['err'])) {
-            flash_set('Gespeichert, aber Attachment fehlgeschlagen: ' . $res['err'], 'err');
-          }
-        } catch (Throwable $e) {
-          flash_set('Gespeichert, aber Attachment fehlgeschlagen.', 'err');
-        }
-      }
-
-      workerlog_append($nid, "[oliver] {$ts} Statusänderung: {$stTxt}{$marker}");
-
-      flash_set($toJames ? 'Gespeichert & an James.' : 'Gespeichert.', 'info');
-      header('Location: /?id=' . $nid);
-      exit;
-    }
+    // Editing existing task text from UI is disabled to avoid noisy histories.
+    flash_set('Direktes Editieren von Tasks ist deaktiviert. Bitte nur Subtasks anlegen.', 'err');
+    header('Location: /?id=' . (int)($_POST['node_id'] ?? 0));
+    exit;
   }
 
   if ($action === 'add_subtask') {
@@ -125,8 +82,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $formChildBody = (string)($_POST['description'] ?? '');
     $taskType = (string)($_POST['task_type'] ?? 'planung');
     if (!in_array($taskType, ['planung','umsetzung'], true)) $taskType = 'planung';
-    $submitTo = (string)($_POST['submit_to'] ?? '');
-    $toJames = ($submitTo === 'james');
 
     $title = trim($formChildTitle);
     $body = trim($formChildBody);
@@ -141,14 +96,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       flash_set('Titel darf max. 40 Zeichen haben.', 'err');
     } else {
       $ts = date('d.m.Y H:i');
-      // Put newest status at the top (not the bottom)
       $marker = ($taskType === 'umsetzung') ? ' ##UMSETZUNG##' : '';
-      $stTxt = $toJames ? 'todo_james' : 'todo_oliver';
+
+      // Always delegate to James (both parent + new child)
+      $stTxt = 'todo_james';
       $desc = "[oliver] {$ts} Statusänderung: {$stTxt}{$marker}\n\n" . rtrim($formChildBody);
 
       $st = $pdo->prepare('INSERT INTO nodes (parent_id, title, description, priority, created_by, worker_status) VALUES (?, ?, ?, ?, ?, ?)');
       $st->execute([$parentId, $title, $desc, null, 'oliver', $stTxt]);
       $newId = (int)$pdo->lastInsertId();
+
+      // Ensure parent is also todo_james
+      $pdo->prepare('UPDATE nodes SET worker_status=? WHERE id=?')->execute([$stTxt, $parentId]);
 
       // optional attachment upload (Oliver)
       if (!empty($_FILES['attachment'])) {
@@ -162,13 +121,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
       }
 
-      // also prepend a short line into parent description (newest first)
-      $st = $pdo->prepare('UPDATE nodes SET description=CONCAT(?, COALESCE(description,\'\')) WHERE id=?');
-      $st->execute(["[oliver] {$ts} Subtask angelegt: {$title}\n\n", $parentId]);
-
+      // Keep history clean: do not prepend into parent description.
       workerlog_append($newId, "[oliver] {$ts} Statusänderung: {$stTxt}{$marker}");
+      workerlog_append($parentId, "[oliver] {$ts} Subtask angelegt -> todo_james");
 
-      flash_set($toJames ? 'Subtask angelegt & an James.' : 'Subtask angelegt.', 'info');
+      flash_set('Subtask angelegt & an James. (Parent ebenfalls todo_james)', 'info');
       header('Location: /?id=' . $newId);
       exit;
     }
@@ -954,30 +911,7 @@ renderHeader('Dashboard');
             </div>
           <?php endif; ?>
 
-          <form method="post" enctype="multipart/form-data" style="margin:0">
-            <input type="hidden" name="action" value="save_task">
-            <input type="hidden" name="node_id" value="<?php echo (int)$node['id']; ?>">
-
-            <?php $isUmsetzung = (strpos((string)($node['description'] ?? ''), '##UMSETZUNG##') !== false); ?>
-            <div class="row" style="align-items:center; gap:10px; margin-bottom:8px;">
-              <label style="margin:0;">Aufgabentyp:</label>
-              <select name="task_type" style="width:auto; min-width:180px; margin:0;">
-                <option value="planung" <?php echo $isUmsetzung ? '' : 'selected'; ?>>Planung</option>
-                <option value="umsetzung" <?php echo $isUmsetzung ? 'selected' : ''; ?>>Umsetzung</option>
-              </select>
-            </div>
-
-            <label>Aufgabe / Notiz:</label>
-            <textarea class="task-note" name="description" required><?php echo h((string)($node['description'] ?? '')); ?></textarea>
-
-            <div class="row" style="margin-top:10px; align-items:center;">
-              <span class="meta">Anhang optional:</span>
-              <input type="file" name="attachment" accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt" style="width:auto; max-width:380px">
-              <button class="btn" name="submit_to" value="oliver" type="submit">Speichern</button>
-              <button class="btn" name="submit_to" value="james" type="submit">Speichern &gt; James</button>
-            </div>
-          </form>
-
+          <div class="meta">Direktes Editieren ist deaktiviert. Bitte neue Subtasks anlegen.</div>
           <div style="height:14px"></div>
         <?php endif; ?>
 
