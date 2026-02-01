@@ -98,15 +98,37 @@ renderHeader('Setup');
 
   <form method="post" action="/setup.php">
 
-    <label>Worker Prompt – Rules Block (wird an den Job-Prompt angehängt)</label>
-    <textarea name="worker_rules_block"><?php echo h($workerRulesCur); ?></textarea>
+    <?php
+      $sel = (string)($_GET['p'] ?? 'worker_rules_block');
+      $options = [
+        'worker_rules_block' => 'Worker Prompt – Rules Block',
+        'summary_cleanup_instructions' => 'Summary+Cleanup Prompt – Instructions Block',
+        'wrapper_prompt_template' => 'Wrapper Prompt Template (worker_main)',
+      ];
+      if (!isset($options[$sel])) $sel = 'worker_rules_block';
+    ?>
 
-    <label>Summary+Cleanup Prompt – Instructions Block</label>
-    <textarea name="summary_cleanup_instructions"><?php echo h($summaryInstrCur); ?></textarea>
+    <label>Prompt auswählen</label>
+    <div class="row" style="align-items:center;">
+      <select name="prompt_select" onchange="location.href='/setup.php?p='+encodeURIComponent(this.value);" style="max-width:520px;">
+        <?php foreach ($options as $k => $label): ?>
+          <option value="<?php echo h($k); ?>" <?php echo $k === $sel ? 'selected' : ''; ?>><?php echo h($label); ?></option>
+        <?php endforeach; ?>
+      </select>
+      <span class="meta" style="white-space:nowrap;">Key: <?php echo h($sel); ?></span>
+    </div>
 
-    <label>Wrapper Prompt Template (worker_main)</label>
-    <div class="meta">Placeholders: {JOB_ID}, {NODE_ID}, {JOB_PROMPT}</div>
-    <textarea name="wrapper_prompt_template"><?php echo h($wrapperTplCur); ?></textarea>
+    <?php if ($sel === 'worker_rules_block'): ?>
+      <label><?php echo h($options[$sel]); ?> (wird an den Job-Prompt angehängt)</label>
+      <textarea name="worker_rules_block"><?php echo h($workerRulesCur); ?></textarea>
+    <?php elseif ($sel === 'summary_cleanup_instructions'): ?>
+      <label><?php echo h($options[$sel]); ?></label>
+      <textarea name="summary_cleanup_instructions"><?php echo h($summaryInstrCur); ?></textarea>
+    <?php else: ?>
+      <label><?php echo h($options[$sel]); ?></label>
+      <div class="meta">Placeholders: {JOB_ID}, {NODE_ID}, {JOB_PROMPT}</div>
+      <textarea name="wrapper_prompt_template"><?php echo h($wrapperTplCur); ?></textarea>
+    <?php endif; ?>
 
     <div class="row" style="margin-top:10px">
       <button class="btn btn-gold" type="submit">Speichern</button>
