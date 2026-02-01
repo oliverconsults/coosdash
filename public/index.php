@@ -761,9 +761,14 @@ renderHeader('Dashboard');
         ?>
         <?php if ($envText !== ''): ?>
           <div class="card" style="margin-top:12px; background:rgba(15,22,35,.72);">
-            <h3 style="margin:0 0 8px 0;">Projekt-Umgebung (env.md)</h3>
-            <div class="meta">Dieser Block wird automatisch in jeden James-Task injiziert.</div>
-            <textarea readonly style="min-height:160px; opacity:0.95; font-size:12px; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;"><?php echo h($envText); ?></textarea>
+            <div class="row" style="justify-content:space-between; align-items:center; gap:10px;">
+              <h3 style="margin:0;">Projekt-Umgebung (env.md)</h3>
+              <button class="btn btn-sm" type="button" onclick="(function(){var el=document.getElementById('envBox'); if(!el) return; el.style.display = (el.style.display==='none'?'block':'none');})()">ein-/ausblenden</button>
+            </div>
+            <div class="meta">Dieser Block wird automatisch in jeden James-Task injiziert. Standard: ausgeblendet.</div>
+            <div id="envBox" style="display:none; margin-top:10px;">
+              <textarea readonly style="min-height:160px; opacity:0.95; font-size:12px; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;"><?php echo h($envText); ?></textarea>
+            </div>
           </div>
         <?php endif; ?>
 
