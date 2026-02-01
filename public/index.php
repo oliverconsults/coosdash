@@ -1162,11 +1162,29 @@ renderHeader('Dashboard');
                     <div class="kanban-title"><?php echo h($c['title']); ?><?php if (!empty($c['has_att'])): ?> <span class="att-clip" title="Attachment">📁</span><?php endif; ?></div>
                     <div class="kanban-meta">
                       <span class="pill section"><?php echo h((string)($c['project'] ?? $c['section'])); ?></span>
-                      <?php $right = '#' . (int)$c['id']; ?>
-                      <?php if ($col === 'done'): ?>
-                        <?php $ts = strtotime((string)($c['updated_at'] ?? '')); ?>
-                        <?php if ($ts) $right = date('d.m.Y H:i:s', $ts) . ' · ' . $right; ?>
-                      <?php endif; ?>
+                      <?php
+                        $right = '#' . (int)$c['id'];
+                        if ($col === 'done') {
+                          $ts = strtotime((string)($c['updated_at'] ?? ''));
+                          if ($ts) {
+                            $delta = time() - $ts;
+                            if ($delta < 0) $delta = 0;
+                            if ($delta < 60) {
+                              $right = 'vor ' . $delta . 's · ' . $right;
+                            } elseif ($delta < 90*60) {
+                              $mins = (int)round($delta / 60);
+                              $right = 'vor ' . $mins . ' Min. · ' . $right;
+                            } elseif ($delta < 48*3600) {
+                              $hrs = $delta / 3600;
+                              $hrsTxt = ($hrs < 10) ? number_format($hrs, 1, ',', '') : (string)round($hrs);
+                              $right = 'vor ' . $hrsTxt . 'h · ' . $right;
+                            } else {
+                              $days = (int)round($delta / 86400);
+                              $right = 'vor ' . $days . 'd · ' . $right;
+                            }
+                          }
+                        }
+                      ?>
                       <span class="pill dim"><?php echo h($right); ?></span>
                     </div>
                   </a>
