@@ -30,4 +30,4 @@ foreach ($rows as $r) {
   @file_put_contents('/var/www/coosdash/shared/logs/worker.log', $tsLine . "  #{$nid}  [auto] {$tsHuman} Queue reset: claimed job #{$id} stale (>10m)\n", FILE_APPEND);
 }
 
-echo "OK reset={$fixed}\n";
+echo date('Y-m-d H:i:s') . "  OK reset={$fixed}\n";

@@ -45,7 +45,7 @@ function depthUnderRoot(PDO $pdo, int $nodeId, int $rootId): ?int {
 
 $projectsId = rootId($pdo, 'Projekte');
 if (!$projectsId) {
-  fwrite(STDERR, "Missing root 'Projekte'\n");
+  fwrite(STDERR, date('Y-m-d H:i:s') . "  Missing root 'Projekte'\n");
   exit(2);
 }
 
@@ -165,4 +165,4 @@ $logDir = '/var/www/coosdash/shared/logs';
 @mkdir($logDir, 0775, true);
 file_put_contents($logDir . '/worker_summary_produce.log', $tsLine . " queued={$enq}\n", FILE_APPEND);
 
-echo "OK queued={$enq}\n";
+echo date('Y-m-d H:i:s') . "  OK queued={$enq}\n";

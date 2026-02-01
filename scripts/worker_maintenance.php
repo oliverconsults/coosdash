@@ -41,7 +41,7 @@ function depthUnderRoot(PDO $pdo, int $nodeId, int $rootId): ?int {
 
 $projectsId = rootId($pdo, 'Projekte');
 if (!$projectsId) {
-  fwrite(STDERR, "Missing root 'Projekte'\n");
+  fwrite(STDERR, date('Y-m-d H:i:s') . "  Missing root 'Projekte'\n");
   exit(2);
 }
 
@@ -124,4 +124,4 @@ $logDir = '/var/www/coosdash/shared/logs';
 $log = $logDir . '/worker_maintenance.log';
 file_put_contents($log, $tsLine . " autoclose={$did['closed']} unblock={$did['unblocked']}\n", FILE_APPEND);
 
-echo "OK autoclose={$did['closed']} unblock={$did['unblocked']}\n";
+echo date('Y-m-d H:i:s') . "  OK autoclose={$did['closed']} unblock={$did['unblocked']}\n";

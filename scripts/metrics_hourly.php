@@ -150,4 +150,5 @@ $st->execute([
   (int)$deletedTotal,
 ]);
 
-echo "OK metrics_hourly ts={$tsStr} ideas=" . json_encode($ideas) . " projects=" . json_encode($projects) . " later={$laterTotal} deleted={$deletedTotal}\n";
+$tsLine = date('Y-m-d H:i:s');
+echo $tsLine . "  OK metrics_hourly ts={$tsStr} ideas=" . json_encode($ideas) . " projects=" . json_encode($projects) . " later={$laterTotal} deleted={$deletedTotal}\n";

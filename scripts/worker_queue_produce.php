@@ -15,7 +15,7 @@ if (is_file($statePath)) {
   if (is_array($j) && !empty($j['enabled'])) $enabled = 1;
 }
 if (!$enabled) {
-  echo "OK james sleeps (no enqueue)\n";
+  echo date('Y-m-d H:i:s') . "  OK james sleeps (no enqueue)\n";
   exit(0);
 }
 
@@ -26,7 +26,7 @@ require_once __DIR__ . '/migrate_worker_queue.php';
 $st = $pdo->query("SELECT COUNT(*) AS c FROM worker_queue WHERE status IN ('open','claimed')");
 $row = $st->fetch();
 if ($row && (int)$row['c'] > 0) {
-  echo "OK skip (job already open/claimed)\n";
+  echo date('Y-m-d H:i:s') . "  OK skip (job already open/claimed)\n";
   exit(0);
 }
 
@@ -36,7 +36,7 @@ $rc = 0;
 exec('php ' . escapeshellarg(__DIR__ . '/james_tick_select.php') . ' 2>/dev/null', $selOut, $rc);
 $txt = trim(implode("\n", $selOut));
 if ($rc !== 0 || $txt === '' || str_contains($txt, 'NO_TODO')) {
-  echo "OK no target\n";
+  echo date('Y-m-d H:i:s') . "  OK no target\n";
   exit(0);
 }
 
@@ -157,4 +157,4 @@ $jobId = (int)$pdo->lastInsertId();
 $promptFinal = str_replace('{JOB_ID}', (string)$jobId, $prompt);
 $pdo->prepare('UPDATE worker_queue SET prompt_text=? WHERE id=?')->execute([$promptFinal, $jobId]);
 
-echo "OK queued job_id={$jobId} node_id={$nodeId}\n";
+echo date('Y-m-d H:i:s') . "  OK queued job_id={$jobId} node_id={$nodeId}\n";
