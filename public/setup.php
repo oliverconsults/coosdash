@@ -76,6 +76,31 @@ $defaultProjectSetupPrompt = "# COOS Project Setup (LLM)\n\n"
   . "- children: 4 bis 6 kurze direkte Subtasks (<= 40 Zeichen), deutsch.\n"
   . "- Letztes Kind ist immer quality_title.\n";
 
+// AJAX: fetch history entry text (preview only)
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'GET' && (string)($_GET['action'] ?? '') === 'history_get') {
+  requireLogin();
+  header('Content-Type: application/json; charset=utf-8');
+  $key = (string)($_GET['key'] ?? '');
+  $idx = (int)($_GET['idx'] ?? -1);
+  if ($key === '') {
+    echo json_encode(['ok'=>false,'msg'=>'missing key']);
+    exit;
+  }
+  $hist = prompt_history_list($key, 100);
+  $row = $hist[$idx] ?? null;
+  if (!is_array($row)) {
+    echo json_encode(['ok'=>false,'msg'=>'not found']);
+    exit;
+  }
+  echo json_encode([
+    'ok' => true,
+    'ts' => (string)($row['ts'] ?? ''),
+    'user' => (string)($row['user'] ?? ''),
+    'value' => (string)($row['old'] ?? ''),
+  ], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
+  exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $action = (string)($_POST['action'] ?? 'save');
 
@@ -172,14 +197,14 @@ renderHeader('Setup');
 
     <?php if ($sel === 'worker_rules_block'): ?>
       <label><?php echo h($options[$sel]); ?> (wird an den Job-Prompt angehängt)</label>
-      <textarea name="worker_rules_block" style="min-height:260px;"><?php echo h($workerRulesCur); ?></textarea>
+      <textarea id="promptEditor" name="worker_rules_block" style="min-height:260px;"><?php echo h($workerRulesCur); ?></textarea>
     <?php elseif ($sel === 'summary_cleanup_instructions'): ?>
       <label><?php echo h($options[$sel]); ?></label>
-      <textarea name="summary_cleanup_instructions" style="min-height:260px;"><?php echo h($summaryInstrCur); ?></textarea>
+      <textarea id="promptEditor" name="summary_cleanup_instructions" style="min-height:260px;"><?php echo h($summaryInstrCur); ?></textarea>
     <?php elseif ($sel === 'project_setup_prompt'): ?>
       <label><?php echo h($options[$sel]); ?></label>
       <div class="meta">Placeholders: {TITLE}, {SLUG}, {DESCRIPTION}</div>
-      <textarea name="project_setup_prompt" style="min-height:260px;"><?php echo h($projectSetupCur); ?></textarea>
+      <textarea id="promptEditor" name="project_setup_prompt" style="min-height:260px;"><?php echo h($projectSetupCur); ?></textarea>
     <?php elseif ($sel === 'check_next_effective_prompt'): ?>
       <?php
         $job = null;
@@ -216,7 +241,7 @@ renderHeader('Setup');
     <?php else: ?>
       <label><?php echo h($options[$sel]); ?></label>
       <div class="meta">Placeholders: {JOB_ID}, {NODE_ID}, {JOB_PROMPT}</div>
-      <textarea name="wrapper_prompt_template" style="min-height:260px;"><?php echo h($wrapperTplCur); ?></textarea>
+      <textarea id="promptEditor" name="wrapper_prompt_template" style="min-height:260px;"><?php echo h($wrapperTplCur); ?></textarea>
     <?php endif; ?>
 
     <div class="row" style="margin-top:10px">
@@ -239,18 +264,21 @@ renderHeader('Setup');
     <form method="post" action="/setup.php?p=<?php echo h($sel); ?>" onsubmit="return confirm('Diese Version wirklich wiederherstellen?');">
       <input type="hidden" name="action" value="restore_history">
       <input type="hidden" name="key" value="<?php echo h($sel); ?>">
-      <label>Restore Version</label>
-      <select name="restore_idx" style="max-width:720px;">
+      <label>History ansehen (lädt oben in den Editor, speichert nicht automatisch)</label>
+      <div class="row" style="align-items:center; gap:10px; flex-wrap:wrap;">
+        <select id="histSelect" name="restore_idx" style="max-width:720px;">
         <?php foreach ($hist as $idx => $hrow): ?>
           <?php
             $label = (string)($hrow['ts'] ?? '') . ' · user=' . (string)($hrow['user'] ?? '-') . ' · sha=' . substr((string)($hrow['new_sha1'] ?? ''), 0, 8);
           ?>
           <option value="<?php echo (int)$idx; ?>"><?php echo h($label); ?></option>
         <?php endforeach; ?>
-      </select>
-      <div class="row" style="margin-top:10px;">
+        </select>
+        <button class="btn btn-md" type="button" onclick="histReset()">Reset auf aktuell</button>
         <button class="btn" type="submit">Restore</button>
       </div>
+
+      <div id="histMeta" class="meta" style="margin-top:8px;"></div>
     </form>
   <?php endif; ?>
 </div>
@@ -367,5 +395,43 @@ renderHeader('Setup');
     <?php endif; ?>
   </div>
 <?php endif; ?>
+
+<script>
+(function(){
+  const editor = document.getElementById('promptEditor');
+  const sel = document.getElementById('histSelect');
+  const meta = document.getElementById('histMeta');
+  if (!editor) return;
+
+  // Snapshot current value so we can reset without reload.
+  window.__promptCurrent = editor.value;
+
+  window.histReset = function(){
+    editor.value = window.__promptCurrent || '';
+    if (meta) meta.textContent = '';
+  };
+
+  async function loadHistory(idx){
+    if (!sel) return;
+    if (!idx || idx < 0) return;
+    const key = <?php echo json_encode($sel, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES); ?>;
+    const url = '/setup.php?action=history_get&key=' + encodeURIComponent(key) + '&idx=' + encodeURIComponent(idx);
+    const res = await fetch(url, {credentials:'same-origin'});
+    const j = await res.json();
+    if (!j || !j.ok) {
+      if (meta) meta.textContent = 'History konnte nicht geladen werden.';
+      return;
+    }
+    editor.value = j.value || '';
+    if (meta) meta.textContent = 'Preview: ' + (j.ts || '') + ' · user=' + (j.user || '-') + ' (nicht gespeichert)';
+  }
+
+  if (sel) {
+    sel.addEventListener('change', function(){
+      loadHistory(parseInt(sel.value,10));
+    });
+  }
+})();
+</script>
 
 <?php renderFooter();
