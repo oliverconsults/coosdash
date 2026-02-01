@@ -82,10 +82,10 @@ foreach ($rows as $r) {
 // (If you want this back later, re-enable this block.)
 
 // 3) Reactivate canceled queue jobs (older than 30 minutes)
-// Goal: canceled jobs should not permanently block progress. After cooldown, put them back to 'open'
-// so worker_main can pick them up again.
+// Goal: jobs canceled by the James on/off toggle should not permanently block progress.
+// We ONLY reactivate jobs for nodes that are still actionable (todo_james) to avoid re-running already done tasks.
 $st = $pdo->prepare(
-  "SELECT id,node_id,created_at,updated_at FROM worker_queue " .
+  "SELECT id,node_id,created_at,updated_at,claimed_by,claimed_at FROM worker_queue " .
   "WHERE status='canceled' AND updated_at < DATE_SUB(NOW(), INTERVAL 30 MINUTE) " .
   "ORDER BY updated_at ASC LIMIT 50"
 );
@@ -95,8 +95,20 @@ foreach ($canceled as $r) {
   $jid = (int)$r['id'];
   $nid = (int)$r['node_id'];
   if ($jid <= 0 || $nid <= 0) continue;
+
   // only under Projekte
   if (!isUnderRoot($pdo, $nid, $projectsId)) continue;
+
+  // only if the node is still todo_james (otherwise we'd re-run completed work)
+  $stN = $pdo->prepare('SELECT worker_status, blocked_until FROM nodes WHERE id=?');
+  $stN->execute([$nid]);
+  $nr = $stN->fetch(PDO::FETCH_ASSOC);
+  if (!$nr) continue;
+  if ((string)($nr['worker_status'] ?? '') !== 'todo_james') continue;
+
+  // respect blocked_until
+  $bu = (string)($nr['blocked_until'] ?? '');
+  if ($bu !== '' && strtotime($bu) > time()) continue;
 
   // If there is already an open/claimed job for that node, keep this one canceled.
   $st2 = $pdo->prepare("SELECT COUNT(*) FROM worker_queue WHERE node_id=? AND status IN ('open','claimed')");
