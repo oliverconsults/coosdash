@@ -9,7 +9,7 @@
 // Output:
 //   URL: https://coos.eu/att/<token>/<stored_name>
 
-require_once __DIR__ . '/../public/functions.inc.php';
+require_once __DIR__ . '/../public/functions_v3.inc.php';
 
 $nodeId = (int)($argv[1] ?? 0);
 $src = (string)($argv[2] ?? '');
