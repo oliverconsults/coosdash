@@ -167,6 +167,16 @@ if ($cLock && flock($cLock, LOCK_EX | LOCK_NB)) {
         $tpl
       );
 
+      // --- LLM prompt/response logging (effective prompt sent to agent + raw CLI output)
+      $llmDir = '/var/www/coosdash/shared/llm';
+      $llmLog = '/var/www/coosdash/shared/logs/worker_llm.log';
+      @mkdir($llmDir, 0775, true);
+      @mkdir(dirname($llmLog), 0775, true);
+
+      $promptPath = $llmDir . '/job_' . $jobId . '_node_' . $nodeId . '_prompt.txt';
+      $respPath = $llmDir . '/job_' . $jobId . '_node_' . $nodeId . '_response.txt';
+      @file_put_contents($promptPath, $msg);
+
       $agentCmd = 'clawdbot agent --session-id ' . escapeshellarg('coos-worker-queue') .
         ' --message ' . escapeshellarg($msg) .
         ' --timeout 300 --thinking low';
@@ -174,8 +184,17 @@ if ($cLock && flock($cLock, LOCK_EX | LOCK_NB)) {
       $agentOut = [];
       $agentCode = 0;
       exec($agentCmd . ' 2>&1', $agentOut, $agentCode);
+
+      $respRaw = implode("\n", $agentOut);
+      @file_put_contents($respPath, $respRaw);
+
       $tail = implode(' / ', array_slice($agentOut, -6));
       logline('consumer: agent exit=' . $agentCode . ($tail ? (' | ' . $tail) : ''));
+
+      // Human-readable line in worker logs
+      $tsLine = date('Y-m-d H:i:s');
+      @file_put_contents($llmLog, $tsLine . "  job_id={$jobId} node_id={$nodeId} exit={$agentCode} prompt=" . basename($promptPath) . " response=" . basename($respPath) . "\n", FILE_APPEND);
+      @file_put_contents('/var/www/coosdash/shared/logs/worker.log', $tsLine . "  #{$nodeId}  [llm] job_id={$jobId} exit={$agentCode} (siehe worker_llm.log)\n", FILE_APPEND);
 
       // Safety net: if the agent forgot to close the job, fail it so the queue doesn't stall.
       try {
