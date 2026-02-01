@@ -148,18 +148,7 @@ $prompt .= prompt_require('worker_rules_block');
 $prompt .= "\nOperational (English):\n";
 $prompt .= "- Quick healthcheck: php /home/deploy/projects/coos/scripts/worker_api_cli.php action=ping\n";
 
-$prompt .= "\nRegeln:\n";
-$prompt .= "- cooscrm writes: only via /home/deploy/projects/coos/scripts/worker_api_cli.php\n";
-$prompt .= "- Always end by calling job_done or job_fail (never exit without closing the job).\n";
-$prompt .= "- Vor done immer Runs/Ergebnis verifizieren.\n";
-$prompt .= "- Wichtig (Encoding): wenn du Umlaute/Sonderzeichen oder mehrere Zeilen schreibst, nutze *_b64 Parameter (headline_b64/body_b64).\n";
-$prompt .= "  Base64-Helfer (keine node -e Hacks): printf '%s' \"TEXT\" | php /home/deploy/projects/coos/scripts/b64_stdin.php\n";
-$prompt .= "- WICHTIG: Sobald du set_status todo_oliver setzt (Delegation an Oliver), ist der Job für dich beendet: KEINE weiteren Aktionen wie add_children / set_blocked_* / attachments danach. Direkt job_done.\n";
-$prompt .= "- Delegation ist NUR im Notfall erlaubt: Stelle GENAU 1 präzise Frage an Oliver (max. 2 Zeilen), dann set_status todo_oliver, dann job_done.\n";
-$prompt .= "- Bevor du delegierst: führe mindestens 2 konkrete Recon-Schritte durch (z.B. grep nach Entrypoint, runtime-tree check, cron/scripts check, Attachments/ENV check) und erwähne kurz was du geprüft hast.\n";
-$prompt .= "- Wenn dir Info fehlt: nutze D) FRAGE AN OLIVER (Delegation).\n";
-$prompt .= "- Wenn du nicht weiterkommst: job_fail mit kurzem Grund. Nach 3 fails blockt das System den Task.\n";
-$prompt .= "- Tool-KB: Wenn du ein Tool erfolgreich nutzt/installierst: /home/deploy/clawd/TOOLS.md + /home/deploy/clawd/tools/<tool>.md kurz updaten.\n";
+// Regeln are part of worker_rules_block (editable in Setup)
 
 $stIns = $pdo->prepare('INSERT INTO worker_queue (status, node_id, prompt_text, selector_meta) VALUES (\'open\', ?, ?, ?)');
 $stIns->execute([$nodeId, $prompt, json_encode($meta, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)]);
