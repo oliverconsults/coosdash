@@ -53,6 +53,7 @@ $did = [
   'closed' => 0,
   'reactivated' => 0,
   'todo_bubbled' => 0,
+  'gc_blocks' => 0,
 ];
 
 // 1) auto-unblock
@@ -187,10 +188,41 @@ foreach ($todoIds as $tid) {
   }
 }
 
+// 5) GC: clear dangling blocked_by_node_id refs (or refs pointing into Gelöscht)
+$deletedRootId = rootId($pdo, 'Gelöscht');
+$st = $pdo->prepare('SELECT id, blocked_by_node_id FROM nodes WHERE blocked_by_node_id IS NOT NULL');
+$st->execute();
+foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+  $id = (int)$r['id'];
+  $bid = (int)$r['blocked_by_node_id'];
+  if ($id <= 0 || $bid <= 0) continue;
+
+  $clear = false;
+
+  // clear if blocker node is missing
+  $st2 = $pdo->prepare('SELECT id FROM nodes WHERE id=?');
+  $st2->execute([$bid]);
+  $exists = (int)($st2->fetchColumn() ?: 0);
+  if ($exists <= 0) {
+    $clear = true;
+  }
+
+  // clear if blocker node is under Gelöscht
+  if (!$clear && $deletedRootId > 0 && isUnderRoot($pdo, $bid, $deletedRootId)) {
+    $clear = true;
+  }
+
+  if ($clear) {
+    $pdo->prepare('UPDATE nodes SET blocked_by_node_id=NULL WHERE id=?')->execute([$id]);
+    @file_put_contents('/var/www/coosdash/shared/logs/worker.log', $tsLine . "  #{$id}  [auto] {$tsHuman} Blocker GC: cleared dangling blocked_by #{$bid}\n", FILE_APPEND);
+    $did['gc_blocks']++;
+  }
+}
+
 // log
 $logDir = '/var/www/coosdash/shared/logs';
 @mkdir($logDir, 0775, true);
 $log = $logDir . '/worker_maintenance.log';
-file_put_contents($log, $tsLine . " autoclose={$did['closed']} unblock={$did['unblocked']} reactivated={$did['reactivated']} todo_bubbled={$did['todo_bubbled']}\n", FILE_APPEND);
+file_put_contents($log, $tsLine . " autoclose={$did['closed']} unblock={$did['unblocked']} reactivated={$did['reactivated']} todo_bubbled={$did['todo_bubbled']} gc_blocks={$did['gc_blocks']}\n", FILE_APPEND);
 
-echo date('Y-m-d H:i:s') . "  OK autoclose={$did['closed']} unblock={$did['unblocked']} reactivated={$did['reactivated']} todo_bubbled={$did['todo_bubbled']}\n";
+echo date('Y-m-d H:i:s') . "  OK autoclose={$did['closed']} unblock={$did['unblocked']} reactivated={$did['reactivated']} todo_bubbled={$did['todo_bubbled']} gc_blocks={$did['gc_blocks']}\n";

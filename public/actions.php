@@ -264,6 +264,10 @@ if ($action === 'remove_recursive') {
   $pdo->beginTransaction();
   try {
     $moved = countSubtree($pdo, $nodeId);
+
+    // Clear blockers referencing this node before moving it under Gelöscht.
+    $pdo->prepare('UPDATE nodes SET blocked_by_node_id=NULL WHERE blocked_by_node_id=?')->execute([$nodeId]);
+
     moveSubtreeRoot($pdo, $nodeId, $deletedRootId);
     $pdo->prepare('UPDATE nodes SET worker_status="done" WHERE id=?')->execute([$nodeId]);
     $ts = date('d.m.Y H:i');
