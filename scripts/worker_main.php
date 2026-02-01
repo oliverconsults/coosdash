@@ -267,11 +267,26 @@ if ($cLock && flock($cLock, LOCK_EX | LOCK_NB)) {
               $hasKids = (int)$st->fetchColumn();
               if ($hasKids === 0) {
                 $newIds = $add($nodeId, $norm);
-                // find quality node id by title
+
+                // Quality node should not be worked on before the main tasks.
+                // Block QC by the last non-QC sibling (so it runs last).
                 $qualityId = 0;
-                $st = $pdo2->prepare('SELECT id FROM nodes WHERE parent_id=? AND title=? ORDER BY id DESC LIMIT 1');
-                $st->execute([$nodeId, $qualityTitle]);
-                $qualityId = (int)($st->fetchColumn() ?: 0);
+                $lastNonQcId = 0;
+                if (is_array($newIds) && count($newIds) >= 2) {
+                  $qualityId = (int)$newIds[count($newIds)-1];
+                  $lastNonQcId = (int)$newIds[count($newIds)-2];
+                  if ($qualityId > 0 && $lastNonQcId > 0) {
+                    $cmdB = '/usr/bin/php ' . escapeshellarg($base . '/worker_api_cli.php') .
+                      ' action=set_blocked_by node_id=' . escapeshellarg((string)$qualityId) .
+                      ' blocked_by_node_id=' . escapeshellarg((string)$lastNonQcId);
+                    $oo=[]; $cc=0; exec($cmdB . ' 2>&1', $oo, $cc);
+                  }
+                } else {
+                  // fallback: find by title
+                  $st = $pdo2->prepare('SELECT id FROM nodes WHERE parent_id=? AND title=? ORDER BY id DESC LIMIT 1');
+                  $st->execute([$nodeId, $qualityTitle]);
+                  $qualityId = (int)($st->fetchColumn() ?: 0);
+                }
 
                 // quality children: 5-10, chunked
                 $qnorm=[];
@@ -289,9 +304,21 @@ if ($cLock && flock($cLock, LOCK_EX | LOCK_NB)) {
                 if (count($qnorm)>10) $qnorm=array_slice($qnorm,0,10);
                 while (count($qnorm)<5) $qnorm[]='Smoke-Test (kritische Pfade)';
 
+                $qcIds = [];
                 if ($qualityId>0) {
                   for ($i=0; $i<count($qnorm); $i+=6) {
-                    $add($qualityId, array_slice($qnorm, $i, 6));
+                    $ids = $add($qualityId, array_slice($qnorm, $i, 6));
+                    if (is_array($ids)) $qcIds = array_merge($qcIds, $ids);
+                  }
+
+                  // Block QC subpoints by QC parent, so they don't get picked before QC is unblocked.
+                  foreach ($qcIds as $cid) {
+                    $cid = (int)$cid;
+                    if ($cid <= 0) continue;
+                    $cmdB2 = '/usr/bin/php ' . escapeshellarg($base . '/worker_api_cli.php') .
+                      ' action=set_blocked_by node_id=' . escapeshellarg((string)$cid) .
+                      ' blocked_by_node_id=' . escapeshellarg((string)$qualityId);
+                    $oo=[]; $cc=0; exec($cmdB2 . ' 2>&1', $oo, $cc);
                   }
                 }
 
