@@ -1,0 +1,42 @@
+# deploy user's crontab
+@reboot /home/deploy/.local/bin/clawdbot-autostart.sh
+
+# InvestorTools
+CRON_TZ=Europe/Berlin
+
+# Night runner: quotes -> metrics -> setups (batch 100 each)
+*/10 23 * * * /usr/bin/php /var/www/investortools/current/cronjobs/night_runner.php 100 100 100 >>/var/www/investortools/shared/logs/night_runner.log 2>&1
+*/10 0-5 * * * /usr/bin/php /var/www/investortools/current/cronjobs/night_runner.php 100 100 100 >>/var/www/investortools/shared/logs/night_runner.log 2>&1
+
+# Fundamentals (not critical): run once per day, batch 60 (script filters to 30d+ old)
+30 3 * * * /usr/bin/php /var/www/investortools/current/cronjobs/fundamentals_batch.php 60 >>/var/www/investortools/shared/logs/fundamentals.log 2>&1
+
+# Trading Engine
+
+# Trading Engine
+*/5 14-23 * * 1-5 /usr/bin/php /var/www/investortools/current/cronjobs/tradercron.php >>/var/www/investortools/shared/logs/tradercron_cron.log 2>&1
+
+# COOS CRM metrics (hourly)
+0 * * * * /usr/bin/php /home/deploy/projects/coos/scripts/metrics_hourly.php >>/var/www/coosdash/shared/logs/metrics_hourly.cron.log 2>&1
+
+# COOS Worker maintenance (auto-close/unblock)
+*/30 * * * * /usr/bin/php /home/deploy/projects/coos/scripts/worker_maintenance.php >>/var/www/coosdash/shared/logs/worker_maintenance.cron.log 2>&1
+
+# COOS Worker queue producer (LLM-budget: 30min)
+* * * * * /usr/bin/php /home/deploy/projects/coos/scripts/worker_queue_produce.php >>/var/www/coosdash/shared/logs/worker_queue_produce.cron.log 2>&1
+
+# COOS Worker queue maintenance (reset stale claimed)
+* * * * * /usr/bin/php /home/deploy/projects/coos/scripts/worker_queue_maintenance.php >>/var/www/coosdash/shared/logs/worker_queue_maintenance.cron.log 2>&1
+
+# COOS Summary+Cleanup producer (10min)
+*/10 * * * * /usr/bin/php /home/deploy/projects/coos/scripts/worker_summary_produce.php >>/var/www/coosdash/shared/logs/worker_summary_produce.cron.log 2>&1
+
+# COOSdash: sync worker cron enabled state (no LLM when off)
+*/2 * * * * /home/deploy/projects/coos/scripts/cron_sync_james_worker_toggle.sh >>/var/www/coosdash/shared/logs/cron_sync_james_worker_toggle.log 2>&1
+
+
+# COOS CRM DB backup (daily, keep 14 days)
+17 3 * * * /usr/bin/php /home/deploy/projects/coos/scripts/db_backup_daily.php >>/var/www/coosdash/shared/logs/db_backup_daily.cron.log 2>&1
+
+# InvestorTools DB backup (daily, keep 14 days)
+23 3 * * * CONFIG_PATH=/var/www/investortools/shared/config.local.php BACKUP_DIR=/var/www/investortools/shared/backups/db /usr/bin/php /home/deploy/projects/coos/scripts/db_backup_daily.php >>/var/www/investortools/shared/logs/db_backup_daily.cron.log 2>&1
