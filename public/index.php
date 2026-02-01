@@ -974,12 +974,10 @@ renderHeader('Dashboard');
 
     <?php else: ?>
       <?php
-        // Kanban overview (leaf nodes only) for Ideen + Projekte
-        $ideasRootId = 0;
+        // Kanban overview (leaf nodes only) for Projekte
         $projectsRootId = 0;
         foreach ($roots as $r) {
           $t = (string)($r['title'] ?? '');
-          if ($t === 'Ideen') $ideasRootId = (int)$r['id'];
           if ($t === 'Projekte') $projectsRootId = (int)$r['id'];
         }
 
@@ -1012,8 +1010,8 @@ renderHeader('Dashboard');
           $hasKids = !empty($byParentAll[$id]);
           if ($hasKids) continue;
 
-          // only Ideen + Projekte
-          if (!($isUnder($id, $ideasRootId) || $isUnder($id, $projectsRootId))) continue;
+          // only Projekte
+          if (!($isUnder($id, $projectsRootId))) continue;
 
           $st = (string)($n['worker_status'] ?? '');
 
@@ -1029,7 +1027,7 @@ renderHeader('Dashboard');
           if (!isset($cards[$st])) continue;
 
           $sec = (string)($sectionByIdAll[$id] ?? '');
-          if ($sec !== 'Ideen' && $sec !== 'Projekte') continue;
+          if ($sec !== 'Projekte') continue;
 
           $cards[$st][] = [
             'id' => $id,
@@ -1096,7 +1094,7 @@ renderHeader('Dashboard');
       ?>
 
       <div class="card">
-        <h2 style="margin-bottom:10px">Kanban (Leafs: Ideen + Projekte)</h2>
+        <h2 style="margin-bottom:10px">Kanban (Leafs: Projekte)</h2>
         <div class="kanban">
           <?php foreach (['todo_oliver','todo_james','blocked','done'] as $col): ?>
             <div class="kanban-col">
