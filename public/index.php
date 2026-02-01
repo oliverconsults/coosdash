@@ -222,20 +222,46 @@ try {
   $metricsRows = [];
 }
 
-// Done Projekte (direct children of root "Projekte") -> link to t.coos.eu/<slug>/
+// Done Projekte (direct children of root "Projekte")
+// Important: a project counts as done ONLY if the whole subtree is done.
 $doneProjects = [];
 try {
   projects_migrate($pdo);
   $projectsId = projects_root_id($pdo);
   if ($projectsId > 0) {
-    $st = $pdo->prepare("SELECT n.id, n.title, p.slug, n.updated_at
+    $st = $pdo->prepare("SELECT n.id, n.title, n.updated_at, p.slug
                          FROM nodes n
                          JOIN projects p ON p.node_id = n.id
-                         WHERE n.parent_id = ? AND n.worker_status = 'done'
-                         ORDER BY n.updated_at DESC, n.id DESC
-                         LIMIT 60");
+                         WHERE n.parent_id = ?
+                         ORDER BY n.updated_at DESC, n.id DESC");
     $st->execute([$projectsId]);
-    $doneProjects = $st->fetchAll(PDO::FETCH_ASSOC);
+    $cands = $st->fetchAll(PDO::FETCH_ASSOC);
+
+    $subtreeAllDone = function(int $rootId) use (&$subtreeAllDone, $byParentAll, $byIdAll): bool {
+      $stack = [$rootId];
+      while ($stack) {
+        $cur = array_pop($stack);
+        foreach (($byParentAll[$cur] ?? []) as $kid) {
+          $kidId = (int)($kid['id'] ?? 0);
+          if ($kidId <= 0) continue;
+          $st = (string)($byIdAll[$kidId]['worker_status'] ?? '');
+          if ($st !== 'done') return false;
+          $stack[] = $kidId;
+        }
+      }
+      return true;
+    };
+
+    foreach ($cands as $p) {
+      $pid = (int)($p['id'] ?? 0);
+      if ($pid <= 0) continue;
+      if ((string)($p['slug'] ?? '') === '') continue;
+      if ((string)($p['title'] ?? '') === '') continue;
+      if ((string)($byIdAll[$pid]['worker_status'] ?? '') !== 'done') continue;
+      if (!$subtreeAllDone($pid)) continue;
+      $doneProjects[] = $p;
+      if (count($doneProjects) >= 60) break;
+    }
   }
 } catch (Throwable $e) {
   $doneProjects = [];

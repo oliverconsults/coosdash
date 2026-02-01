@@ -52,6 +52,7 @@ $did = [
   'unblocked' => 0,
   'closed' => 0,
   'reactivated' => 0,
+  'todo_bubbled' => 0,
 ];
 
 // 1) auto-unblock
@@ -123,10 +124,53 @@ foreach ($canceled as $r) {
   $did['reactivated']++;
 }
 
+// 4) Bubble up TODO status: if any descendant under "Projekte" is todo, ensure ancestors are todo_james.
+// This prevents "done" projects with unfinished children.
+$todoIds = [];
+$st = $pdo->prepare("SELECT id FROM nodes WHERE worker_status IN ('todo_james','todo_oliver')");
+$st->execute();
+foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+  $id = (int)($r['id'] ?? 0);
+  if ($id > 0) $todoIds[] = $id;
+}
+
+foreach ($todoIds as $tid) {
+  if (!isUnderRoot($pdo, $tid, $projectsId)) continue;
+
+  $cur = $tid;
+  for ($i=0; $i<80; $i++) {
+    $stP = $pdo->prepare('SELECT id,parent_id,worker_status,title FROM nodes WHERE id=?');
+    $stP->execute([$cur]);
+    $row = $stP->fetch(PDO::FETCH_ASSOC);
+    if (!$row) break;
+    if ($row['parent_id'] === null) break;
+    $pid = (int)$row['parent_id'];
+    if ($pid <= 0) break;
+
+    // stop at Projekte root
+    if ($pid === $projectsId) break;
+
+    // only touch ancestors under Projekte
+    if (!isUnderRoot($pdo, $pid, $projectsId)) break;
+
+    $stS = $pdo->prepare('SELECT worker_status FROM nodes WHERE id=?');
+    $stS->execute([$pid]);
+    $pStatus = (string)($stS->fetchColumn() ?: '');
+
+    if ($pStatus === 'done') {
+      $pdo->prepare('UPDATE nodes SET worker_status="todo_james" WHERE id=?')->execute([$pid]);
+      @file_put_contents('/var/www/coosdash/shared/logs/worker.log', $tsLine . "  #{$pid}  [auto] {$tsHuman} Todo bubbled up (child todo -> parent todo_james)\n", FILE_APPEND);
+      $did['todo_bubbled']++;
+    }
+
+    $cur = $pid;
+  }
+}
+
 // log
 $logDir = '/var/www/coosdash/shared/logs';
 @mkdir($logDir, 0775, true);
 $log = $logDir . '/worker_maintenance.log';
-file_put_contents($log, $tsLine . " autoclose={$did['closed']} unblock={$did['unblocked']} reactivated={$did['reactivated']}\n", FILE_APPEND);
+file_put_contents($log, $tsLine . " autoclose={$did['closed']} unblock={$did['unblocked']} reactivated={$did['reactivated']} todo_bubbled={$did['todo_bubbled']}\n", FILE_APPEND);
 
-echo date('Y-m-d H:i:s') . "  OK autoclose={$did['closed']} unblock={$did['unblocked']} reactivated={$did['reactivated']}\n";
+echo date('Y-m-d H:i:s') . "  OK autoclose={$did['closed']} unblock={$did['unblocked']} reactivated={$did['reactivated']} todo_bubbled={$did['todo_bubbled']}\n";
