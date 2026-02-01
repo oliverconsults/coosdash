@@ -74,6 +74,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stIns->execute([$parentId, $ct, '', $createdBy, 'todo_james']);
       }
 
+      // Persist project metadata (env.md path etc.)
+      projects_migrate($pdo);
+      $envPath = '/var/www/t/' . $slug . '/shared/env.md';
+      $pdo->prepare('INSERT INTO projects (node_id, slug, env_path) VALUES (?,?,?) ON DUPLICATE KEY UPDATE slug=VALUES(slug), env_path=VALUES(env_path)')
+          ->execute([$parentId, $slug, $envPath]);
+
       // Enqueue provisioning request for deploy-side cron
       $queuePath = '/var/www/coosdash/shared/data/project_setup_queue.jsonl';
       @mkdir(dirname($queuePath), 0775, true);

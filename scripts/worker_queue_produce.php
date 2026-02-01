@@ -105,6 +105,13 @@ if ($blockedBy > 0) $prompt .= "- BLOCKED_BY_NODE_ID={$blockedBy}\n";
 if ($blockedUntil !== '' && strtotime($blockedUntil)) $prompt .= "- BLOCKED_UNTIL={$blockedUntil}\n";
 $prompt .= "\n";
 
+// Project env (always include if node is under Projekte)
+$env = project_env_text_for_node($pdo, $nodeId);
+if ($env !== '') {
+  $prompt .= "PROJEKT_UMGEBUNG (immer beachten):\n";
+  $prompt .= $env . "\n\n";
+}
+
 $defaultRules = "Wie du Änderungen machst (PFLICHT):\n"
   . "- KEINE direkten SQL-Writes in der **cooscrm** DB. Für cooscrm ausschließlich den CLI-Wrapper nutzen: php /home/deploy/projects/coos/scripts/worker_api_cli.php ...\n"
   . "- Eigene Projekt-Datenbank (z.B. *_rv/*_test): direkte SQL-Writes sind erlaubt, wenn nötig (vorsichtig, nachvollziehbar).\n"

@@ -796,6 +796,21 @@ renderHeader('Dashboard');
         ?>
 
         <?php
+          // Project env preview (always visible for nodes under Projekte)
+          $envText = '';
+          if ($isInProjekte) {
+            $envText = project_env_text_for_node($pdo, (int)$node['id'], 3500);
+          }
+        ?>
+        <?php if ($envText !== ''): ?>
+          <div class="card" style="margin-top:12px; background:rgba(15,22,35,.72);">
+            <h3 style="margin:0 0 8px 0;">Projekt-Umgebung (env.md)</h3>
+            <div class="meta">Dieser Block wird automatisch in jeden James-Task injiziert.</div>
+            <textarea readonly style="min-height:160px; opacity:0.95; font-size:12px; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;"><?php echo h($envText); ?></textarea>
+          </div>
+        <?php endif; ?>
+
+        <?php
           $isRoot = (($byId[(int)$node['id']]['parent_id'] ?? null) === null);
           $isContainerRoot = $isRoot && in_array((string)$node['title'], ['Ideen','Projekte','Später','Gelöscht'], true);
         ?>

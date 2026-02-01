@@ -127,6 +127,13 @@ foreach ($parents as $p) {
   $prompt .= "TARGET_NODE_ID={$pid}\n";
   $prompt .= "TITLE=" . (string)$p['title'] . "\n\n";
 
+  // Project env (always include if node is under Projekte)
+  $env = project_env_text_for_node($pdo, $pid);
+  if ($env !== '') {
+    $prompt .= "PROJEKT_UMGEBUNG (immer beachten):\n";
+    $prompt .= $env . "\n\n";
+  }
+
   $prompt .= "Kinder (direkt):\n";
   foreach ($kids as $k) {
     $prompt .= "- #" . (int)$k['id'] . " " . (string)$k['title'] . "\n";

@@ -239,6 +239,68 @@ function prompts_path(): string {
   return '/var/www/coosdash/shared/data/prompts.json';
 }
 
+// --- Projects (t.coos.eu) metadata ---
+function projects_migrate(PDO $pdo): void {
+  // Minimal metadata so every node can resolve its project env.md
+  $pdo->exec("CREATE TABLE IF NOT EXISTS projects (\n    node_id INT NOT NULL PRIMARY KEY,\n    slug VARCHAR(64) NOT NULL,\n    env_path VARCHAR(255) NOT NULL,\n    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,\n    KEY idx_slug (slug)\n  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+}
+
+function projects_root_id(PDO $pdo): int {
+  static $cached = null;
+  if ($cached !== null) return (int)$cached;
+  $st = $pdo->prepare("SELECT id FROM nodes WHERE parent_id IS NULL AND title='Projekte' LIMIT 1");
+  $st->execute();
+  $cached = (int)($st->fetchColumn() ?: 0);
+  return (int)$cached;
+}
+
+function project_root_for_node(PDO $pdo, int $nodeId): int {
+  $projectsId = projects_root_id($pdo);
+  if ($projectsId <= 0 || $nodeId <= 0) return 0;
+
+  $cur = $nodeId;
+  for ($i=0; $i<80; $i++) {
+    $st = $pdo->prepare('SELECT id,parent_id FROM nodes WHERE id=?');
+    $st->execute([$cur]);
+    $r = $st->fetch(PDO::FETCH_ASSOC);
+    if (!$r) return 0;
+    if ($r['parent_id'] === null) return 0;
+    $pid = (int)$r['parent_id'];
+    if ($pid === $projectsId) return (int)$r['id'];
+    $cur = $pid;
+  }
+  return 0;
+}
+
+function project_env_path_for_node(PDO $pdo, int $nodeId): ?string {
+  $rootId = project_root_for_node($pdo, $nodeId);
+  if ($rootId <= 0) return null;
+
+  try {
+    projects_migrate($pdo);
+    $st = $pdo->prepare('SELECT env_path FROM projects WHERE node_id=? LIMIT 1');
+    $st->execute([$rootId]);
+    $p = $st->fetchColumn();
+    if (is_string($p) && $p !== '') return $p;
+  } catch (Throwable $e) {
+    return null;
+  }
+  return null;
+}
+
+function project_env_text_for_node(PDO $pdo, int $nodeId, int $maxChars=4000): string {
+  $p = project_env_path_for_node($pdo, $nodeId);
+  if (!$p) return '';
+  if (!is_file($p)) return '';
+  $raw = @file_get_contents($p);
+  if (!is_string($raw) || trim($raw) === '') return '';
+  $raw = trim($raw);
+  if (mb_strlen($raw) > $maxChars) {
+    $raw = mb_substr($raw, 0, $maxChars) . "\n…(truncated)";
+  }
+  return $raw;
+}
+
 function prompts_history_path(): string {
   return '/var/www/coosdash/shared/data/prompts_history.jsonl';
 }
