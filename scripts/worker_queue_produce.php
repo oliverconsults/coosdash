@@ -6,17 +6,15 @@ require_once __DIR__ . '/../public/functions_v3.inc.php';
 
 $pdo = db();
 
-// Respect UI toggle (James sleeps)
+// UI toggle (James sleeps):
+// When OFF, we still enqueue the NEXT job (so Oliver can inspect the effective prompt),
+// but worker_main will not consume it (no LLM call).
 $statePath = '/var/www/coosdash/shared/data/james_state.json';
 $enabled = 0;
 if (is_file($statePath)) {
   $raw = @file_get_contents($statePath);
   $j = $raw ? json_decode($raw, true) : null;
   if (is_array($j) && !empty($j['enabled'])) $enabled = 1;
-}
-if (!$enabled) {
-  echo date('Y-m-d H:i:s') . "  OK james sleeps (no enqueue)\n";
-  exit(0);
 }
 
 // Ensure table exists
@@ -136,4 +134,5 @@ $jobId = (int)$pdo->lastInsertId();
 $promptFinal = str_replace('{JOB_ID}', (string)$jobId, $prompt);
 $pdo->prepare('UPDATE worker_queue SET prompt_text=? WHERE id=?')->execute([$promptFinal, $jobId]);
 
-echo date('Y-m-d H:i:s') . "  OK queued job_id={$jobId} node_id={$nodeId}\n";
+$mode = $enabled ? 'enabled' : 'disabled';
+echo date('Y-m-d H:i:s') . "  OK queued job_id={$jobId} node_id={$nodeId} (james={$mode})\n";
