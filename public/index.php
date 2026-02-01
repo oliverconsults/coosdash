@@ -693,6 +693,44 @@ renderHeader('Dashboard');
             $s = $wt % 60;
             $wtTxt = sprintf('%d:%02d:%02d', $h, $m, $s);
           }
+
+          // Subtree sums (current node + all descendants)
+          $sumTokIn = null;
+          $sumTokOut = null;
+          $sumWt = null;
+          $sumTokAll = null;
+          $sumWtTxt = null;
+
+          if ($isInProjekte && $tokIn !== null && $tokOut !== null && $wt !== null) {
+            $sumTokIn = 0;
+            $sumTokOut = 0;
+            $sumWt = 0;
+
+            $seen = [];
+            $stack = [(int)$node['id']];
+            while ($stack) {
+              $id2 = array_pop($stack);
+              if ($id2 <= 0 || isset($seen[$id2])) continue;
+              $seen[$id2] = true;
+
+              $n2 = $byIdAll[$id2] ?? null;
+              if ($n2) {
+                $sumTokIn += (int)($n2['token_in'] ?? 0);
+                $sumTokOut += (int)($n2['token_out'] ?? 0);
+                $sumWt += (int)($n2['worktime'] ?? 0);
+              }
+
+              foreach (($byParent[$id2] ?? []) as $cid) {
+                $stack[] = (int)$cid;
+              }
+            }
+
+            $sumTokAll = $sumTokIn + $sumTokOut;
+            $h2 = intdiv($sumWt, 3600);
+            $m2 = intdiv($sumWt % 3600, 60);
+            $s2 = $sumWt % 60;
+            $sumWtTxt = sprintf('%d:%02d:%02d', $h2, $m2, $s2);
+          }
         ?>
         <div class="meta">
           #<?php echo (int)$node['id']; ?> • erstellt von <?php echo h($node['created_by']); ?>
@@ -702,6 +740,11 @@ renderHeader('Dashboard');
             <span style="white-space:nowrap;"> | Token in/out/all: <?php echo (int)$tokIn; ?>/<?php echo (int)$tokOut; ?>/<?php echo (int)$tokAll; ?>
               &nbsp; Worktime: <?php echo htmlspecialchars($wtTxt, ENT_QUOTES, 'UTF-8'); ?>
             </span>
+            <?php if ($sumTokIn !== null && $sumTokOut !== null && $sumWtTxt !== null): ?>
+              <span style="white-space:nowrap;"> | Σ (Subtree) Token in/out/all: <?php echo (int)$sumTokIn; ?>/<?php echo (int)$sumTokOut; ?>/<?php echo (int)$sumTokAll; ?>
+                &nbsp; Worktime: <?php echo htmlspecialchars($sumWtTxt, ENT_QUOTES, 'UTF-8'); ?>
+              </span>
+            <?php endif; ?>
           <?php endif; ?>
         </div>
 
