@@ -17,10 +17,11 @@ if (!james_set_enabled($next)) {
   exit;
 }
 
-// If turning off: clear any pre-produced open/claimed jobs (so queue is empty while sleeping)
+// If turning off: clear any *open* jobs so the queue is empty while sleeping.
+// IMPORTANT: do NOT cancel 'claimed' jobs, otherwise an in-flight worker run can't finish cleanly.
 if (!$next) {
   try {
-    $pdo->exec("UPDATE worker_queue SET status='canceled' WHERE status IN ('open','claimed')");
+    $pdo->exec("UPDATE worker_queue SET status='canceled' WHERE status='open'");
   } catch (Throwable $e) {
     // ignore
   }
