@@ -75,48 +75,10 @@ foreach ($rows as $r) {
   $did['unblocked']++;
 }
 
-// 2) auto-close parents (limit per run)
-$MAX_CLOSE = 20;
-$st = $pdo->prepare('SELECT id, title, worker_status FROM nodes WHERE worker_status <> "done"');
-$st->execute();
-$all = $st->fetchAll();
-
-foreach ($all as $p) {
-  if ($did['closed'] >= $MAX_CLOSE) break;
-
-  $pid = (int)$p['id'];
-  if ($pid <= 0) continue;
-  if (!isUnderRoot($pdo, $pid, $projectsId)) continue;
-
-  // has children?
-  $stC = $pdo->prepare('SELECT id, title, worker_status FROM nodes WHERE parent_id=? ORDER BY id');
-  $stC->execute([$pid]);
-  $kids = $stC->fetchAll();
-  if (!$kids) continue;
-
-  $allDone = true;
-  foreach ($kids as $k) {
-    if ((string)$k['worker_status'] !== 'done') { $allDone = false; break; }
-  }
-  if (!$allDone) continue;
-
-  // Determine depth below Projekte
-  $depth = depthUnderRoot($pdo, $pid, $projectsId);
-  if ($depth === null) continue;
-
-  // Depth rule:
-  // - depth <= 3: keep hierarchy (Projekte > A > AA > AAA) => just set done (no summary, no cleanup)
-  // - depth > 3: do NOT auto-close here (summary+cleanup pipeline handles it)
-  if ($depth > 3) {
-    continue;
-  }
-
-  // close parent (no summary at shallow levels)
-  $pdo->prepare('UPDATE nodes SET worker_status="done" WHERE id=?')->execute([$pid]);
-  @file_put_contents('/var/www/coosdash/shared/logs/worker.log', $tsLine . "  #{$pid}  [auto] {$tsHuman} Auto-close (depth {$depth})\n", FILE_APPEND);
-
-  $did['closed']++;
-}
+// 2) auto-close parents
+// Disabled: we keep parents open for manual verification (second check).
+// Summary+cleanup pipeline stays enabled separately.
+// (If you want this back later, re-enable this block.)
 
 // log
 $logDir = '/var/www/coosdash/shared/logs';

@@ -239,7 +239,6 @@ runScript($base . '/worker_queue_maintenance.php');
 runScript($base . '/worker_maintenance.php');
 
 // 5) Summary+Cleanup producer
-// Disabled: Auto-close was too risky; keep manual verification step.
-// runScript($base . '/worker_summary_produce.php');
+runScript($base . '/worker_summary_produce.php');
 
 logline('OK worker_main done');
