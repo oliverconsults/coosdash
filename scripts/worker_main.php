@@ -18,7 +18,7 @@
 
 declare(strict_types=1);
 
-set_time_limit(300);
+set_time_limit(260);
 
 $lockPath = '/var/www/coosdash/shared/tmp/worker_main.lock';
 $logPath  = '/var/www/coosdash/shared/logs/worker_main.cron.log';
