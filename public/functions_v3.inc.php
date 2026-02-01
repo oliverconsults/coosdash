@@ -282,6 +282,17 @@ function project_env_path_for_node(PDO $pdo, int $nodeId): ?string {
     $st->execute([$rootId]);
     $p = $st->fetchColumn();
     if (is_string($p) && $p !== '') return $p;
+
+    // Backward-compatible fallback: parse project root description for a line like "env=/var/www/t/<slug>/shared/env.md"
+    $st2 = $pdo->prepare('SELECT description FROM nodes WHERE id=? LIMIT 1');
+    $st2->execute([$rootId]);
+    $d = (string)($st2->fetchColumn() ?: '');
+    if ($d !== '') {
+      if (preg_match('/\benv=([^\s\n\r]+)/', $d, $m)) {
+        $p2 = trim((string)$m[1]);
+        if ($p2 !== '') return $p2;
+      }
+    }
   } catch (Throwable $e) {
     return null;
   }
