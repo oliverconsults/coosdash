@@ -720,8 +720,10 @@ renderHeader('Dashboard');
                 $sumWt += (int)($n2['worktime'] ?? 0);
               }
 
-              foreach (($byParent[$id2] ?? []) as $cid) {
-                $stack[] = (int)$cid;
+              foreach (($byParent[$id2] ?? []) as $childRow) {
+                if (is_array($childRow) && isset($childRow['id'])) {
+                  $stack[] = (int)$childRow['id'];
+                }
               }
             }
 
