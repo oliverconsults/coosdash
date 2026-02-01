@@ -274,8 +274,8 @@ renderHeader('Setup');
           <option value="<?php echo (int)$idx; ?>"><?php echo h($label); ?></option>
         <?php endforeach; ?>
         </select>
-        <button class="btn btn-md" type="button" onclick="histReset()">Reset auf aktuell</button>
         <button class="btn" type="submit">Restore</button>
+        <button class="btn btn-md" type="button" onclick="histReset()">Reset auf aktuell</button>
       </div>
 
       <div id="histMeta" class="meta" style="margin-top:8px;"></div>
