@@ -96,7 +96,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $baseDesc = "[oliver] {$ts} Projektbeschreibung\n\n" . $desc . "\n\n";
       $baseDesc .= "[setup] slug={$slug}\n";
       $baseDesc .= "[setup] url=https://t.coos.eu/{$slug}/\n";
-      $baseDesc .= "[setup] env=/var/www/t/{$slug}/shared/env.md\n\n";
+      $baseDesc .= "[setup] env=/var/www/t/{$slug}/shared/env.md\n";
+      $baseDesc .= "[setup] status=warte_auf_llm_setup\n\n";
 
       // Either create a new project node, or re-use an existing Ideen-node (move it under Projekte).
       if ($fromNodeId > 0) {
@@ -107,9 +108,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$src) {
           $err = 'Source-Node nicht gefunden.';
         } else {
-          // Move under Projekte + set status
+          // Move under Projekte + set status=done (wait for LLM setup before James starts)
           $pdo->prepare('UPDATE nodes SET parent_id=?, title=?, worker_status=?, updated_at=NOW() WHERE id=?')
-              ->execute([$projectsId, $title, 'todo_james', $fromNodeId]);
+              ->execute([$projectsId, $title, 'done', $fromNodeId]);
 
           // Prepend new project description + setup markers, keep old text below for context
           $oldDesc = (string)($src['description'] ?? '');
@@ -121,7 +122,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       } else {
         // Create parent project node
         $stIns = $pdo->prepare('INSERT INTO nodes (parent_id,title,description,created_by,worker_status,created_at,updated_at) VALUES (?,?,?,?,?,NOW(),NOW())');
-        $stIns->execute([$projectsId, $title, $baseDesc, $createdBy, 'todo_james']);
+        // Mark as done initially: we wait for project-setup LLM to generate subtasks.
+        $stIns->execute([$projectsId, $title, $baseDesc, $createdBy, 'done']);
         $parentId = (int)$pdo->lastInsertId();
       }
 
@@ -149,6 +151,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'requested_by' => $createdBy,
       ];
       @file_put_contents($queuePath, json_encode($req, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES) . "\n", FILE_APPEND);
+
+      // Create a markdown meta file (for audit / context) and attach it to the project.
+      $metaMd = "# Projekt Setup (LLM)\n\n";
+      $metaMd .= "- Node: #{$parentId}\n";
+      $metaMd .= "- Title: {$title}\n";
+      $metaMd .= "- Slug: {$slug}\n";
+      $metaMd .= "- URL: https://t.coos.eu/{$slug}/\n";
+      $metaMd .= "- Env: /var/www/t/{$slug}/shared/env.md\n";
+      $metaMd .= "- Prompt: /llm_file.php?f=" . basename($promptFile) . "\n";
+      $metaMd .= "- Response: /llm_file.php?f=" . basename($reqId . '_response.txt') . "\n\n";
+      $metaMd .= "## Beschreibung\n\n" . $desc . "\n";
+      $metaPath = $llmDir . '/' . $reqId . '_meta.md';
+      @file_put_contents($metaPath, $metaMd);
+      // Best effort attach
+      @exec('php ' . escapeshellarg(__DIR__ . '/../scripts/worker_api_cli.php') . ' action=add_attachment node_id=' . escapeshellarg((string)$parentId) . ' path=' . escapeshellarg($metaPath) . ' ' . escapeshellarg('project-setup.md') . ' 2>/dev/null');
 
       // Enqueue a project-setup job for worker_main (runs as deploy, can call clawdbot agent)
       require_once __DIR__ . '/../scripts/migrate_worker_queue.php';

@@ -296,6 +296,18 @@ if ($cLock && flock($cLock, LOCK_EX | LOCK_NB)) {
                 }
 
                 @file_put_contents('/var/www/coosdash/shared/logs/worker.log', $tsLine . "  #{$nodeId}  [auto] {$tsHuman} Project-Setup applied (children=" . count($norm) . ", qc=" . count($qnorm) . ")\n", FILE_APPEND);
+
+                // After setup: hand off to James
+                $cmdS = '/usr/bin/php ' . escapeshellarg($base . '/worker_api_cli.php') .
+                  ' action=set_status node_id=' . escapeshellarg((string)$nodeId) .
+                  ' worker_status=todo_james';
+                $oo=[]; $cc=0; exec($cmdS . ' 2>&1', $oo, $cc);
+
+                $cmdU = '/usr/bin/php ' . escapeshellarg($base . '/worker_api_cli.php') .
+                  ' action=prepend_update node_id=' . escapeshellarg((string)$nodeId) .
+                  ' headline=' . escapeshellarg('Setup (LLM) fertig') .
+                  ' body=' . escapeshellarg('Subtasks + Qualitätskontrolle-Unterpunkte wurden erzeugt. Projekt ist jetzt todo_james.');
+                $oo=[]; $cc=0; exec($cmdU . ' 2>&1', $oo, $cc);
               }
             }
           } catch (Throwable $e) {
