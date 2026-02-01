@@ -118,6 +118,25 @@ async function main() {
     die(`veraPDF not compliant (exit_code=${r2.out.exit_code}).`);
   }
 
+  // Extra assert: embedded XML must be associated as /AFRelationship /Alternative (PDF/A-3 + ZUGFeRD)
+  try {
+    const rep = r2.out.report_json || {};
+    const jobs = rep.report?.jobs || rep.jobs || [];
+    const features = jobs[0]?.featuresReport || jobs[0]?.features_report || {};
+    const ef = features.embeddedFiles || features.embeddedfiles || null;
+    const afRel = ef && (ef.afRelationship || ef.afrelationship);
+    const fn = ef && (ef.fileName || ef.file_name);
+    if (fn && fn !== 'zugferd-invoice.xml') {
+      die(`Unexpected embedded filename: ${fn}`);
+    }
+    if (afRel && afRel !== 'Alternative') {
+      die(`Unexpected AFRelationship: ${afRel} (expected Alternative)`);
+    }
+    // If ef is missing, we don't hard-fail here because extract output can vary by veraPDF version.
+  } catch (e) {
+    die(`AFRelationship check failed: ${e && e.message || e}`);
+  }
+
   process.stdout.write('OK CI veraPDF PDF/A-3B compliant\n');
 }
 

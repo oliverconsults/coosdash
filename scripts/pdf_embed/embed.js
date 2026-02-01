@@ -569,10 +569,24 @@ async function main() {
   const inferConformanceLevel = (s) => {
     const t = String(s || '').toLowerCase();
 
-    // Common Factur-X guideline URNs (1p0)
-    if (t.includes(':en16931')) return 'EN16931';
+    // IMPORTANT:
+    // We currently write XMP under the ZUGFeRD 1p0 namespace
+    //   urn:zugferd:pdfa:CrossIndustryDocument:invoice:1p0#
+    // and Mustang validates zf:ConformanceLevel against the ZUGFeRD 1.x value set.
+    // Valid values there are typically: BASIC | COMFORT | EXTENDED.
+    // (Values like EN16931 or BASIC-WL belong to ZUGFeRD 2.x / Factur-X profiles,
+    //  but are NOT valid in this 1p0 XMP context.)
+
+    // Heuristics based on Guideline/Profile identifiers inside the XML.
+    if (t.includes(':extended')) return 'EXTENDED';
+
+    // Treat EN16931 / COMFORT-ish as COMFORT for ZUGFeRD 1p0 XMP.
+    if (t.includes(':en16931')) return 'COMFORT';
     if (t.includes(':comfort')) return 'COMFORT';
-    if (t.includes(':basicwl') || t.includes(':basic-wl')) return 'BASIC-WL';
+
+    // BASIC-WL / MINIMUM / BASIC -> BASIC (best-effort)
+    if (t.includes(':basicwl') || t.includes(':basic-wl')) return 'BASIC';
+    if (t.includes(':minimum')) return 'BASIC';
     if (t.includes(':basic')) return 'BASIC';
 
     // Fallback

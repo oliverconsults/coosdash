@@ -1,0 +1,9 @@
+commit=c76e200c22a7be5b83c77b1e6d8f7e2bf9569025
+tag=release-2024-10-31
+--- valid
+xrechnung3_extension_ubl.xml
+xrechnung3_minimal_cii.xml
+xrechnung3_minimal_ubl.xml
+--- invalid
+xrechnung3_minimal_ubl_bad_customizationid.xml
+xrechnung3_minimal_ubl_missing_currency.xml
