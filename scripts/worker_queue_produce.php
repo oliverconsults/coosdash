@@ -149,6 +149,8 @@ $prompt .= "\nOperational (English):\n";
 $prompt .= "- Quick healthcheck: php /home/deploy/projects/coos/scripts/worker_api_cli.php action=ping\n";
 
 $prompt .= "\nRegeln:\n";
+$prompt .= "- cooscrm writes: only via /home/deploy/projects/coos/scripts/worker_api_cli.php\n";
+$prompt .= "- Always end by calling job_done or job_fail (never exit without closing the job).\n";
 $prompt .= "- Vor done immer Runs/Ergebnis verifizieren.\n";
 $prompt .= "- Wichtig (Encoding): wenn du Umlaute/Sonderzeichen oder mehrere Zeilen schreibst, nutze *_b64 Parameter (headline_b64/body_b64).\n";
 $prompt .= "  Base64-Helfer (keine node -e Hacks): printf '%s' \"TEXT\" | php /home/deploy/projects/coos/scripts/b64_stdin.php\n";

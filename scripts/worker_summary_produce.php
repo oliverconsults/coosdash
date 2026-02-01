@@ -162,6 +162,10 @@ foreach ($parents as $p) {
 
   $prompt .= $instr;
 
+  $prompt .= "\nRules:\n";
+  $prompt .= "- cooscrm writes: only via /home/deploy/projects/coos/scripts/worker_api_cli.php (no direct SQL writes)\n";
+  $prompt .= "- Always end by calling job_done or job_fail (never exit without closing the job).\n";
+
   $pdo->prepare("INSERT INTO worker_queue (status, node_id, prompt_text, selector_meta) VALUES ('open', ?, ?, ?)")
       ->execute([$pid, $prompt, json_encode(['type'=>'summary_cleanup'], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)]);
   $jobId = (int)$pdo->lastInsertId();
