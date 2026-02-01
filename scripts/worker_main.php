@@ -18,6 +18,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/../public/functions_v3.inc.php';
+
 // Must be > agent --timeout (300) plus overhead, otherwise PHP can time out mid-run and leave jobs stuck in 'claimed'.
 set_time_limit(420);
 
