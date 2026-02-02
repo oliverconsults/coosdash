@@ -125,75 +125,75 @@ foreach ($canceled as $r) {
   $did['reactivated']++;
 }
 
-// 4) Bubble up TODO status: if any descendant under "Projekte" is todo, ensure ancestors are todo_james.
-// This prevents "done" projects with unfinished children.
-$todoIds = [];
-// Bubble-up should not steal Oliver-owned branches.
-// We bubble only from todo_james leaves, and we stop when we hit a todo_oliver ancestor.
-$st = $pdo->prepare("SELECT id FROM nodes WHERE worker_status='todo_james'");
-$st->execute();
-foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
-  $id = (int)($r['id'] ?? 0);
-  if ($id > 0) $todoIds[] = $id;
-}
-
-foreach ($todoIds as $tid) {
-  if (!isUnderRoot($pdo, $tid, $projectsId)) continue;
-
-  $cur = $tid;
-  for ($i=0; $i<80; $i++) {
-    $stP = $pdo->prepare('SELECT id,parent_id,worker_status,title FROM nodes WHERE id=?');
-    $stP->execute([$cur]);
-    $row = $stP->fetch(PDO::FETCH_ASSOC);
-    if (!$row) break;
-    if ($row['parent_id'] === null) break;
-    $pid = (int)$row['parent_id'];
-    if ($pid <= 0) break;
-
-    // stop at Projekte root
-    if ($pid === $projectsId) break;
-
-    // only touch ancestors under Projekte
-    if (!isUnderRoot($pdo, $pid, $projectsId)) break;
-
-    $stS = $pdo->prepare('SELECT worker_status FROM nodes WHERE id=?');
-    $stS->execute([$pid]);
-    $pStatus = (string)($stS->fetchColumn() ?: '');
-
-    // If Oliver explicitly owns an ancestor, do not bubble beyond it.
-    if ($pStatus === 'todo_oliver') {
-      break;
-    }
-
-    if ($pStatus !== 'todo_james') {
-      $pdo->prepare('UPDATE nodes SET worker_status="todo_james" WHERE id=?')->execute([$pid]);
-
-      // Build chain from the original todo leaf up to this parent
-      $chain = [];
-      $x = $tid;
-      for ($j=0; $j<30; $j++) {
-        $stC = $pdo->prepare('SELECT id,parent_id,title FROM nodes WHERE id=?');
-        $stC->execute([$x]);
-        $rr = $stC->fetch(PDO::FETCH_ASSOC);
-        if (!$rr) break;
-        $chain[] = '#' . (int)$rr['id'] . ' ' . (string)$rr['title'];
-        if ((int)$rr['id'] === $pid) break;
-        if ($rr['parent_id'] === null) break;
-        $x = (int)$rr['parent_id'];
-      }
-      $chainTxt = $chain ? implode(' > ', $chain) : ('#' . $tid . ' > #' . $pid);
-
-      @file_put_contents(
-        '/var/www/coosdash/shared/logs/worker.log',
-        $tsLine . "  #{$pid}  [auto] {$tsHuman} Todo bubbled up: {$chainTxt}\n",
-        FILE_APPEND
-      );
-      $did['todo_bubbled']++;
-    }
-
-    $cur = $pid;
-  }
-}
+// 4) Bubble up TODO status (DISABLED)
+// Kept for later if needed.
+// Goal (when enabled): prevent "done" projects with unfinished children.
+//
+// $todoIds = [];
+// $st = $pdo->prepare("SELECT id FROM nodes WHERE worker_status='todo_james'");
+// $st->execute();
+// foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+//   $id = (int)($r['id'] ?? 0);
+//   if ($id > 0) $todoIds[] = $id;
+// }
+//
+// foreach ($todoIds as $tid) {
+//   if (!isUnderRoot($pdo, $tid, $projectsId)) continue;
+//
+//   $cur = $tid;
+//   for ($i=0; $i<80; $i++) {
+//     $stP = $pdo->prepare('SELECT id,parent_id,worker_status,title FROM nodes WHERE id=?');
+//     $stP->execute([$cur]);
+//     $row = $stP->fetch(PDO::FETCH_ASSOC);
+//     if (!$row) break;
+//     if ($row['parent_id'] === null) break;
+//     $pid = (int)$row['parent_id'];
+//     if ($pid <= 0) break;
+//
+//     // stop at Projekte root
+//     if ($pid === $projectsId) break;
+//
+//     // only touch ancestors under Projekte
+//     if (!isUnderRoot($pdo, $pid, $projectsId)) break;
+//
+//     $stS = $pdo->prepare('SELECT worker_status FROM nodes WHERE id=?');
+//     $stS->execute([$pid]);
+//     $pStatus = (string)($stS->fetchColumn() ?: '');
+//
+//     // If Oliver explicitly owns an ancestor, do not bubble beyond it.
+//     if ($pStatus === 'todo_oliver') {
+//       break;
+//     }
+//
+//     if ($pStatus !== 'todo_james') {
+//       $pdo->prepare('UPDATE nodes SET worker_status="todo_james" WHERE id=?')->execute([$pid]);
+//
+//       // Build chain from the original todo leaf up to this parent
+//       $chain = [];
+//       $x = $tid;
+//       for ($j=0; $j<30; $j++) {
+//         $stC = $pdo->prepare('SELECT id,parent_id,title FROM nodes WHERE id=?');
+//         $stC->execute([$x]);
+//         $rr = $stC->fetch(PDO::FETCH_ASSOC);
+//         if (!$rr) break;
+//         $chain[] = '#' . (int)$rr['id'] . ' ' . (string)$rr['title'];
+//         if ((int)$rr['id'] === $pid) break;
+//         if ($rr['parent_id'] === null) break;
+//         $x = (int)$rr['parent_id'];
+//       }
+//       $chainTxt = $chain ? implode(' > ', $chain) : ('#' . $tid . ' > #' . $pid);
+//
+//       @file_put_contents(
+//         '/var/www/coosdash/shared/logs/worker.log',
+//         $tsLine . "  #{$pid}  [auto] {$tsHuman} Todo bubbled up: {$chainTxt}\n",
+//         FILE_APPEND
+//       );
+//       $did['todo_bubbled']++;
+//     }
+//
+//     $cur = $pid;
+//   }
+// }
 
 // 5) GC: clear dangling blocked_by_node_id refs (or refs pointing into Gelöscht)
 $deletedRootId = rootId($pdo, 'Gelöscht');
