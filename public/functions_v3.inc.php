@@ -44,6 +44,14 @@ function requireLogin(): void {
     header('Location: /login.php');
     exit;
   }
+
+  // Avoid PHP session lock contention: most pages are read-only and don't need a write-locked session.
+  // If a long request is in-flight, other tabs would otherwise "hang" waiting for the session lock.
+  if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
+    if (session_status() === PHP_SESSION_ACTIVE) {
+      @session_write_close();
+    }
+  }
 }
 
 function h($s): string {
