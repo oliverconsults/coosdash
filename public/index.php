@@ -1080,7 +1080,7 @@ renderHeader('Dashboard');
                 <div class="meta" style="padding:8px 2px;">—</div>
               <?php else: ?>
                 <?php foreach (array_slice($cols[$col], 0, 40) as $c): ?>
-                  <a class="kanban-card" href="/?id=<?php echo (int)$c['id']; ?>">
+                  <a class="kanban-card" href="/?id=<?php echo (int)$c['id']; ?>&view=work">
                     <div class="kanban-title"><?php echo h($c['title']); ?><?php if (!empty($c['has_att'])): ?> <span class="att-clip" title="Attachment">📁</span><?php endif; ?></div>
                     <div class="kanban-meta">
                       <span class="pill section"><?php echo h((string)($c['project'] ?? '')); ?></span>
@@ -1845,7 +1845,7 @@ renderHeader('Dashboard');
                 <div class="meta" style="padding:8px 2px;">—</div>
               <?php else: ?>
                 <?php foreach (array_slice($cards[$col], 0, 20) as $c): ?>
-                  <a class="kanban-card" href="/?id=<?php echo (int)$c['id']; ?>">
+                  <a class="kanban-card" href="/?id=<?php echo (int)$c['id']; ?>&view=work">
                     <div class="kanban-title"><?php echo h($c['title']); ?><?php if (!empty($c['has_att'])): ?> <span class="att-clip" title="Attachment">📁</span><?php endif; ?></div>
                     <div class="kanban-meta">
                       <span class="pill section"><?php echo h((string)($c['project'] ?? $c['section'])); ?></span>
