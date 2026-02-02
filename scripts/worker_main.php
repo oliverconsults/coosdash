@@ -361,13 +361,15 @@ if ($cLock && flock($cLock, LOCK_EX | LOCK_NB)) {
                     if (is_array($ids)) $qcIds = array_merge($qcIds, $ids);
                   }
 
-                  // Block QC subpoints by QC parent, so they don't get picked before QC is unblocked.
+                  // Block QC subpoints by the last non-QC sibling as well.
+                  // Reason: if QC itself is blocked, QC subpoints must not wait on QC (would deadlock).
+                  $blockerId = $lastNonQcId > 0 ? $lastNonQcId : $qualityId;
                   foreach ($qcIds as $cid) {
                     $cid = (int)$cid;
                     if ($cid <= 0) continue;
                     $cmdB2 = '/usr/bin/php ' . escapeshellarg($base . '/worker_api_cli.php') .
                       ' action=set_blocked_by node_id=' . escapeshellarg((string)$cid) .
-                      ' blocked_by_node_id=' . escapeshellarg((string)$qualityId);
+                      ' blocked_by_node_id=' . escapeshellarg((string)$blockerId);
                     $oo=[]; $cc=0; exec($cmdB2 . ' 2>&1', $oo, $cc);
                   }
                 }
