@@ -18,6 +18,21 @@ if (!in_array($view, ['work','kanban','report'], true)) $view = 'work';
 // persist selected view
 @setcookie('coos_view', $view, time() + 60*60*24*180, '/');
 
+// special routing: selecting the "Projekte" root in Work should go to new_project.php
+if ($nodeId > 0 && $view === 'work') {
+  try {
+    $st = $pdo->prepare('SELECT title, parent_id FROM nodes WHERE id=?');
+    $st->execute([$nodeId]);
+    $r = $st->fetch(PDO::FETCH_ASSOC);
+    if ($r && (string)$r['title'] === 'Projekte' && $r['parent_id'] === null) {
+      header('Location: /new_project.php');
+      exit;
+    }
+  } catch (Throwable $e) {
+    // ignore
+  }
+}
+
 // form state (to preserve user input on validation errors)
 $formNote = '';
 $formAsChild = false;
