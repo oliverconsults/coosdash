@@ -1,8 +1,24 @@
 <?php
 // functions_v3.inc.php (opcache-bypass copy)
+$__REQ_START = microtime(true);
+
 if (session_status() === PHP_SESSION_NONE) {
   session_start();
 }
+
+// Log very slow requests for debugging (best effort)
+register_shutdown_function(function() use ($__REQ_START) {
+  $dt = microtime(true) - (float)$__REQ_START;
+  if ($dt < 2.0) return;
+  $uri = (string)($_SERVER['REQUEST_URI'] ?? '');
+  $method = (string)($_SERVER['REQUEST_METHOD'] ?? '');
+  $ip = (string)($_SERVER['REMOTE_ADDR'] ?? '');
+  $ua = (string)($_SERVER['HTTP_USER_AGENT'] ?? '');
+  $ua = str_replace(["\n","\r","\t"], ' ', $ua);
+  $line = date('Y-m-d H:i:s') . "  slow_http dt=" . number_format($dt, 3, '.', '') . " method={$method} ip={$ip} uri={$uri} ua={$ua}\n";
+  @mkdir('/var/www/coosdash/shared/logs', 0775, true);
+  @file_put_contents('/var/www/coosdash/shared/logs/http_slow.log', $line, FILE_APPEND);
+});
 
 function cfg() {
   static $cfg = null;
