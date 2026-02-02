@@ -9,7 +9,7 @@ if (session_status() === PHP_SESSION_NONE) {
 // Log very slow requests for debugging (best effort)
 register_shutdown_function(function() use ($__REQ_START) {
   $dt = microtime(true) - (float)$__REQ_START;
-  if ($dt < 2.0) return;
+  if ($dt < 1.5) return;
   $uri = (string)($_SERVER['REQUEST_URI'] ?? '');
   $method = (string)($_SERVER['REQUEST_METHOD'] ?? '');
   $ip = (string)($_SERVER['REMOTE_ADDR'] ?? '');
