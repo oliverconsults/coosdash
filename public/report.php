@@ -190,6 +190,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['action'] ?? '') ==
   $slug = (string)($slugByProjectId[$pid] ?? '');
   $title = (string)($proj['title'] ?? '');
 
+  // Block duplicate report runs for the same project (only one pending/open at a time)
+  try {
+    $st = $pdo->prepare("SELECT COUNT(*) FROM project_reports WHERE project_node_id=? AND status='pending'");
+    $st->execute([$pid]);
+    $pending = (int)($st->fetchColumn() ?: 0);
+    if ($pending > 0) {
+      flash_set('Für dieses Projekt läuft bereits ein Report (pending). Bitte warten.', 'err');
+      header('Location: /report.php?project_id=' . $pid);
+      exit;
+    }
+  } catch (Throwable $e) {
+    // ignore
+  }
+  try {
+    // also guard against duplicates in worker_queue (open/claimed)
+    $st = $pdo->prepare("SELECT COUNT(*) FROM worker_queue WHERE status IN ('open','claimed') AND selector_meta LIKE ?");
+    $needle = '%"type":"project_report"%"project_id":' . $pid . '%';
+    $st->execute([$needle]);
+    $q = (int)($st->fetchColumn() ?: 0);
+    if ($q > 0) {
+      flash_set('Für dieses Projekt ist bereits ein Report in der Queue. Bitte warten.', 'err');
+      header('Location: /report.php?project_id=' . $pid);
+      exit;
+    }
+  } catch (Throwable $e) {
+    // ignore
+  }
+
   $reqId = 'project_report_' . date('Ymd_His') . '_p' . $pid;
 
   // Create report row first

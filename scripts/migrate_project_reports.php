@@ -20,4 +20,4 @@ $pdo->exec("CREATE TABLE IF NOT EXISTS project_reports (
   INDEX idx_created (created_at)
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
 
-echo "OK project_reports table ready\n";
+// (silent)
