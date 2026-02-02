@@ -142,7 +142,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $ts = date('d.m.Y H:i');
       $marker = ($taskType === 'umsetzung') ? ' ##UMSETZUNG##' : '';
 
-      // Always delegate to James (both parent + new child)
+      // New child goes to James by default
       $stTxt = 'todo_james';
       $desc = "[oliver] {$ts} Statusänderung: {$stTxt}{$marker}\n\n" . rtrim($formChildBody);
 
@@ -150,8 +150,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $st->execute([$parentId, $title, $desc, null, 'oliver', $stTxt]);
       $newId = (int)$pdo->lastInsertId();
 
-      // Ensure parent is also todo_james
-      $pdo->prepare('UPDATE nodes SET worker_status=? WHERE id=?')->execute([$stTxt, $parentId]);
+      // NOTE: do NOT auto-modify parent status when creating a subtask.
+      // (Oliver explicitly controls parent status.)
 
       // optional attachments upload (Oliver) – supports multi-upload
       if (!empty($_FILES['attachment'])) {
