@@ -274,6 +274,7 @@ function renderHeader(string $title='COOS'): void {
               <img src="<?php echo h($jIcon); ?>" alt="James" width="30" height="30" style="display:block; flex:0 0 auto; border-radius:4px;">
               <span><?php echo $jOn ? 'James aktiv' : 'James sleeps'; ?></span>
             </a>
+            <a class="btn" href="/warteliste.php">Warteliste</a>
             <a class="btn" href="/workerlog.php">Worker Log</a>
             <a class="btn" href="/setup.php">Setup</a>
             <!-- Login Log removed -->
