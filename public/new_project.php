@@ -316,7 +316,9 @@ renderHeader('Neues Projekt');
   <div>
     <?php
       // Show the same left navigation as the dashboard (incl. buttons + counts + chart)
-      $nodeId = $fromNodeId > 0 ? (int)$fromNodeId : 0;
+      // Default selection for this page: "Projekte" root (so the nav is expanded and usable).
+      $projectsRootId = (int)($pdo->query("SELECT id FROM nodes WHERE parent_id IS NULL AND title='Projekte' LIMIT 1")->fetchColumn() ?: 0);
+      $nodeId = $fromNodeId > 0 ? (int)$fromNodeId : $projectsRootId;
       require __DIR__ . '/left_nav.inc.php';
     ?>
   </div>
