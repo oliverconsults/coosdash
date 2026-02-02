@@ -210,7 +210,7 @@ function renderHeader(string $title='COOS'): void {
         </div>
         <div class="row">
           <?php if (isLoggedIn()): ?>
-            <a class="btn" href="/">Dashboard</a>
+            <a class="btn" href="/?view=work">Dashboard</a>
             <a class="btn" href="/new_project.php">Neues Projekt</a>
             <?php $jOn = james_enabled(); ?>
             <?php

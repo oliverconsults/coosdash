@@ -18,6 +18,22 @@ if (!in_array($view, ['work','kanban','report'], true)) $view = 'work';
 // persist selected view
 @setcookie('coos_view', $view, time() + 60*60*24*180, '/');
 
+// If user lands on / with a non-work view, forward to the dedicated view pages.
+if ($view === 'kanban') {
+  $qs = [];
+  if ($nodeId) $qs['id'] = $nodeId;
+  $qs['view'] = 'kanban';
+  header('Location: /kanban.php' . ($qs ? ('?' . http_build_query($qs)) : ''));
+  exit;
+}
+if ($view === 'report') {
+  $qs = [];
+  if ($nodeId) $qs['id'] = $nodeId;
+  $qs['view'] = 'report';
+  header('Location: /report.php' . ($qs ? ('?' . http_build_query($qs)) : ''));
+  exit;
+}
+
 // special routing: selecting the "Projekte" root in Work should go to new_project.php
 if ($nodeId > 0 && $view === 'work') {
   try {
