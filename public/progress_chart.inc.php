@@ -27,7 +27,7 @@ $yFor = function(int $i, int $sum) use ($y0,$y1,$totalMax): float {
 };
 
 $areas = [
-  ['key'=>'done','label'=>'Done','color'=>'rgba(255,215,128,0.78)'],
+  ['key'=>'done','label'=>'Done','color'=>'rgba(80, 180, 120, 0.70)'],
   ['key'=>'blocked','label'=>'Blocked','color'=>'rgba(255,120,120,0.55)'],
   ['key'=>'todo_j','label'=>'ToDo (J)','color'=>'rgba(180,140,255,0.55)'],
   ['key'=>'todo_o','label'=>'ToDo (O)','color'=>'rgba(120,200,255,0.55)'],
