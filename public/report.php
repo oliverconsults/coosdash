@@ -20,36 +20,8 @@ function report_sanitize_html(string $html): string {
   return (string)$html;
 }
 
-// --- ensure prompt exists ---
-$defaultProjectReportPrompt = "# COOS Projekt-Report\n\n"
-  . "Du erstellst einen kompakten HTML-Report (kein Markdown) für Oliver.\n\n"
-  . "Input:\n"
-  . "- Projekt: {PROJECT_TITLE} (#{PROJECT_NODE_ID})\n"
-  . "- Slug: {PROJECT_SLUG}\n"
-  . "- Timestamp: {TS}\n"
-  . "- Projektstart (Root created_at): {PROJECT_ROOT_CREATED_AT}\n\n"
-  . "Daten (Tree + Status):\n"
-  . "{PROJECT_TREE}\n\n"
-  . "Daten (Stats):\n"
-  . "{PROJECT_STATS}\n\n"
-  . "Daten (Artefakte/Attachments im Projekt):\n"
-  . "{PROJECT_ATTACHMENTS}\n\n"
-  . "Output (NUR HTML, ohne ```):\n"
-  . "- Starte mit <div class=\"report\"> ... </div>\n"
-  . "- Nutze nur leichtes HTML: h2/h3/p/ul/li/strong/em/code/pre/table/tr/th/td/hr\n"
-  . "- Schreibe die Report-Überschrift selbst als <h2>coos.eu Projektreport (Projekt / Slug) vom TS</h2>\n"
-  . "- Ignoriere QC-Blocker: Wenn Blocker/Abhängigkeiten NUR aus dem QC-Teilbaum kommen, nicht erwähnen.\n"
-  . "- Berichte explizit über Artefakte: Liste relevante Attachments + kurze Bedeutung.\n"
-  . "- Keine externen Links außer coos.eu / t.coos.eu\n";
-
-if (!is_file(prompts_path())) {
-  prompt_set('project_report_prompt', $defaultProjectReportPrompt);
-} else {
-  $all = prompts_load();
-  if (!isset($all['project_report_prompt']) || !is_string($all['project_report_prompt']) || trim((string)$all['project_report_prompt']) === '') {
-    prompt_set('project_report_prompt', $defaultProjectReportPrompt);
-  }
-}
+// Prompt is edited under /setup.php and is the source of truth.
+// Do not auto-overwrite prompts from code.
 
 // current selection
 $nodeId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
