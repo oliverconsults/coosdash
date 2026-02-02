@@ -1104,6 +1104,79 @@ renderHeader('Dashboard');
         <div class="meta">Platzhalter: hier können wir als nächstes Projekt-Reportings/Charts/Time/Token pro Projekt reinpacken.</div>
       </div>
 
+    <?php elseif ($view === 'work' && !$node): ?>
+      <?php
+        // Welcome dashboard for Work view (no selection)
+        $last = null;
+        if (!empty($metricsRows)) $last = $metricsRows[count($metricsRows)-1];
+        $p = $last ? [
+          'todo_james' => (int)($last['projects_todo_james'] ?? 0),
+          'todo_oliver' => (int)($last['projects_todo_oliver'] ?? 0),
+          'blocked' => (int)($last['projects_blocked'] ?? 0),
+          'done' => (int)($last['projects_done'] ?? 0),
+        ] : null;
+        $i = $last ? [
+          'todo_james' => (int)($last['ideas_todo_james'] ?? 0),
+          'todo_oliver' => (int)($last['ideas_todo_oliver'] ?? 0),
+          'blocked' => (int)($last['ideas_blocked'] ?? 0),
+          'done' => (int)($last['ideas_done'] ?? 0),
+        ] : null;
+        $lastTs = $last ? strtotime((string)($last['ts'] ?? '')) : 0;
+      ?>
+
+      <div class="card">
+        <h2 style="margin:0 0 8px 0;">Willkommen, Oliver</h2>
+        <div class="meta">Work-Ansicht · wähle links ein Projekt oder eine Idee, um Details zu sehen.</div>
+
+        <?php if ($lastTs): ?>
+          <div class="meta" style="margin-top:6px;">Letztes Metrics-Update: <?php echo h(date('d.m.Y H:i', $lastTs)); ?></div>
+        <?php endif; ?>
+
+        <div style="height:14px"></div>
+
+        <div class="row" style="gap:12px; align-items:stretch;">
+          <div class="card" style="flex:1; background:rgba(5,7,11,.22);">
+            <h3 style="margin:0 0 10px 0; font-size:13px; color:rgba(242,217,138,.95);">Projekte</h3>
+            <?php if ($p): ?>
+              <div class="row" style="gap:8px;">
+                <span class="pill">ToDo (J): <?php echo (int)$p['todo_james']; ?></span>
+                <span class="pill">ToDo (O): <?php echo (int)$p['todo_oliver']; ?></span>
+                <span class="pill">Blocked: <?php echo (int)$p['blocked']; ?></span>
+                <span class="pill">Done: <?php echo (int)$p['done']; ?></span>
+              </div>
+            <?php else: ?>
+              <div class="meta">(Keine Metrics)</div>
+            <?php endif; ?>
+            <div style="height:10px"></div>
+            <div class="meta">Tipp: Klick auf ein Projekt links → dann siehst du Status/Env/Artefakte.</div>
+          </div>
+
+          <div class="card" style="flex:1; background:rgba(5,7,11,.22);">
+            <h3 style="margin:0 0 10px 0; font-size:13px; color:rgba(242,217,138,.95);">Ideen</h3>
+            <?php if ($i): ?>
+              <div class="row" style="gap:8px;">
+                <span class="pill">ToDo (J): <?php echo (int)$i['todo_james']; ?></span>
+                <span class="pill">ToDo (O): <?php echo (int)$i['todo_oliver']; ?></span>
+                <span class="pill">Blocked: <?php echo (int)$i['blocked']; ?></span>
+                <span class="pill">Done: <?php echo (int)$i['done']; ?></span>
+              </div>
+            <?php else: ?>
+              <div class="meta">(Keine Metrics)</div>
+            <?php endif; ?>
+            <div style="height:10px"></div>
+            <div class="meta">Tipp: Ideen kannst du links direkt zu Projekten machen (Neues Projekt).</div>
+          </div>
+        </div>
+
+        <div style="height:14px"></div>
+
+        <div class="row" style="gap:10px;">
+          <a class="btn btn-gold" href="/new_project.php">Neues Projekt anlegen</a>
+          <a class="btn" href="/report.php">Zum Report</a>
+          <a class="btn" href="/kanban.php">Zum Kanban</a>
+        </div>
+      </div>
+
     <?php elseif ($node): ?>
       <div class="card">
         <?php
