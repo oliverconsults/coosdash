@@ -1175,6 +1175,111 @@ renderHeader('Dashboard');
           <a class="btn" href="/report.php">Zum Report</a>
           <a class="btn" href="/kanban.php">Zum Kanban</a>
         </div>
+
+        <?php
+          // Last updated nodes (Projekte subtree only)
+          $projectsRootId = 0;
+          foreach ($roots as $r) {
+            if (((string)($r['title'] ?? '')) === 'Projekte') $projectsRootId = (int)$r['id'];
+          }
+
+          $isUnder = function(int $nodeId2, int $rootId2) use ($byIdAll): bool {
+            if ($nodeId2 <= 0 || $rootId2 <= 0) return false;
+            $cur = $nodeId2;
+            for ($i=0; $i<160; $i++) {
+              $row = $byIdAll[$cur] ?? null;
+              if (!$row) return false;
+              $pid = $row['parent_id'];
+              if ($pid === null) return false;
+              $pid = (int)$pid;
+              if ($pid === $rootId2) return true;
+              $cur = $pid;
+            }
+            return false;
+          };
+
+          $topProjectTitle = function(int $nodeId2) use ($byIdAll, $projectsRootId): string {
+            if ($nodeId2 <= 0 || !$projectsRootId) return '';
+            $cur = $nodeId2;
+            for ($i=0; $i<160; $i++) {
+              $row = $byIdAll[$cur] ?? null;
+              if (!$row) return '';
+              $pid = $row['parent_id'];
+              if ($pid === null) return '';
+              $pid = (int)$pid;
+              if ($pid === $projectsRootId) return (string)($row['title'] ?? '');
+              $cur = $pid;
+            }
+            return '';
+          };
+
+          $recent = [];
+          foreach ($byIdAll as $id2 => $n2) {
+            $id2 = (int)$id2;
+            if (!$projectsRootId || !$isUnder($id2, $projectsRootId)) continue;
+            $u = (string)($n2['updated_at'] ?? '');
+            if ($u === '') continue;
+            $recent[] = [
+              'id' => $id2,
+              'title' => (string)($n2['title'] ?? ''),
+              'worker_status' => (string)($n2['worker_status'] ?? ''),
+              'updated_at' => $u,
+              'project' => $topProjectTitle($id2),
+            ];
+          }
+          usort($recent, function($a,$b){
+            $ta = (string)($a['updated_at'] ?? '');
+            $tb = (string)($b['updated_at'] ?? '');
+            if ($ta === $tb) return ((int)($b['id']??0) <=> (int)($a['id']??0));
+            return strcmp($tb, $ta);
+          });
+          $recent = array_slice($recent, 0, 5);
+
+          $sinceTxt = function(string $ts): string {
+            $t = strtotime($ts);
+            if (!$t) return '';
+            $d = time() - $t;
+            if ($d < 0) $d = 0;
+            if ($d < 60) return 'vor ' . $d . 's';
+            if ($d < 90*60) return 'vor ' . (int)round($d/60) . ' Min.';
+            if ($d < 48*3600) {
+              $hrs = $d/3600;
+              $hrsTxt = ($hrs < 10) ? number_format($hrs, 1, ',', '') : (string)round($hrs);
+              return 'vor ' . $hrsTxt . 'h';
+            }
+            return 'vor ' . (int)round($d/86400) . 'd';
+          };
+
+          $wsLabel = function(string $ws): string {
+            return match($ws) {
+              'todo_james' => 'ToDo (James)',
+              'todo_oliver' => 'ToDo (Oliver)',
+              'done' => 'Done',
+              default => $ws,
+            };
+          };
+        ?>
+
+        <div style="height:16px"></div>
+        <div class="card" style="background:rgba(5,7,11,.22);">
+          <h3 style="margin:0 0 10px 0; font-size:13px; color:rgba(242,217,138,.95);">Zuletzt bearbeitet (Projekte)</h3>
+          <?php if (empty($recent)): ?>
+            <div class="meta">—</div>
+          <?php else: ?>
+            <div style="display:flex; flex-direction:column; gap:8px;">
+              <?php foreach ($recent as $r): ?>
+                <a class="btn" href="/?id=<?php echo (int)$r['id']; ?>&view=work" style="text-decoration:none;">
+                  <div class="row" style="justify-content:space-between; align-items:center; gap:10px;">
+                    <div>
+                      <div style="font-size:13px; line-height:1.25; color:rgba(255,255,255,0.92)">#<?php echo (int)$r['id']; ?> · <?php echo h((string)$r['project']); ?> — <?php echo h((string)$r['title']); ?></div>
+                      <div class="meta"><?php echo h($wsLabel((string)$r['worker_status'])); ?> · <?php echo h($sinceTxt((string)$r['updated_at'])); ?></div>
+                    </div>
+                  </div>
+                </a>
+              <?php endforeach; ?>
+            </div>
+          <?php endif; ?>
+        </div>
       </div>
 
     <?php elseif ($node): ?>
