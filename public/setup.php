@@ -81,15 +81,20 @@ $defaultProjectReportPrompt = "# COOS Projekt-Report\n\n"
   . "Input:\n"
   . "- Projekt: {PROJECT_TITLE} (#{PROJECT_NODE_ID})\n"
   . "- Slug: {PROJECT_SLUG}\n"
-  . "- Timestamp: {TS}\n\n"
+  . "- Timestamp: {TS}\n"
+  . "- Projektstart (Root created_at): {PROJECT_ROOT_CREATED_AT}\n\n"
   . "Daten (Tree + Status):\n"
   . "{PROJECT_TREE}\n\n"
   . "Daten (Stats):\n"
   . "{PROJECT_STATS}\n\n"
+  . "Daten (Artefakte/Attachments im Projekt):\n"
+  . "{PROJECT_ATTACHMENTS}\n\n"
   . "Output (NUR HTML, ohne ```):\n"
   . "- Starte mit <div class=\"report\"> ... </div>\n"
   . "- Nutze nur leichtes HTML: h2/h3/p/ul/li/strong/em/code/pre/table/tr/th/td/hr\n"
-  . "- Inhalt: Fortschritt, Blocker, nächste 3 Schritte, Risiken/Offenes\n";
+  . "- Schreibe die Report-Überschrift selbst als <h2>coos.eu Projektreport (Projekt / Slug) vom TS</h2>\n"
+  . "- Ignoriere QC-Blocker: Wenn Blocker/Abhängigkeiten NUR aus dem QC-Teilbaum kommen, nicht erwähnen.\n"
+  . "- Berichte explizit über Artefakte: Liste relevante Attachments + kurze Bedeutung.\n";
 
 // AJAX: fetch history entry text (preview only)
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'GET' && (string)($_GET['action'] ?? '') === 'history_get') {
@@ -230,7 +235,7 @@ renderHeader('Setup');
       <textarea id="promptEditor" name="project_setup_prompt" style="min-height:260px;"><?php echo h($projectSetupCur); ?></textarea>
     <?php elseif ($sel === 'project_report_prompt'): ?>
       <label><?php echo h($options[$sel]); ?></label>
-      <div class="meta">Placeholders: {PROJECT_TITLE}, {PROJECT_NODE_ID}, {PROJECT_SLUG}, {TS}, {PROJECT_TREE}, {PROJECT_STATS}</div>
+      <div class="meta">Placeholders: {PROJECT_TITLE}, {PROJECT_NODE_ID}, {PROJECT_SLUG}, {TS}, {PROJECT_ROOT_CREATED_AT}, {PROJECT_TREE}, {PROJECT_STATS}, {PROJECT_ATTACHMENTS}</div>
       <textarea id="promptEditor" name="project_report_prompt" style="min-height:260px;"><?php echo h($projectReportCur); ?></textarea>
     <?php elseif ($sel === 'check_next_effective_prompt'): ?>
       <?php

@@ -26,16 +26,21 @@ $defaultProjectReportPrompt = "# COOS Projekt-Report\n\n"
   . "Input:\n"
   . "- Projekt: {PROJECT_TITLE} (#{PROJECT_NODE_ID})\n"
   . "- Slug: {PROJECT_SLUG}\n"
-  . "- Timestamp: {TS}\n\n"
+  . "- Timestamp: {TS}\n"
+  . "- Projektstart (Root created_at): {PROJECT_ROOT_CREATED_AT}\n\n"
   . "Daten (Tree + Status):\n"
   . "{PROJECT_TREE}\n\n"
   . "Daten (Stats):\n"
   . "{PROJECT_STATS}\n\n"
+  . "Daten (Artefakte/Attachments im Projekt):\n"
+  . "{PROJECT_ATTACHMENTS}\n\n"
   . "Output (NUR HTML, ohne ```):\n"
   . "- Starte mit <div class=\"report\"> ... </div>\n"
   . "- Nutze nur leichtes HTML: h2/h3/p/ul/li/strong/em/code/pre/table/tr/th/td/hr\n"
-  . "- Keine externen Links außer coos.eu / t.coos.eu\n"
-  . "- Inhalt: Fortschritt, Blocker, nächste 3 sinnvolle Schritte, Risiken/Offenes, (kurz) Status pro Haupt-Subtree\n";
+  . "- Schreibe die Report-Überschrift selbst als <h2>coos.eu Projektreport (Projekt / Slug) vom TS</h2>\n"
+  . "- Ignoriere QC-Blocker: Wenn Blocker/Abhängigkeiten NUR aus dem QC-Teilbaum kommen, nicht erwähnen.\n"
+  . "- Berichte explizit über Artefakte: Liste relevante Attachments + kurze Bedeutung.\n"
+  . "- Keine externen Links außer coos.eu / t.coos.eu\n";
 
 if (!is_file(prompts_path())) {
   prompt_set('project_report_prompt', $defaultProjectReportPrompt);
@@ -129,6 +134,48 @@ $buildTreeText = function(int $rootId) use ($pdo, $isBlocked): string {
   };
   $walk($rootId, 0);
   return implode("\n", $out);
+};
+
+$buildAttachmentsText = function(int $rootId) use ($pdo): string {
+  if ($rootId <= 0) return '';
+
+  // collect subtree node ids
+  $rows = $pdo->query('SELECT id,parent_id FROM nodes ORDER BY id')->fetchAll(PDO::FETCH_ASSOC);
+  $byParent = [];
+  foreach ($rows as $r) {
+    $id = (int)$r['id'];
+    $pid = $r['parent_id'] === null ? 0 : (int)$r['parent_id'];
+    $byParent[$pid][] = $id;
+  }
+
+  $ids = [];
+  $stack = [$rootId];
+  while ($stack) {
+    $id = array_pop($stack);
+    $ids[$id] = true;
+    foreach (($byParent[$id] ?? []) as $cid) $stack[] = (int)$cid;
+  }
+
+  if (!$ids) return '';
+
+  // fetch attachments
+  $in = implode(',', array_fill(0, count($ids), '?'));
+  $st = $pdo->prepare("SELECT node_id, token, stored_name, orig_name, created_at FROM node_attachments WHERE node_id IN ($in) ORDER BY created_at DESC, id DESC LIMIT 80");
+  $st->execute(array_keys($ids));
+  $atts = $st->fetchAll(PDO::FETCH_ASSOC);
+  if (!$atts) return '—';
+
+  $out = [];
+  foreach ($atts as $a) {
+    $nid = (int)($a['node_id'] ?? 0);
+    $tok = (string)($a['token'] ?? '');
+    $fn = (string)($a['stored_name'] ?? '');
+    $orig = (string)($a['orig_name'] ?? $fn);
+    if ($tok === '' || $fn === '') continue;
+    $url = '/att/' . $tok . '/' . $fn;
+    $out[] = '- #' . $nid . ' · ' . $orig . ' (' . $url . ')';
+  }
+  return $out ? implode("\n", $out) : '—';
 };
 
 $buildStatsText = function(int $rootId) use ($pdo, $isBlocked): string {
@@ -226,13 +273,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['action'] ?? '') ==
   $reportId = (int)$pdo->lastInsertId();
 
   $ts = date('d.m.Y H:i:s');
+
+  // root created_at (project start)
+  $st = $pdo->prepare('SELECT created_at FROM nodes WHERE id=?');
+  $st->execute([$pid]);
+  $rootCreatedAt = (string)($st->fetchColumn() ?: '');
+
   $tree = $buildTreeText($pid);
   $stats = $buildStatsText($pid);
+  $attsTxt = $buildAttachmentsText($pid);
 
   $tpl = prompt_require('project_report_prompt');
   $prompt = str_replace(
-    ['{PROJECT_TITLE}','{PROJECT_NODE_ID}','{PROJECT_SLUG}','{TS}','{PROJECT_TREE}','{PROJECT_STATS}'],
-    [$title, (string)$pid, $slug, $ts, $tree, $stats],
+    ['{PROJECT_TITLE}','{PROJECT_NODE_ID}','{PROJECT_SLUG}','{TS}','{PROJECT_ROOT_CREATED_AT}','{PROJECT_TREE}','{PROJECT_STATS}','{PROJECT_ATTACHMENTS}'],
+    [$title, (string)$pid, $slug, $ts, $rootCreatedAt, $tree, $stats, $attsTxt],
     $tpl
   );
 
