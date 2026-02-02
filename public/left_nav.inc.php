@@ -68,6 +68,10 @@ $renderTree = function(int $parentId=0, int $depth=0, array $prefix=[]) use (&$r
     $hasKids = !empty($byParentAll[$id]);
     $isActive = ($id === (int)$nodeId);
 
+    // show total number of direct children in parentheses (matches dashboard)
+    $directCount = !empty($byParentAll[$id]) ? count($byParentAll[$id]) : 0;
+    $countTxt = $hasKids ? ' (' . $directCount . ')' : '';
+
     $indent = $depth * 5;
     $numParts = array_merge($prefix, [$i]);
     $num = implode('.', $numParts) . '.';
@@ -122,7 +126,7 @@ $renderTree = function(int $parentId=0, int $depth=0, array $prefix=[]) use (&$r
       echo '<a href="' . h($href) . '" style="display:flex;align-items:center;gap:0;">'
         . '<span style="color:' . $col . ';">' . h($num) . '</span>'
         . '&nbsp;'
-        . '<span style="color:' . $col . ';">' . h($title) . $attIcon . '</span>'
+        . '<span style="color:' . $col . ';">' . h($title) . h($countTxt) . $attIcon . '</span>'
         . '</a>';
       if ($statusText !== '') echo '<span class="tag" style="margin-left:auto">' . h($statusText) . '</span>';
       echo '</summary>';
@@ -133,7 +137,7 @@ $renderTree = function(int $parentId=0, int $depth=0, array $prefix=[]) use (&$r
       echo '<a href="' . h($href) . '" style="display:flex;align-items:center;gap:0;">'
         . '<span style="color:' . $col . ';">' . h($num) . '</span>'
         . '&nbsp;'
-        . '<span style="color:' . $col . ';">' . h($title) . $attIcon . '</span>'
+        . '<span style="color:' . $col . ';">' . h($title) . h($countTxt) . $attIcon . '</span>'
         . '</a>';
       if ($statusText !== '') echo '<span class="tag" style="margin-left:auto">' . h($statusText) . '</span>';
       echo '</div></div>';
