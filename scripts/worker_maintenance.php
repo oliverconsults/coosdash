@@ -128,7 +128,9 @@ foreach ($canceled as $r) {
 // 4) Bubble up TODO status: if any descendant under "Projekte" is todo, ensure ancestors are todo_james.
 // This prevents "done" projects with unfinished children.
 $todoIds = [];
-$st = $pdo->prepare("SELECT id FROM nodes WHERE worker_status IN ('todo_james','todo_oliver')");
+// Bubble-up should not steal Oliver-owned branches.
+// We bubble only from todo_james leaves, and we stop when we hit a todo_oliver ancestor.
+$st = $pdo->prepare("SELECT id FROM nodes WHERE worker_status='todo_james'");
 $st->execute();
 foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
   $id = (int)($r['id'] ?? 0);
@@ -157,6 +159,11 @@ foreach ($todoIds as $tid) {
     $stS = $pdo->prepare('SELECT worker_status FROM nodes WHERE id=?');
     $stS->execute([$pid]);
     $pStatus = (string)($stS->fetchColumn() ?: '');
+
+    // If Oliver explicitly owns an ancestor, do not bubble beyond it.
+    if ($pStatus === 'todo_oliver') {
+      break;
+    }
 
     if ($pStatus !== 'todo_james') {
       $pdo->prepare('UPDATE nodes SET worker_status="todo_james" WHERE id=?')->execute([$pid]);
