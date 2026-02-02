@@ -10,12 +10,40 @@ if (session_status() === PHP_SESSION_NONE) {
 register_shutdown_function(function() use ($__REQ_START) {
   $dt = microtime(true) - (float)$__REQ_START;
   if ($dt < 1.5) return;
+
+  $sapi = PHP_SAPI;
+  $pid = function_exists('getmypid') ? (int)getmypid() : 0;
+  $script = (string)($_SERVER['SCRIPT_NAME'] ?? ($_SERVER['PHP_SELF'] ?? ''));
   $uri = (string)($_SERVER['REQUEST_URI'] ?? '');
   $method = (string)($_SERVER['REQUEST_METHOD'] ?? '');
   $ip = (string)($_SERVER['REMOTE_ADDR'] ?? '');
   $ua = (string)($_SERVER['HTTP_USER_AGENT'] ?? '');
   $ua = str_replace(["\n","\r","\t"], ' ', $ua);
-  $line = date('Y-m-d H:i:s') . "  slow_http dt=" . number_format($dt, 3, '.', '') . " method={$method} ip={$ip} uri={$uri} ua={$ua}\n";
+
+  $argv0 = '';
+  $argvN = '';
+  if ($sapi === 'cli' && !empty($_SERVER['argv']) && is_array($_SERVER['argv'])) {
+    $argv0 = (string)($_SERVER['argv'][0] ?? '');
+    $argvN = implode(' ', array_slice(array_map('strval', $_SERVER['argv']), 1, 8));
+    $argvN = str_replace(["\n","\r","\t"], ' ', $argvN);
+  }
+
+  $mem = (function_exists('memory_get_peak_usage') ? (int)memory_get_peak_usage(true) : 0);
+
+  $line = date('Y-m-d H:i:s')
+    . '  slow dt=' . number_format($dt, 3, '.', '')
+    . ' sapi=' . $sapi
+    . ' pid=' . $pid
+    . ' script=' . $script
+    . ' method=' . $method
+    . ' ip=' . $ip
+    . ' uri=' . $uri
+    . ' argv0=' . $argv0
+    . ' argv=' . $argvN
+    . ' mem_peak=' . $mem
+    . ' ua=' . $ua
+    . "\n";
+
   @mkdir('/var/www/coosdash/shared/logs', 0775, true);
   @file_put_contents('/var/www/coosdash/shared/logs/http_slow.log', $line, FILE_APPEND);
 });
