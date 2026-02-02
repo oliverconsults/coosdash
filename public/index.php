@@ -1108,6 +1108,37 @@ renderHeader('Dashboard');
         $colTitle = ['todo_oliver'=>'ToDo (Oliver)','todo_james'=>'ToDo (James)','blocked'=>'BLOCKED','done'=>'Done'];
       ?>
 
+      <?php
+        // Depth bars (like the old Kanban): scale against deepest node under Projekte
+        $depthUnderRootK = function(int $nodeId, int $rootId) use ($byIdAll): int {
+          if ($nodeId <= 0 || $rootId <= 0) return 0;
+          $d = 0;
+          $cur = $nodeId;
+          for ($i=0; $i<160; $i++) {
+            $row = $byIdAll[$cur] ?? null;
+            if (!$row) return 0;
+            $pid = $row['parent_id'];
+            if ($pid === null) return 0;
+            $pid = (int)$pid;
+            $d++;
+            if ($pid === $rootId) return $d;
+            $cur = $pid;
+          }
+          return 0;
+        };
+
+        $maxDepthProjects = 0;
+        if ($projectsRootIdK > 0) {
+          foreach ($byIdAll as $id2 => $n2) {
+            $id2 = (int)$id2;
+            if (!$isUnderK($id2, $projectsRootIdK)) continue;
+            $dd = $depthUnderRootK($id2, $projectsRootIdK);
+            if ($dd > $maxDepthProjects) $maxDepthProjects = $dd;
+          }
+        }
+        if ($maxDepthProjects <= 0) $maxDepthProjects = 1;
+      ?>
+
       <div class="card">
         <h2 style="margin:0 0 10px 0;">Kanban (Leafs: Projekte)</h2>
         <div class="kanban">
@@ -1117,6 +1148,25 @@ renderHeader('Dashboard');
                 <span><?php echo h($colTitle[$col]); ?></span>
                 <span class="pill dim"><?php echo count($cols[$col]); ?></span>
               </h3>
+
+              <?php
+                $top = $cols[$col][0] ?? null;
+                $topId = $top ? (int)$top['id'] : 0;
+                $curDepth = ($topId && $projectsRootIdK) ? $depthUnderRootK($topId, $projectsRootIdK) : 0;
+                $pct = ($maxDepthProjects > 0 && $curDepth > 0) ? max(0, min(100, (int)round(($curDepth / $maxDepthProjects) * 100))) : 0;
+                $tt = $topId ? ('Top-Task: Tiefe ' . $curDepth . ' / ' . $maxDepthProjects . ' (#' . $topId . ')') : '—';
+              ?>
+
+              <?php if ($pct > 0): ?>
+                <div title="<?php echo h($tt); ?>" style="position:relative; height:8px; border-radius:999px; background:linear-gradient(90deg, rgba(120,255,170,0.9), rgba(255,200,90,0.9), rgba(255,120,120,0.95)); overflow:hidden; margin:6px 0 10px 0;">
+                  <div style="position:absolute; top:0; right:0; height:100%; width:<?php echo (int)(100-$pct); ?>%; background:rgba(0,0,0,0.80);"></div>
+                </div>
+              <?php else: ?>
+                <div title="<?php echo h($tt); ?>" style="position:relative; height:8px; border-radius:999px; background:linear-gradient(90deg, rgba(120,255,170,0.9), rgba(255,200,90,0.9), rgba(255,120,120,0.95)); overflow:hidden; margin:6px 0 10px 0;">
+                  <div style="position:absolute; top:0; right:0; height:100%; width:100%; background:rgba(0,0,0,0.88);"></div>
+                </div>
+              <?php endif; ?>
+
               <?php if (empty($cols[$col])): ?>
                 <div class="meta" style="padding:8px 2px;">—</div>
               <?php else: ?>
