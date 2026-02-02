@@ -153,15 +153,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       // Ensure parent is also todo_james
       $pdo->prepare('UPDATE nodes SET worker_status=? WHERE id=?')->execute([$stTxt, $parentId]);
 
-      // optional attachment upload (Oliver)
+      // optional attachments upload (Oliver) – supports multi-upload
       if (!empty($_FILES['attachment'])) {
         try {
-          $res = attachments_store_upload($pdo, $newId, $_FILES['attachment'], 'oliver');
-          if (is_array($res) && !empty($res['err'])) {
-            flash_set('Subtask angelegt, aber Attachment fehlgeschlagen: ' . $res['err'], 'err');
+          $f = $_FILES['attachment'];
+          $errs = [];
+
+          // single vs multi
+          $isMulti = is_array($f['name'] ?? null);
+          if (!$isMulti) {
+            $res = attachments_store_upload($pdo, $newId, $f, 'oliver');
+            if (is_array($res) && !empty($res['err'])) $errs[] = (string)$res['err'];
+          } else {
+            $n = count($f['name']);
+            for ($i=0; $i<$n; $i++) {
+              $one = [
+                'name' => $f['name'][$i] ?? '',
+                'type' => $f['type'][$i] ?? '',
+                'tmp_name' => $f['tmp_name'][$i] ?? '',
+                'error' => $f['error'][$i] ?? UPLOAD_ERR_NO_FILE,
+                'size' => $f['size'][$i] ?? 0,
+              ];
+              $res = attachments_store_upload($pdo, $newId, $one, 'oliver');
+              if (is_array($res) && !empty($res['err'])) $errs[] = (string)$res['err'];
+            }
+          }
+
+          if (!empty($errs)) {
+            $msg = implode(' | ', array_slice($errs, 0, 3));
+            if (count($errs) > 3) $msg .= ' | …';
+            flash_set('Subtask angelegt, aber Attachment(s) fehlgeschlagen: ' . $msg, 'err');
           }
         } catch (Throwable $e) {
-          flash_set('Subtask angelegt, aber Attachment fehlgeschlagen.', 'err');
+          flash_set('Subtask angelegt, aber Attachment(s) fehlgeschlagen.', 'err');
         }
       }
 
@@ -1651,7 +1675,7 @@ renderHeader('Dashboard');
 
           <div class="row" style="margin-top:10px; align-items:center;">
             <span class="meta">Anhang optional:</span>
-            <input type="file" name="attachment" accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt" style="width:auto; max-width:380px">
+            <input type="file" name="attachment[]" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt" style="width:auto; max-width:380px">
             <button class="btn" name="submit_to" value="oliver" type="submit">Absenden</button>
             <button class="btn" name="submit_to" value="james" type="submit">Absenden &gt; James</button>
           </div>
