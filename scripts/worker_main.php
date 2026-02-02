@@ -144,18 +144,27 @@ if ($cLock && flock($cLock, LOCK_EX | LOCK_NB)) {
       $nodeId = (int)($job['node_id'] ?? 0);
       $promptText = (string)($job['prompt_text'] ?? '');
 
-      // For project setup jobs: send ONLY the stored prompt_text to the LLM (no wrapper),
-      // then let worker_main apply the JSON result (create subtasks + QC subpoints) and close the job.
+      // For project setup + project report jobs: send ONLY the stored prompt_text to the LLM (no wrapper).
+      // project_setup: worker_main applies JSON and creates subtasks.
+      // project_report: worker_main stores returned HTML and marks the report row done.
       $isProjectSetup = false;
+      $isProjectReport = false;
       $reqId = '';
+      $reportId = 0;
+
       $meta = json_decode((string)($job['selector_meta'] ?? ''), true);
       if (is_array($meta) && ($meta['type'] ?? '') === 'project_setup') {
         $isProjectSetup = true;
         $reqId = (string)($meta['req_id'] ?? '');
       }
+      if (is_array($meta) && ($meta['type'] ?? '') === 'project_report') {
+        $isProjectReport = true;
+        $reqId = (string)($meta['req_id'] ?? '');
+        $reportId = (int)($meta['report_id'] ?? 0);
+      }
 
       $msg = '';
-      if ($isProjectSetup) {
+      if ($isProjectSetup || $isProjectReport) {
         $msg = $promptText;
       } else {
         // Normal jobs: wrap prompt_text with the existing wrapper template
@@ -177,7 +186,7 @@ if ($cLock && flock($cLock, LOCK_EX | LOCK_NB)) {
       $respPath = $llmDir . '/job_' . $jobId . '_node_' . $nodeId . '_response.txt';
       @file_put_contents($promptPath, $msg);
 
-      $session = $isProjectSetup ? 'coos-project-setup' : 'coos-worker-queue';
+      $session = $isProjectSetup ? 'coos-project-setup' : ($isProjectReport ? 'coos-project-report' : 'coos-worker-queue');
       $agentCmd = 'clawdbot agent --session-id ' . escapeshellarg($session) .
         ' --message ' . escapeshellarg($msg) .
         ' --timeout 300 --thinking low';
@@ -189,10 +198,51 @@ if ($cLock && flock($cLock, LOCK_EX | LOCK_NB)) {
       $respRaw = implode("\n", $agentOut);
       @file_put_contents($respPath, $respRaw);
 
-      // If this is a project-setup job, also write to the project_setup_* files so the UI can show it.
-      if ($isProjectSetup && $reqId !== '') {
+      // If this is a project-setup / project-report job, also write to the reqId_* files so the UI can show it.
+      if (($isProjectSetup || $isProjectReport) && $reqId !== '') {
         $projResp = $llmDir . '/' . $reqId . '_response.txt';
         @file_put_contents($projResp, $respRaw);
+      }
+
+      // Project report application (server-side): store HTML and mark report row done.
+      if ($isProjectReport) {
+        require_once $base . '/migrate_project_reports.php';
+
+        // extract HTML-ish response (best effort)
+        $html = trim($respRaw);
+        if (preg_match('/<div\b[^>]*class\s*=\s*(["\"])report\1[^>]*>.*<\/div>/is', $respRaw, $m)) {
+          $html = $m[0];
+        }
+        // sanitize (remove scripts/styles/on* attrs)
+        $html = preg_replace('/<script\b[^>]*>.*?<\/script>/is', '', $html);
+        $html = preg_replace('/<style\b[^>]*>.*?<\/style>/is', '', $html);
+        $html = preg_replace('/\son\w+\s*=\s*"[^"]*"/i', '', $html);
+        $html = preg_replace("/\son\w+\s*=\s*'[^']*'/i", '', $html);
+
+        $reportsDir = '/var/www/coosdash/shared/reports';
+        @mkdir($reportsDir, 0775, true);
+        $htmlFile = 'report_' . (int)$reportId . '.html';
+        @file_put_contents($reportsDir . '/' . $htmlFile, $html);
+
+        if ($reportId > 0) {
+          try {
+            $pdo2 = db();
+            $pdo2->prepare('UPDATE project_reports SET status=\'done\', generated_at=NOW(), response_file=?, html_file=? WHERE id=?')
+                 ->execute([$reqId !== '' ? ($reqId . '_response.txt') : null, $htmlFile, $reportId]);
+          } catch (Throwable $e) {
+            // ignore
+          }
+        }
+
+        // mark queue job done
+        $cmd = '/usr/bin/php ' . escapeshellarg($base . '/worker_api_cli.php') .
+          ' action=job_done job_id=' . escapeshellarg((string)$jobId) .
+          ' node_id=' . escapeshellarg((string)$nodeId) .
+          ' session_id=' . escapeshellarg('coos-project-report');
+        $o=[]; $c=0; exec($cmd . ' 2>&1', $o, $c);
+
+        // stop further processing for this job (skip project_setup parser)
+        goto AFTER_SPECIAL_JOB;
       }
 
       // Project setup application (server-side): parse JSON and create subtasks under the project.
@@ -346,6 +396,8 @@ if ($cLock && flock($cLock, LOCK_EX | LOCK_NB)) {
           $o=[]; $c=0; exec($doneCmd . ' 2>&1', $o, $c);
         }
       }
+
+      AFTER_SPECIAL_JOB:
 
       $tail = implode(' / ', array_slice($agentOut, -6));
       logline('consumer: agent exit=' . $agentCode . ($tail ? (' | ' . $tail) : ''));

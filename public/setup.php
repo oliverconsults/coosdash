@@ -76,6 +76,21 @@ $defaultProjectSetupPrompt = "# COOS Project Setup (LLM)\n\n"
   . "- children: 4 bis 6 kurze direkte Subtasks (<= 40 Zeichen), deutsch.\n"
   . "- Letztes Kind ist immer quality_title.\n";
 
+$defaultProjectReportPrompt = "# COOS Projekt-Report\n\n"
+  . "Du erstellst einen kompakten HTML-Report (kein Markdown) für Oliver.\n\n"
+  . "Input:\n"
+  . "- Projekt: {PROJECT_TITLE} (#{PROJECT_NODE_ID})\n"
+  . "- Slug: {PROJECT_SLUG}\n"
+  . "- Timestamp: {TS}\n\n"
+  . "Daten (Tree + Status):\n"
+  . "{PROJECT_TREE}\n\n"
+  . "Daten (Stats):\n"
+  . "{PROJECT_STATS}\n\n"
+  . "Output (NUR HTML, ohne ```):\n"
+  . "- Starte mit <div class=\"report\"> ... </div>\n"
+  . "- Nutze nur leichtes HTML: h2/h3/p/ul/li/strong/em/code/pre/table/tr/th/td/hr\n"
+  . "- Inhalt: Fortschritt, Blocker, nächste 3 Schritte, Risiken/Offenes\n";
+
 // AJAX: fetch history entry text (preview only)
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'GET' && (string)($_GET['action'] ?? '') === 'history_get') {
   requireLogin();
@@ -133,12 +148,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $summaryInstr = (string)($_POST['summary_cleanup_instructions'] ?? '');
   $wrapperTpl = (string)($_POST['wrapper_prompt_template'] ?? '');
   $setupPrompt = (string)($_POST['project_setup_prompt'] ?? '');
+  $reportPrompt = (string)($_POST['project_report_prompt'] ?? '');
 
   $ok = true;
   if ($workerRules !== '') $ok = $ok && prompt_set('worker_rules_block', $workerRules);
   if ($summaryInstr !== '') $ok = $ok && prompt_set('summary_cleanup_instructions', $summaryInstr);
   if ($wrapperTpl !== '') $ok = $ok && prompt_set('wrapper_prompt_template', $wrapperTpl);
   if ($setupPrompt !== '') $ok = $ok && prompt_set('project_setup_prompt', $setupPrompt);
+  if ($reportPrompt !== '') $ok = $ok && prompt_set('project_report_prompt', $reportPrompt);
 
   flash_set($ok ? 'Setup gespeichert.' : 'Fehler beim Speichern.', $ok ? 'info' : 'err');
   header('Location: /setup.php?p=' . rawurlencode((string)($_GET['p'] ?? 'worker_rules_block')));
@@ -151,18 +168,23 @@ if (!is_file(prompts_path())) {
   prompt_set('summary_cleanup_instructions', $defaultSummaryInstr);
   prompt_set('wrapper_prompt_template', $defaultWrapperTpl);
   prompt_set('project_setup_prompt', $defaultProjectSetupPrompt);
+  prompt_set('project_report_prompt', $defaultProjectReportPrompt);
 }
 
-// Ensure the new key exists as well
+// Ensure the new keys exist as well
 $all = prompts_load();
 if (!isset($all['project_setup_prompt']) || !is_string($all['project_setup_prompt']) || trim($all['project_setup_prompt'])==='') {
   prompt_set('project_setup_prompt', $defaultProjectSetupPrompt);
+}
+if (!isset($all['project_report_prompt']) || !is_string($all['project_report_prompt']) || trim($all['project_report_prompt'])==='') {
+  prompt_set('project_report_prompt', $defaultProjectReportPrompt);
 }
 
 $workerRulesCur = prompt_require('worker_rules_block');
 $summaryInstrCur = prompt_require('summary_cleanup_instructions');
 $wrapperTplCur = prompt_require('wrapper_prompt_template');
 $projectSetupCur = prompt_require('project_setup_prompt');
+$projectReportCur = prompt_require('project_report_prompt');
 
 renderHeader('Setup');
 ?>
@@ -178,6 +200,7 @@ renderHeader('Setup');
       'summary_cleanup_instructions' => 'Summary+Cleanup Prompt – Instructions Block',
       'wrapper_prompt_template' => 'Wrapper Prompt Template (worker_main)',
       'project_setup_prompt' => 'Neues Projekt – Setup LLM Script',
+      'project_report_prompt' => 'Projekt-Report – Prompt',
       'check_next_effective_prompt' => 'Check next effective Prompt (Queue)',
     ];
     if (!isset($options[$sel])) $sel = 'worker_rules_block';
@@ -205,6 +228,10 @@ renderHeader('Setup');
       <label><?php echo h($options[$sel]); ?></label>
       <div class="meta">Placeholders: {TITLE}, {SLUG}, {DESCRIPTION}</div>
       <textarea id="promptEditor" name="project_setup_prompt" style="min-height:260px;"><?php echo h($projectSetupCur); ?></textarea>
+    <?php elseif ($sel === 'project_report_prompt'): ?>
+      <label><?php echo h($options[$sel]); ?></label>
+      <div class="meta">Placeholders: {PROJECT_TITLE}, {PROJECT_NODE_ID}, {PROJECT_SLUG}, {TS}, {PROJECT_TREE}, {PROJECT_STATS}</div>
+      <textarea id="promptEditor" name="project_report_prompt" style="min-height:260px;"><?php echo h($projectReportCur); ?></textarea>
     <?php elseif ($sel === 'check_next_effective_prompt'): ?>
       <?php
         $job = null;
