@@ -433,7 +433,12 @@ renderHeader('Report');
               <?php if ($slug !== ''): ?><span class="meta">/<?php echo h($slug); ?></span><?php endif; ?>
               <span class="meta">· <?php echo h($st); ?></span>
               <?php if ($st === 'done'): ?>
-                <a class="btn btn-md" style="margin-left:8px; padding:2px 8px;" href="/report_pdf.php?report_id=<?php echo $rid; ?>" title="PDF herunterladen">PDF</a>
+                <a class="btn btn-md" style="margin-left:8px; padding:2px 8px; display:inline-flex; align-items:center; gap:6px;" href="/report_pdf.php?report_id=<?php echo $rid; ?>" title="PDF herunterladen">
+                  <span style="width:16px; height:16px; display:inline-block; color:#c7a24a;">
+                    <?php echo file_get_contents(__DIR__ . '/assets/icon_pdf.svg'); ?>
+                  </span>
+                  <span>PDF</span>
+                </a>
               <?php endif; ?>
             </li>
           <?php endforeach; ?>
