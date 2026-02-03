@@ -92,7 +92,9 @@ foreach ($depthById as $id => $d) {
   $n = $byId[$id] ?? null;
   if (!$n) continue;
   if (($n['worker_status'] ?? '') !== 'todo_james') continue;
-  // NOTE: we no longer require leaf-only; James should pick the deepest open node even if it has children.
+  // Only pick leaf nodes: tasks with no children.
+  // This enforces a clear "deepest leaf first" order within each project.
+  if (!empty($children[$id] ?? [])) continue;
   if ($isBlocked($n)) continue; // do not pick blocked tasks
   if ($hasBlockedUndoneDesc((int)$id)) continue; // avoid ancestors above blocked undone tasks
 
