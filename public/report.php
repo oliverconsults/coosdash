@@ -382,6 +382,9 @@ renderHeader('Report');
               <a href="/report.php?project_id=<?php echo (int)($r['project_node_id'] ?? 0); ?>&report_id=<?php echo $rid; ?>"><?php echo h($pt); ?></a>
               <?php if ($slug !== ''): ?><span class="meta">/<?php echo h($slug); ?></span><?php endif; ?>
               <span class="meta">· <?php echo h($tsTxt); ?> · <?php echo h($st); ?></span>
+              <?php if ($st === 'done'): ?>
+                <a class="btn btn-md" style="margin-left:8px; padding:2px 8px;" href="/report_print.php?report_id=<?php echo $rid; ?>" title="Als PDF speichern">PDF</a>
+              <?php endif; ?>
             </li>
           <?php endforeach; ?>
         </ul>
