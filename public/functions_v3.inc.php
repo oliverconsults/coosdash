@@ -448,9 +448,9 @@ function prompt_history_list(string $key, int $limit=100): array {
     if (!is_array($j)) continue;
     if (($j['key'] ?? '') !== $key) continue;
 
-    // Hide empty history entries (sha of empty string) to avoid confusing "blank editor" previews.
-    // (Old values were not stored; we only have new_sha1.)
-    if (($j['new_sha1'] ?? '') === sha1('')) continue;
+    // Hide history entries that would restore an empty prompt (prevents confusing "blank editor" previews).
+    $oldVal = is_string($j['old'] ?? null) ? (string)$j['old'] : '';
+    if (trim($oldVal) === '') continue;
 
     $out[] = $j;
     if (count($out) >= $limit) break;
