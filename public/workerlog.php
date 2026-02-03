@@ -42,7 +42,8 @@ $renderLine = function(string $line): string {
 
   // Node links
   // Important: avoid linking queue job references like "job #123" to a node.
-  $safe = preg_replace('/(?<!job )#(\d+)/', '<a href="/?id=$1">#$1</a>', $safe);
+  // Always deep-link into kanban view=work so details are immediately visible.
+  $safe = preg_replace('/(?<!job )#(\d+)/', '<a href="/kanban.php?id=$1&view=work">#$1</a>', $safe);
 
   // Link local llm file viewer URLs
   $safe = preg_replace(
