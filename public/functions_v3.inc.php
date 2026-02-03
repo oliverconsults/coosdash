@@ -447,6 +447,11 @@ function prompt_history_list(string $key, int $limit=100): array {
     $j = json_decode($lines[$i], true);
     if (!is_array($j)) continue;
     if (($j['key'] ?? '') !== $key) continue;
+
+    // Hide empty history entries (sha of empty string) to avoid confusing "blank editor" previews.
+    // (Old values were not stored; we only have new_sha1.)
+    if (($j['new_sha1'] ?? '') === sha1('')) continue;
+
     $out[] = $j;
     if (count($out) >= $limit) break;
   }
