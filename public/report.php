@@ -293,7 +293,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['action'] ?? '') ==
   // root created_at (project start)
   $st = $pdo->prepare('SELECT created_at FROM nodes WHERE id=?');
   $st->execute([$pid]);
-  $rootCreatedAt = (string)($st->fetchColumn() ?: '');
+  $rootCreatedAtRaw = (string)($st->fetchColumn() ?: '');
+  $rootCreatedAt = $rootCreatedAtRaw;
+  if ($rootCreatedAtRaw !== '' && strtotime($rootCreatedAtRaw)) {
+    // For reports: show Projektstart in the same human format as "Stand".
+    $rootCreatedAt = date('d.m.Y H:i:s', strtotime($rootCreatedAtRaw));
+  }
 
   $tree = $buildTreeText($pid);
   $stats = $buildStatsText($pid);
