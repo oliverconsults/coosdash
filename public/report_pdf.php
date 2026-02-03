@@ -208,7 +208,20 @@ $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' :
 $baseHref = $scheme . '://' . $host . '/';
 
 $slug = (string)($r['slug'] ?? '');
-$subtitle = trim(($slug !== '' ? ($slug . ' · ') : '') . $tsName . ' · Report #' . (int)$reportId);
+// Project start (root created_at)
+$rootCreatedAt = '';
+try {
+  $pid = (int)($r['project_node_id'] ?? 0);
+  if ($pid > 0) {
+    $st0 = $pdo->prepare('SELECT created_at FROM nodes WHERE id=?');
+    $st0->execute([$pid]);
+    $rootCreatedAt = (string)($st0->fetchColumn() ?: '');
+  }
+} catch (Throwable $e) {
+  $rootCreatedAt = '';
+}
+$rootTxt = $rootCreatedAt ? date('Y-m-d H:i:s', strtotime($rootCreatedAt)) : '';
+$subtitle = trim(($slug !== '' ? ($slug . ' · ') : '') . ($rootTxt !== '' ? ('Projektstart: ' . $rootTxt . ' · ') : '') . 'Stand: ' . $tsName . ' · Report #' . (int)$reportId);
 
 $logoUrl = $scheme . '://' . $host . '/assets/coos_logo_gold.png';
 $gold = '#c7a24a';
