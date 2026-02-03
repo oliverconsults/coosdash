@@ -496,6 +496,21 @@ if ($action === 'cleanup_done_subtree') {
       }
 
       // duplicate found → delete attachment row + file folder
+      try {
+        $lp = '/var/www/coosdash/shared/logs/worker_dedup.log';
+        @mkdir(dirname($lp), 0775, true);
+        $tsd = date('Y-m-d H:i:s');
+        $keepId = (int)($seen[$sha]['id'] ?? 0);
+        $keepToken = (string)($seen[$sha]['token'] ?? '');
+        @file_put_contents(
+          $lp,
+          $tsd . "  #{$nodeId}  dedup sha={$sha} keep_att={$keepId} keep_token={$keepToken} removed_att={$aid} removed_token={$token} file=" . $stored . "\n",
+          FILE_APPEND
+        );
+      } catch (Throwable $e) {
+        // ignore
+      }
+
       $pdo->prepare('DELETE FROM node_attachments WHERE id=?')->execute([$aid]);
       $dedupRemoved++;
 
