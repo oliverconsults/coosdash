@@ -361,6 +361,8 @@ if ($cLock && flock($cLock, LOCK_EX | LOCK_NB)) {
                     ' worker_status=todo_oliver';
                   $oo=[]; $cc=0; exec($cmdQ . ' 2>&1', $oo, $cc);
 
+                  @file_put_contents('/var/www/coosdash/shared/logs/worker.log', $tsLine . "  #{$nodeId}  [auto] {$tsHuman} QC init: set #{$qualityId} (Qualitätskontrolle) -> todo_oliver\n", FILE_APPEND);
+
                   foreach ($qcIds as $cid) {
                     $cid = (int)$cid;
                     if ($cid <= 0) continue;
