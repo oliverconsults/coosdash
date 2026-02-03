@@ -14,6 +14,36 @@ function report_sanitize_html(string $html): string {
   return (string)$html;
 }
 
+function fmt_km(int $n): string {
+  $abs = abs($n);
+  if ($abs >= 1_000_000) {
+    $v = round($n / 1_000_000, 1);
+    $s = rtrim(rtrim((string)$v, '0'), '.');
+    return $s . 'M';
+  }
+  if ($abs >= 1_000) {
+    $v = round($n / 1_000, 1);
+    $s = rtrim(rtrim((string)$v, '0'), '.');
+    return $s . 'K';
+  }
+  return (string)$n;
+}
+
+// Best-effort token formatting in rendered report HTML.
+// We don't rely on the LLM to format numbers consistently.
+function report_format_tokens_km(string $html): string {
+  return preg_replace_callback('/(token(?:_in|_out|_all)?[^0-9]{0,20})(\d{4,})(\s*(?:\/(\d{4,}))(?:\/(\d{4,}))?)?/i', function($m) {
+    $prefix = (string)($m[1] ?? '');
+    $a = fmt_km((int)($m[2] ?? 0));
+    $b = isset($m[4]) && $m[4] !== '' ? fmt_km((int)$m[4]) : '';
+    $c = isset($m[5]) && $m[5] !== '' ? fmt_km((int)$m[5]) : '';
+    $tail = '';
+    if ($b !== '') $tail .= '/' . $b;
+    if ($c !== '') $tail .= '/' . $c;
+    return $prefix . $a . $tail;
+  }, $html);
+}
+
 function rrmdir(string $dir): void {
   if (!is_dir($dir)) return;
   foreach (@scandir($dir) ?: [] as $f) {
@@ -153,6 +183,7 @@ if (is_file($cachePdf) && filemtime($cachePdf) >= filemtime($src)) {
 
 $html = (string)@file_get_contents($src);
 $html = report_sanitize_html($html);
+$html = report_format_tokens_km($html);
 
 // Build printable HTML wrapper (white background, COOS styling)
 $host = (string)($_SERVER['HTTP_HOST'] ?? 'admin.coos.eu');
@@ -163,6 +194,7 @@ $slug = (string)($r['slug'] ?? '');
 $subtitle = trim(($slug !== '' ? ($slug . ' · ') : '') . $tsName . ' · Report #' . (int)$reportId);
 
 $logoUrl = $scheme . '://' . $host . '/assets/coos_logo_gold.png';
+$gold = '#c7a24a';
 
 $wrapped = "<!doctype html>\n<html><head><meta charset=\"utf-8\">\n";
 $wrapped .= "<base href=\"" . htmlspecialchars($baseHref, ENT_QUOTES) . "\">\n";
@@ -173,7 +205,9 @@ $wrapped .= "*{ -webkit-print-color-adjust: exact; print-color-adjust: exact; }\
 $wrapped .= "body{ background:#fff; color:#0b1220; font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; font-size: 12.5px; line-height: 1.5; }\n";
 $wrapped .= ".header{ display:flex; align-items:center; justify-content:space-between; gap:16px; padding-bottom:10px; border-bottom:1px solid #e6e8ee; }\n";
 $wrapped .= ".brand{ display:flex; align-items:center; gap:12px; }\n";
-$wrapped .= ".brand img{ height:22px; width:auto; }\n";
+$wrapped .= ".brand img{ height:30px; width:auto; }\n";
+$wrapped .= ".wordmark{ font-weight:800; font-size:16px; letter-spacing:.2px; }\n";
+$wrapped .= ".wordmark .eu{ color:" . $gold . "; }\n";
 $wrapped .= ".title{ font-size:18px; font-weight:700; margin:0; }\n";
 $wrapped .= ".subtitle{ font-size:11px; color:#667085; margin-top:2px; }\n";
 $wrapped .= ".content{ padding-top:14px; }\n";
@@ -191,12 +225,13 @@ $wrapped .= "<div class=\"header\">\n";
 $wrapped .= "  <div class=\"brand\">\n";
 $wrapped .= "    <img src=\"" . htmlspecialchars($logoUrl, ENT_QUOTES) . "\" alt=\"COOS\">\n";
 $wrapped .= "    <div>\n";
-$wrapped .= "      <div class=\"title\">" . htmlspecialchars($projectTitle, ENT_QUOTES) . "</div>\n";
+$wrapped .= "      <div class=\"wordmark\">COOS<span class=\"eu\">.eu</span></div>\n";
 $wrapped .= "      <div class=\"subtitle\">" . htmlspecialchars($subtitle, ENT_QUOTES) . "</div>\n";
 $wrapped .= "    </div>\n";
 $wrapped .= "  </div>\n";
 $wrapped .= "</div>\n";
 $wrapped .= "<div class=\"content\">\n";
+$wrapped .= "<div class=\"title\">" . htmlspecialchars($projectTitle, ENT_QUOTES) . "</div>\n";
 $wrapped .= $html;
 $wrapped .= "</div>\n";
 $wrapped .= "</body></html>\n";
