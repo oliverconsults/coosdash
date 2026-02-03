@@ -379,9 +379,9 @@ renderHeader('Report');
               $st = (string)($r['status'] ?? '');
             ?>
             <li>
-              <a href="/report.php?project_id=<?php echo (int)($r['project_node_id'] ?? 0); ?>&report_id=<?php echo $rid; ?>"><?php echo h($pt); ?></a>
+              <a href="/report.php?project_id=<?php echo (int)($r['project_node_id'] ?? 0); ?>&report_id=<?php echo $rid; ?>"><?php echo h($pt . ($ts ? (' ' . date('Y-m-d H:i:s', strtotime($ts))) : '')); ?></a>
               <?php if ($slug !== ''): ?><span class="meta">/<?php echo h($slug); ?></span><?php endif; ?>
-              <span class="meta">· <?php echo h($tsTxt); ?> · <?php echo h($st); ?></span>
+              <span class="meta">· <?php echo h($st); ?></span>
               <?php if ($st === 'done'): ?>
                 <a class="btn btn-md" style="margin-left:8px; padding:2px 8px;" href="/report_print.php?report_id=<?php echo $rid; ?>" title="Als PDF speichern">PDF</a>
               <?php endif; ?>
