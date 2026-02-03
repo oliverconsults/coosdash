@@ -437,7 +437,7 @@ renderHeader('Setup');
 
   async function loadHistory(idx){
     if (!sel) return;
-    if (!idx || idx < 0) return;
+    if (idx === null || Number.isNaN(idx) || idx < 0) return;
     const key = <?php echo json_encode($sel, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES); ?>;
     const url = '/setup.php?action=history_get&key=' + encodeURIComponent(key) + '&idx=' + encodeURIComponent(idx);
     const res = await fetch(url, {credentials:'same-origin'});
