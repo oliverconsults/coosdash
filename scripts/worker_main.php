@@ -318,19 +318,12 @@ if ($cLock && flock($cLock, LOCK_EX | LOCK_NB)) {
               if ($hasKids === 0) {
                 $newIds = $add($nodeId, $norm);
 
-                // Quality node should not be worked on before the main tasks.
-                // Block QC by the last non-QC sibling (so it runs last).
+                // Identify QC node (last child)
                 $qualityId = 0;
                 $lastNonQcId = 0;
                 if (is_array($newIds) && count($newIds) >= 2) {
                   $qualityId = (int)$newIds[count($newIds)-1];
                   $lastNonQcId = (int)$newIds[count($newIds)-2];
-                  if ($qualityId > 0 && $lastNonQcId > 0) {
-                    $cmdB = '/usr/bin/php ' . escapeshellarg($base . '/worker_api_cli.php') .
-                      ' action=set_blocked_by node_id=' . escapeshellarg((string)$qualityId) .
-                      ' blocked_by_node_id=' . escapeshellarg((string)$lastNonQcId);
-                    $oo=[]; $cc=0; exec($cmdB . ' 2>&1', $oo, $cc);
-                  }
                 } else {
                   // fallback: find by title
                   $st = $pdo2->prepare('SELECT id FROM nodes WHERE parent_id=? AND title=? ORDER BY id DESC LIMIT 1');
@@ -361,16 +354,20 @@ if ($cLock && flock($cLock, LOCK_EX | LOCK_NB)) {
                     if (is_array($ids)) $qcIds = array_merge($qcIds, $ids);
                   }
 
-                  // Block QC subpoints by the last non-QC sibling as well.
-                  // Reason: if QC itself is blocked, QC subpoints must not wait on QC (would deadlock).
-                  $blockerId = $lastNonQcId > 0 ? $lastNonQcId : $qualityId;
+                  // QC is initially assigned to Oliver (including all QC subpoints).
+                  // Oliver can later delegate QC by setting the QC parent to todo_james.
+                  $cmdQ = '/usr/bin/php ' . escapeshellarg($base . '/worker_api_cli.php') .
+                    ' action=set_status_silent node_id=' . escapeshellarg((string)$qualityId) .
+                    ' worker_status=todo_oliver';
+                  $oo=[]; $cc=0; exec($cmdQ . ' 2>&1', $oo, $cc);
+
                   foreach ($qcIds as $cid) {
                     $cid = (int)$cid;
                     if ($cid <= 0) continue;
-                    $cmdB2 = '/usr/bin/php ' . escapeshellarg($base . '/worker_api_cli.php') .
-                      ' action=set_blocked_by node_id=' . escapeshellarg((string)$cid) .
-                      ' blocked_by_node_id=' . escapeshellarg((string)$blockerId);
-                    $oo=[]; $cc=0; exec($cmdB2 . ' 2>&1', $oo, $cc);
+                    $cmdQ2 = '/usr/bin/php ' . escapeshellarg($base . '/worker_api_cli.php') .
+                      ' action=set_status_silent node_id=' . escapeshellarg((string)$cid) .
+                      ' worker_status=todo_oliver';
+                    $oo=[]; $cc=0; exec($cmdQ2 . ' 2>&1', $oo, $cc);
                   }
                 }
 
