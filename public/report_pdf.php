@@ -224,7 +224,8 @@ $wrapped .= ".header{ padding-bottom:10px; border-bottom:1px solid #e6e8ee; }\n"
 // wkhtmltopdf's flexbox support is spotty → use table layout for stable branding row.
 $wrapped .= ".brandTbl{ width:100%; border-collapse:collapse; }\n";
 $wrapped .= ".brandTbl td{ border:0; padding:0; vertical-align:middle; }\n";
-$wrapped .= ".logoCell{ width:1%; white-space:nowrap; padding-right:35px; }\n";
+$wrapped .= ".logoCell{ width:1%; white-space:nowrap; }\n";
+$wrapped .= ".spacerCell{ width:35px; }\n";
 $wrapped .= ".logoCell img{ height:36px; width:auto; }\n";
 $wrapped .= ".wordmark{ font-weight:800; font-size:19px; letter-spacing:.2px; line-height:1; }\n";
 $wrapped .= ".wordmark .eu{ color:" . $gold . "; }\n";
@@ -245,6 +246,7 @@ $wrapped .= "<div class=\"header\">\n";
 $wrapped .= "  <table class=\"brandTbl\">\n";
 $wrapped .= "    <tr>\n";
 $wrapped .= "      <td class=\"logoCell\"><img src=\"" . htmlspecialchars($logoUrl, ENT_QUOTES) . "\" alt=\"COOS\"></td>\n";
+$wrapped .= "      <td class=\"spacerCell\"></td>\n";
 $wrapped .= "      <td>\n";
 $wrapped .= "        <div class=\"wordmark\">COOS<span class=\"eu\">.eu</span></div>\n";
 $wrapped .= "        <div class=\"subtitle\">" . htmlspecialchars($subtitle, ENT_QUOTES) . "</div>\n";
