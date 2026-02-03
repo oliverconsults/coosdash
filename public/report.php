@@ -479,11 +479,13 @@ renderHeader('Report');
                 </a>
               <?php endif; ?>
 
-              <form method="post" action="/report.php" style="display:inline; margin-left:8px;" onsubmit="return confirm('Report wirklich endgültig löschen?');">
-                <input type="hidden" name="action" value="delete_report">
-                <input type="hidden" name="report_id" value="<?php echo (int)$rid; ?>">
-                <button type="submit" class="btn btn-md" style="padding:2px 8px; background:transparent; color:#b00020; border:1px solid rgba(176,0,32,.35);">Löschen</button>
-              </form>
+              <?php if ($st === 'done'): ?>
+                <form method="post" action="/report.php" style="display:inline; margin-left:6px;" onsubmit="return confirm('Report wirklich endgültig löschen?');">
+                  <input type="hidden" name="action" value="delete_report">
+                  <input type="hidden" name="report_id" value="<?php echo (int)$rid; ?>">
+                  <button type="submit" class="btn btn-md" style="padding:1px 6px; font-size:11px; background:transparent; color:#b00020; border:1px solid rgba(176,0,32,.28);">Löschen</button>
+                </form>
+              <?php endif; ?>
             </li>
           <?php endforeach; ?>
         </ul>
