@@ -85,6 +85,20 @@ $hasBlockedUndoneDesc = function(int $nodeId) use (&$hasBlockedUndoneDesc, $chil
   return false;
 };
 
+// A node is only "ready" if it has no unfinished descendants.
+// It may have children, but they must all be done (and by implication their subtrees too).
+$hasUndoneDesc = function(int $nodeId) use (&$hasUndoneDesc, $children, $byId): bool {
+  foreach (($children[$nodeId] ?? []) as $cid) {
+    $cid = (int)$cid;
+    $cn = $byId[$cid] ?? null;
+    if (!$cn) continue;
+
+    if ((string)($cn['worker_status'] ?? '') !== 'done') return true;
+    if ($hasUndoneDesc($cid)) return true;
+  }
+  return false;
+};
+
 // Build candidate nodes (unblocked todo_james) + compute their top project
 $cands = [];
 foreach ($depthById as $id => $d) {
@@ -92,9 +106,8 @@ foreach ($depthById as $id => $d) {
   $n = $byId[$id] ?? null;
   if (!$n) continue;
   if (($n['worker_status'] ?? '') !== 'todo_james') continue;
-  // Only pick leaf nodes: tasks with no children.
-  // This enforces a clear "deepest leaf first" order within each project.
-  if (!empty($children[$id] ?? [])) continue;
+  // Node must be ready: it may have children, but all descendants must be done.
+  if ($hasUndoneDesc((int)$id)) continue;
   if ($isBlocked($n)) continue; // do not pick blocked tasks
   if ($hasBlockedUndoneDesc((int)$id)) continue; // avoid ancestors above blocked undone tasks
 
