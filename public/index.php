@@ -142,16 +142,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $ts = date('d.m.Y H:i');
       $marker = ($taskType === 'umsetzung') ? ' ##UMSETZUNG##' : '';
 
-      // New child goes to James by default
-      $stTxt = 'todo_james';
+      // Decide assignment based on which submit button was used
+      $submitTo = (string)($_POST['submit_to'] ?? 'oliver');
+      $stTxt = ($submitTo === 'james') ? 'todo_james' : 'todo_oliver';
       $desc = "[oliver] {$ts} Statusänderung: {$stTxt}{$marker}\n\n" . rtrim($formChildBody);
 
       $st = $pdo->prepare('INSERT INTO nodes (parent_id, title, description, priority, created_by, worker_status) VALUES (?, ?, ?, ?, ?, ?)');
       $st->execute([$parentId, $title, $desc, null, 'oliver', $stTxt]);
       $newId = (int)$pdo->lastInsertId();
 
-      // NOTE: do NOT auto-modify parent status when creating a subtask.
-      // (Oliver explicitly controls parent status.)
+      // If you create a subtask and send it to James, also set the current task to todo_james
+      // (so the parent doesn't stay todo_oliver while work is delegated).
+      if ($submitTo === 'james') {
+        $pdo->prepare('UPDATE nodes SET worker_status=? WHERE id=?')->execute([$stTxt, $parentId]);
+      }
 
       // optional attachments upload (Oliver) – supports multi-upload
       if (!empty($_FILES['attachment'])) {
@@ -191,9 +195,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
       // Keep history clean: do not prepend into parent description.
       workerlog_append($newId, "[oliver] {$ts} Statusänderung: {$stTxt}{$marker}");
-      workerlog_append($parentId, "[oliver] {$ts} Subtask angelegt -> todo_james");
+      if ($submitTo === 'james') {
+        workerlog_append($parentId, "[oliver] {$ts} Subtask angelegt -> todo_james");
+        flash_set('Subtask angelegt & an James. (Parent ebenfalls todo_james)', 'info');
+      } else {
+        workerlog_append($parentId, "[oliver] {$ts} Subtask angelegt -> todo_oliver");
+        flash_set('Subtask angelegt.', 'info');
+      }
 
-      flash_set('Subtask angelegt & an James. (Parent ebenfalls todo_james)', 'info');
       header('Location: /?id=' . $newId);
       exit;
     }
