@@ -451,6 +451,69 @@ if ($action === 'cleanup_done_subtree') {
   $st->execute($args);
   $movedAtt = $st->rowCount();
 
+  // Deduplicate attachments on parent (avoid double-uploaded identical files)
+  // Strategy: compute sha256 from the stored file and remove duplicates (keep oldest attachment row).
+  $dedupRemoved = 0;
+  try {
+    require_once __DIR__ . '/attachments_lib.php';
+    $slug = '';
+    try {
+      $slug = (string)project_slug_for_node($pdo, $nodeId);
+    } catch (Throwable $e) {
+      $slug = '';
+    }
+
+    $bases = [];
+    if ($slug !== '') {
+      $bases[] = '/var/www/t/' . $slug . '/shared/artifacts/att';
+    }
+    $bases[] = '/var/www/coosdash/shared/att';
+
+    $stA = $pdo->prepare('SELECT id, token, stored_name, size_bytes FROM node_attachments WHERE node_id=? ORDER BY id ASC');
+    $stA->execute([$nodeId]);
+    $atts = $stA->fetchAll(PDO::FETCH_ASSOC);
+
+    $seen = []; // sha256 => keepId
+    foreach ($atts as $a) {
+      $aid = (int)($a['id'] ?? 0);
+      $token = (string)($a['token'] ?? '');
+      $stored = (string)($a['stored_name'] ?? '');
+      if ($aid <= 0 || $token === '' || $stored === '') continue;
+
+      $path = '';
+      foreach ($bases as $b) {
+        $p = rtrim($b, '/') . '/' . $token . '/' . $stored;
+        if (is_file($p)) { $path = $p; break; }
+      }
+      if ($path === '') continue;
+
+      $sha = @hash_file('sha256', $path);
+      if (!is_string($sha) || $sha === '') continue;
+
+      if (!isset($seen[$sha])) {
+        $seen[$sha] = ['id' => $aid, 'token' => $token];
+        continue;
+      }
+
+      // duplicate found → delete attachment row + file folder
+      $pdo->prepare('DELETE FROM node_attachments WHERE id=?')->execute([$aid]);
+      $dedupRemoved++;
+
+      // best-effort remove directory (token is unique per upload)
+      $dir = dirname($path);
+      if (is_dir($dir)) {
+        foreach (@scandir($dir) ?: [] as $f) {
+          if ($f === '.' || $f === '..') continue;
+          @unlink($dir . '/' . $f);
+        }
+        @rmdir($dir);
+      }
+    }
+  } catch (Throwable $e) {
+    // best-effort; cleanup must still succeed
+    $dedupRemoved = 0;
+  }
+
   // Roll up metrics from descendants into parent (token_in/token_out/worktime)
   $rolled = ['token_in'=>0,'token_out'=>0,'worktime'=>0];
   try {
@@ -488,7 +551,7 @@ if ($action === 'cleanup_done_subtree') {
   // Prepend summary to parent and mark as Umsetzung + todo_james (handoff back to James)
   $ts2 = date('d.m.Y H:i');
   $txt = "[auto] {$ts2} Zusammenfassung ##UMSETZUNG##\n\n" . rtrim($summary) . "\n\n";
-  $txt .= "[auto] {$ts2} Cleanup: Attachments hochgezogen={$movedAtt}, Nodes geloescht={$deleted}";
+  $txt .= "[auto] {$ts2} Cleanup: Attachments hochgezogen={$movedAtt}, Dedupe entfernt={$dedupRemoved}, Nodes geloescht={$deleted}";
   if (($rolled['token_in'] + $rolled['token_out'] + $rolled['worktime']) > 0) {
     $txt .= ", Metrics gerollt (Token in/out=" . (int)$rolled['token_in'] . "/" . (int)$rolled['token_out'] . ", Worktime=" . (int)$rolled['worktime'] . "s)";
   }
@@ -496,9 +559,9 @@ if ($action === 'cleanup_done_subtree') {
 
   prependDesc($pdo, $nodeId, $txt);
   $pdo->prepare('UPDATE nodes SET worker_status="todo_james" WHERE id=?')->execute([$nodeId]);
-  logLine(date('Y-m-d H:i:s') . "  #{$nodeId}  [auto] {$ts2} Cleanup+Summary: moved_att={$movedAtt} deleted_nodes={$deleted} rolled_in={$rolled['token_in']} rolled_out={$rolled['token_out']} rolled_worktime={$rolled['worktime']}s -> todo_james");
+  logLine(date('Y-m-d H:i:s') . "  #{$nodeId}  [auto] {$ts2} Cleanup+Summary: moved_att={$movedAtt} dedup_removed={$dedupRemoved} deleted_nodes={$deleted} rolled_in={$rolled['token_in']} rolled_out={$rolled['token_out']} rolled_worktime={$rolled['worktime']}s -> todo_james");
 
-  out(true, 'cleaned', ['moved_attachments'=>$movedAtt, 'deleted_nodes'=>$deleted, 'rolled_metrics'=>$rolled]);
+  out(true, 'cleaned', ['moved_attachments'=>$movedAtt, 'dedup_removed'=>$dedupRemoved, 'deleted_nodes'=>$deleted, 'rolled_metrics'=>$rolled]);
 }
 
 out(false, 'unknown action');
