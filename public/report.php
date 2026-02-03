@@ -383,7 +383,7 @@ renderHeader('Report');
               <?php if ($slug !== ''): ?><span class="meta">/<?php echo h($slug); ?></span><?php endif; ?>
               <span class="meta">· <?php echo h($st); ?></span>
               <?php if ($st === 'done'): ?>
-                <a class="btn btn-md" style="margin-left:8px; padding:2px 8px;" href="/report_print.php?report_id=<?php echo $rid; ?>" title="Als PDF speichern">PDF</a>
+                <a class="btn btn-md" style="margin-left:8px; padding:2px 8px;" href="/report_pdf.php?report_id=<?php echo $rid; ?>" title="PDF herunterladen">PDF</a>
               <?php endif; ?>
             </li>
           <?php endforeach; ?>
