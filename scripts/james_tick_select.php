@@ -172,8 +172,10 @@ $cands = array_values(array_filter($cands, fn($c) => (int)$c['project_id'] === (
 $maxDepth = max(array_map(fn($c) => (int)$c['depth'], $cands));
 $cands = array_values(array_filter($cands, fn($c) => (int)$c['depth'] === (int)$maxDepth));
 
-// Parent-internal chronological gating: candidate must be the smallest-id todo_james leaf among its siblings
-$cands = array_values(array_filter($cands, function($c) use ($children, $byId, $isBlocked) {
+// Parent-internal chronological gating:
+// candidate must be the smallest-id *ready* todo_james among its siblings.
+// (If the oldest sibling isn't ready yet because it has undone descendants, don't stall the whole parent.)
+$cands = array_values(array_filter($cands, function($c) use ($children, $byId, $isBlocked, $hasUndoneDesc, $hasBlockedUndoneDesc) {
   $pid = (int)$c['parent_id'];
   $sibIds = $children[$pid] ?? [];
 
@@ -183,8 +185,9 @@ $cands = array_values(array_filter($cands, function($c) use ($children, $byId, $
     $sn = $byId[$sid] ?? null;
     if (!$sn) continue;
     if (($sn['worker_status'] ?? '') !== 'todo_james') continue;
-    // ignore blocked siblings for the "oldest-first" rule
     if ($isBlocked($sn)) continue;
+    if ($hasUndoneDesc($sid)) continue;
+    if ($hasBlockedUndoneDesc($sid)) continue;
     if ($min === null || $sid < $min) $min = $sid;
   }
   return $min === null ? true : ((int)$c['id'] === (int)$min);
