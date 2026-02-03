@@ -232,6 +232,44 @@ $buildStatsText = function(int $rootId) use ($pdo, $isBlocked): string {
   return "- todo_james: {$todoJ}\n- todo_oliver: {$todoO}\n- blocked: {$blocked}\n- done: {$done}\n- token_in/out/all: {$tokIn}/{$tokOut}/" . ($tokIn+$tokOut) . "\n- worktime: {$wtTxt}";
 };
 
+// Delete report action
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['action'] ?? '') === 'delete_report') {
+  $rid = (int)($_POST['report_id'] ?? 0);
+  if ($rid <= 0) {
+    flash_set('Ungültiger Report.', 'err');
+    header('Location: /report.php');
+    exit;
+  }
+
+  try {
+    $st = $pdo->prepare('SELECT html_file FROM project_reports WHERE id=?');
+    $st->execute([$rid]);
+    $htmlFile = (string)($st->fetchColumn() ?: '');
+
+    // delete db row
+    $pdo->prepare('DELETE FROM project_reports WHERE id=?')->execute([$rid]);
+
+    // delete html file (best effort)
+    if ($htmlFile !== '') {
+      $p = '/var/www/coosdash/shared/reports/' . basename($htmlFile);
+      if (is_file($p)) @unlink($p);
+    }
+
+    // delete cached pdf variants (best effort)
+    $pdfDir = '/var/www/coosdash/shared/reports/pdf';
+    foreach (glob($pdfDir . '/report_' . $rid . '_v*.pdf') ?: [] as $f) {
+      if (is_file($f)) @unlink($f);
+    }
+
+    flash_set('Report gelöscht.', 'info');
+  } catch (Throwable $e) {
+    flash_set('Konnte Report nicht löschen.', 'err');
+  }
+
+  header('Location: /report.php');
+  exit;
+}
+
 // Create report action
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['action'] ?? '') === 'create_report') {
   $pid = (int)($_POST['project_id'] ?? 0);
@@ -440,6 +478,12 @@ renderHeader('Report');
                   <span>PDF</span>
                 </a>
               <?php endif; ?>
+
+              <form method="post" action="/report.php" style="display:inline; margin-left:8px;" onsubmit="return confirm('Report wirklich endgültig löschen?');">
+                <input type="hidden" name="action" value="delete_report">
+                <input type="hidden" name="report_id" value="<?php echo (int)$rid; ?>">
+                <button type="submit" class="btn btn-md" style="padding:2px 8px; background:transparent; color:#b00020; border:1px solid rgba(176,0,32,.35);">Löschen</button>
+              </form>
             </li>
           <?php endforeach; ?>
         </ul>
