@@ -20,6 +20,50 @@ function report_sanitize_html(string $html): string {
   return (string)$html;
 }
 
+function fmt_km(int $n): string {
+  $abs = abs($n);
+  if ($abs >= 1000000) {
+    $v = round($n / 1000000, 1);
+    $s = rtrim(rtrim((string)$v, '0'), '.');
+    return $s . 'M';
+  }
+  if ($abs >= 1000) {
+    $v = round($n / 1000, 1);
+    $s = rtrim(rtrim((string)$v, '0'), '.');
+    return $s . 'K';
+  }
+  return (string)$n;
+}
+
+// Post-process rendered HTML to show token numbers in K/M format.
+function report_format_tokens_km(string $html): string {
+  // Tokens table: numbers inside <code>996706 / 56616 / 1053322</code>
+  $html = preg_replace_callback('/<code>(\s*\d{4,}(?:\s*\/\s*\d{4,}){1,}\s*)<\/code>/i', function($m) {
+    $s = (string)($m[1] ?? '');
+    $parts = preg_split('/\s*\/\s*/', trim($s));
+    $parts = array_map(function($x) {
+      $x = preg_replace('/[^0-9\-]/', '', (string)$x);
+      if ($x === '' || !preg_match('/^-?\d+$/', $x)) return $x;
+      return fmt_km((int)$x);
+    }, $parts);
+    return '<code>' . implode(' / ', $parts) . '</code>';
+  }, $html);
+
+  // Generic: token_in/out/all: 123 / 456 / 789
+  $html = preg_replace_callback('/(token(?:_in|_out|_all)?[^0-9]{0,40})(\d{4,})(?:\s*\/\s*(\d{4,}))?(?:\s*\/\s*(\d{4,}))?/i', function($m) {
+    $prefix = (string)($m[1] ?? '');
+    $a = fmt_km((int)($m[2] ?? 0));
+    $b = isset($m[3]) && $m[3] !== '' ? fmt_km((int)$m[3]) : '';
+    $c = isset($m[4]) && $m[4] !== '' ? fmt_km((int)$m[4]) : '';
+    $tail = '';
+    if ($b !== '') $tail .= ' / ' . $b;
+    if ($c !== '') $tail .= ' / ' . $c;
+    return $prefix . $a . $tail;
+  }, $html);
+
+  return $html;
+}
+
 // Prompt is edited under /setup.php and is the source of truth.
 // Do not auto-overwrite prompts from code.
 
@@ -350,6 +394,7 @@ renderHeader('Report');
               }
               if ($html === '') $html = '<div class="meta">(leer)</div>';
               $html = report_sanitize_html($html);
+              $html = report_format_tokens_km($html);
             ?>
             <div class="card" style="margin-top:10px; background:rgba(5,7,11,.28);">
               <?php echo $html; ?>
