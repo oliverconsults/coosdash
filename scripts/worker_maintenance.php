@@ -227,9 +227,20 @@ try {
     $bu = (string)($nr['blocked_until'] ?? '');
     if ($bu !== '' && strtotime($bu) > time()) continue;
 
-    // avoid repeating the same escalation note
+    // Avoid spamming: only escalate once per 30 minutes per node.
+    // (After Oliver flips back to todo_james, a new fail burst should be able to escalate again.)
     $desc = (string)($nr['description'] ?? '');
-    if (strpos($desc, 'Job failed 2 times') !== false) continue;
+    $recentEsc = false;
+    if (preg_match('/\[auto\]\s+(\d{2}\.\d{2}\.\d{4}\s+\d{2}:\d{2}).{0,80}Job failed 2 times/i', $desc, $m)) {
+      $dt = DateTime::createFromFormat('d.m.Y H:i', (string)$m[1]);
+      if ($dt) {
+        $tsEsc = $dt->getTimestamp();
+        if ($tsEsc > 0 && (time() - $tsEsc) < 30*60) {
+          $recentEsc = true;
+        }
+      }
+    }
+    if ($recentEsc) continue;
 
     $line = "[auto] {$tsHuman} Job failed 2 times (30min) → todo_oliver\n";
     $line .= "Bitte prüfen / ggf. Prompt anpassen. Danach wieder todo_james setzen.\n\n";
