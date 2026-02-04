@@ -195,7 +195,56 @@ foreach ($canceled as $r) {
 //   }
 // }
 
-// 5) GC: clear dangling blocked_by_node_id refs (or refs pointing into Gelöscht)
+// 5) Escalate repeated job failures
+// If the same node fails >=2 queue jobs within 30 minutes, add a note and delegate to Oliver.
+// Rationale: avoid infinite retries when the agent gets stuck; prompt Oliver for intervention.
+try {
+  $st = $pdo->query(
+    "SELECT node_id, COUNT(*) AS c, MAX(updated_at) AS last_fail_at " .
+    "FROM worker_queue " .
+    "WHERE status='failed' AND updated_at >= DATE_SUB(NOW(), INTERVAL 30 MINUTE) " .
+    "GROUP BY node_id HAVING c >= 2 " .
+    "ORDER BY last_fail_at DESC LIMIT 80"
+  );
+  foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+    $nid = (int)($r['node_id'] ?? 0);
+    $c = (int)($r['c'] ?? 0);
+    if ($nid <= 0 || $c < 2) continue;
+
+    // only under Projekte
+    if (!isUnderRoot($pdo, $nid, $projectsId)) continue;
+
+    // only if still actionable
+    $stN = $pdo->prepare('SELECT worker_status, blocked_until, description FROM nodes WHERE id=?');
+    $stN->execute([$nid]);
+    $nr = $stN->fetch(PDO::FETCH_ASSOC);
+    if (!$nr) continue;
+
+    $ws = (string)($nr['worker_status'] ?? '');
+    if ($ws !== 'todo_james') continue;
+
+    // respect blocked_until (don't churn blocked tasks)
+    $bu = (string)($nr['blocked_until'] ?? '');
+    if ($bu !== '' && strtotime($bu) > time()) continue;
+
+    // avoid repeating the same escalation note
+    $desc = (string)($nr['description'] ?? '');
+    if (strpos($desc, 'Job failed 2 times') !== false) continue;
+
+    $line = "[auto] {$tsHuman} Job failed 2 times (30min) → todo_oliver\n";
+    $line .= "Bitte prüfen / ggf. Prompt anpassen. Danach wieder todo_james setzen.\n\n";
+
+    $pdo->prepare('UPDATE nodes SET description=CONCAT(?, COALESCE(description,\'\')) WHERE id=?')
+        ->execute([$line, $nid]);
+    $pdo->prepare('UPDATE nodes SET worker_status=\"todo_oliver\" WHERE id=?')->execute([$nid]);
+
+    @file_put_contents('/var/www/coosdash/shared/logs/worker.log', $tsLine . "  #{$nid}  [auto] {$tsHuman} Escalation: job failed >=2 in 30min -> todo_oliver\n", FILE_APPEND);
+  }
+} catch (Throwable $e) {
+  // ignore
+}
+
+// 6) GC: clear dangling blocked_by_node_id refs (or refs pointing into Gelöscht)
 $deletedRootId = rootId($pdo, 'Gelöscht');
 $st = $pdo->prepare('SELECT id, blocked_by_node_id FROM nodes WHERE blocked_by_node_id IS NOT NULL');
 $st->execute();
