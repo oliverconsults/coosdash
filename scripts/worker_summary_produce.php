@@ -56,9 +56,9 @@ $tsLine = date('Y-m-d H:i:s');
 $MAX = 10;
 $enq = 0;
 
-// Candidate parents: any node under Projekte that is not done and has children.
+// Candidate parents: completed nodes under Projekte (worker_status=done) that have children.
 // Skip blocked nodes (blocked_until in the future) to avoid premature auto-close.
-$st = $pdo->query('SELECT id,title,worker_status,blocked_until FROM nodes WHERE worker_status <> "done"');
+$st = $pdo->query('SELECT id,title,worker_status,blocked_until FROM nodes WHERE worker_status = "done"');
 $parents = $st->fetchAll(PDO::FETCH_ASSOC);
 
 foreach ($parents as $p) {
