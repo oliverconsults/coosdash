@@ -1357,24 +1357,7 @@ renderHeader('Dashboard');
         ?>
 
         <div class="row" style="justify-content:space-between; align-items:center">
-          <?php
-            $titleLink = '';
-            try {
-              $slug = project_slug_for_node($pdo, (int)$node['id']);
-              if (is_string($slug) && $slug !== '') {
-                $titleLink = 'https://coos.eu/' . rawurlencode($slug) . '/';
-              }
-            } catch (Throwable $e) {
-              $titleLink = '';
-            }
-          ?>
-          <h2 style="margin:0;">
-            <?php if ($titleLink !== ''): ?>
-              <a href="<?php echo h($titleLink); ?>" target="_blank" rel="noopener"><?php echo h($crumb); ?></a>
-            <?php else: ?>
-              <?php echo h($crumb); ?>
-            <?php endif; ?>
-          </h2>
+          <h2 style="margin:0;"><?php echo h($crumb); ?></h2>
           <?php
             $work = (string)($node['worker_status'] ?? '');
             $workMap = ['todo_james'=>'ToDo (James)','todo_oliver'=>'ToDo (Oliver)','done'=>'erledigt'];
