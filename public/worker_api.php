@@ -573,8 +573,8 @@ if ($action === 'cleanup_done_subtree') {
   $txt .= "\n\n";
 
   prependDesc($pdo, $nodeId, $txt);
-  $pdo->prepare('UPDATE nodes SET worker_status="todo_james" WHERE id=?')->execute([$nodeId]);
-  logLine(date('Y-m-d H:i:s') . "  #{$nodeId}  [auto] {$ts2} Cleanup+Summary: moved_att={$movedAtt} dedup_removed={$dedupRemoved} deleted_nodes={$deleted} rolled_in={$rolled['token_in']} rolled_out={$rolled['token_out']} rolled_worktime={$rolled['worktime']}s -> todo_james");
+  // Keep parent worker_status unchanged (Oliver requested). Cleanup should not reopen the task.
+  logLine(date('Y-m-d H:i:s') . "  #{$nodeId}  [auto] {$ts2} Cleanup+Summary: moved_att={$movedAtt} dedup_removed={$dedupRemoved} deleted_nodes={$deleted} rolled_in={$rolled['token_in']} rolled_out={$rolled['token_out']} rolled_worktime={$rolled['worktime']}s (status unchanged)");
 
   out(true, 'cleaned', ['moved_attachments'=>$movedAtt, 'dedup_removed'=>$dedupRemoved, 'deleted_nodes'=>$deleted, 'rolled_metrics'=>$rolled]);
 }
